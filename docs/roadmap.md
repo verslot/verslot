@@ -1,109 +1,109 @@
-# Verslot 开发路线与进度
+# Verslot Development Roadmap and Progress
 
-最后更新：2026-09-18
+Last updated: 2026-09-18
 
-本文件记录开发阶段、待办事项和交付进度。当前范围以 [v0.1 说明](v0.1.md) 和 [README](../README.md) 为准；后续阶段是开发顺序规划，不代表已经实现或承诺发布日期。
+This document tracks development phases, tasks, and delivery progress. The current scope is defined by the [v0.1 specification](v0.1.md) and [README](../README.md). Later phases describe the planned development order; they do not indicate completed work or committed release dates.
 
-## 进度总览
+## Progress Overview
 
-> 当前处于 **CLI 基础阶段**：命令骨架已实现，尚不能实际管理 Node.js 版本。
+> The project is currently in the **CLI foundation phase**: the command skeleton is implemented, but it cannot yet manage Node.js versions.
 
-| 指标 | 当前情况 |
+| Metric | Current Status |
 | --- | --- |
-| 包版本 | `0.1.0`（不代表已发布） |
-| 当前里程碑 | M1 CLI 基础：实现已落地，验证结果待记录 |
-| 核心功能实现 | **0 / 5**：安装、卸载、切换、列出、查询当前版本均未实现 |
-| 当前开发任务 | 暂无进行中的功能任务记录 |
-| 下一项 | M2：明确目标解析规则、本地存储布局和版本切换方式 |
-| 待决策 | 是否支持部分版本（如 `node@22`）、各平台如何切换版本 |
-| 验证情况 | 已有 CLI 集成测试代码；本次未执行检查，尚无验证结果记录 |
+| Package version | `0.1.0` (does not indicate a published release) |
+| Current milestone | M1 CLI foundation: implementation is in place; validation results have yet to be recorded |
+| Core features implemented | **0 / 5**: install, uninstall, switch, list, and current-version queries are not implemented |
+| Active development tasks | No active feature tasks are currently recorded |
+| Next step | M2: define target parsing rules, local storage layout, and the version-switching mechanism |
+| Open decisions | Whether to support partial versions (such as `node@22`), and how to switch versions on each platform |
+| Validation status | CLI integration test code exists; checks were not run during this update, and no validation results are recorded yet |
 
-这里按用户可用的功能统计实现数量，不将占位命令算作实现。各阶段工作量不同，不用任务数量推算整个项目的完成百分比。
+Implementation counts reflect features users can actually use; placeholder commands do not count as implemented. Phases differ in effort, so task counts are not used to estimate an overall project completion percentage.
 
-## 功能状态
+## Feature Status
 
-| 能力 | 实现状态 | 当前实际行为 | 代码 / 测试依据 |
+| Capability | Implementation Status | Current Behavior | Code / Test Evidence |
 | --- | --- | --- | --- |
-| 帮助、版本、参数数量约束 | 已实现 | 提供帮助和版本；非法 CLI 用法退出码为 `2` | [CLI 定义](../src/cli.rs)、[CLI 测试](../tests/cli.rs) |
-| 目标解析 | 未实现 | 将目标作为原始字符串接收，不校验工具或版本格式 | [CLI 定义](../src/cli.rs)、[延后解析测试](../tests/cli.rs) |
-| `install` | 仅占位 | 返回 `not implemented`，退出码为 `1` | [命令分发](../src/lib.rs)、[退出处理](../src/main.rs) |
-| `uninstall` | 仅占位 | 同上，不删除任何安装 | [命令分发](../src/lib.rs) |
-| `use` | 仅占位 | 同上，不切换版本 | [命令分发](../src/lib.rs) |
-| `list` | 仅占位 | 同上，不读取安装列表 | [命令分发](../src/lib.rs) |
-| `current` | 仅占位 | 同上，不查询当前版本 | [命令分发](../src/lib.rs) |
+| Help, version, and argument-count constraints | Implemented | Provides help and version output; invalid CLI usage exits with code `2` | [CLI definitions](../src/cli.rs), [CLI tests](../tests/cli.rs) |
+| Target parsing | Not implemented | Accepts targets as raw strings without validating the tool or version format | [CLI definitions](../src/cli.rs), [Deferred parsing tests](../tests/cli.rs) |
+| `install` | Placeholder only | Returns `not implemented` with exit code `1` | [Command dispatch](../src/lib.rs), [Exit handling](../src/main.rs) |
+| `uninstall` | Placeholder only | Same as above; does not remove any installations | [Command dispatch](../src/lib.rs) |
+| `use` | Placeholder only | Same as above; does not switch versions | [Command dispatch](../src/lib.rs) |
+| `list` | Placeholder only | Same as above; does not read the list of installed versions | [Command dispatch](../src/lib.rs) |
+| `current` | Placeholder only | Same as above; does not query the current version | [Command dispatch](../src/lib.rs) |
 
-“已实现”只说明代码已存在；验收是否通过在里程碑和进度记录中单独标明。
+“Implemented” only means that the code exists. Whether acceptance criteria have been met is recorded separately in the milestones and progress log.
 
-## 开发路线
+## Development Roadmap
 
-里程碑状态：待开始 → 进行中 → 待验证 → 已完成；无法推进时标为「阻塞」，同时记录原因和解除条件。只有实际开始工作才标为「进行中」。
+Milestone statuses: Not started → In progress → Awaiting validation → Complete. If work cannot proceed, mark it as “Blocked” and record the cause and the conditions for unblocking it. Mark work as “In progress” only when it has actually started.
 
-| 里程碑 | 顺序 | 状态 | 清单进度 | 完成标准 |
+| Milestone | Sequence | Status | Checklist Progress | Completion Criteria |
 | --- | --- | --- | --- | --- |
-| M1 CLI 基础 | 当前 | 待验证 | 5 / 6 | 帮助、版本、参数约束及占位行为符合文档，验证通过 |
-| M2 目标解析与本地状态 | 下一项 | 待开始 | 0 / 6 | 有效目标可解析，非法目标被拒绝，本地状态读写规则明确 |
-| M3 Node.js 安装与查询 | M2 之后 | 待开始 | 0 / 7 | 可安全安装指定版本，查询结果与磁盘一致，可卸载已安装版本 |
-| M4 版本切换 | M3 之后 | 待开始 | 0 / 5 | 可切换已安装版本，实际执行版本与当前状态一致 |
-| M5 跨平台交付 | M4 之后 | 待开始 | 0 / 6 | 各平台核心流程通过验证，使用说明和限制已记录 |
+| M1 CLI foundation | Current | Awaiting validation | 5 / 6 | Help, version, argument constraints, and placeholder behavior match the documentation and pass validation |
+| M2 Target parsing and local state | Next | Not started | 0 / 6 | Valid targets can be parsed, invalid targets are rejected, and local state read/write rules are defined |
+| M3 Node.js installation and queries | After M2 | Not started | 0 / 7 | Specified versions can be installed safely, query results match disk state, and installed versions can be uninstalled |
+| M4 Version switching | After M3 | Not started | 0 / 5 | Installed versions can be selected, and the version actually executed matches the current state |
+| M5 Cross-platform delivery | After M4 | Not started | 0 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
 
-清单进度为下方勾选项数量，反映事项落地情况，不代表工时或交付比例。后续里程碑不预设版本号或日期，临近开发时再细化。
+Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. Later milestones have no preset version numbers or dates; details will be refined as development approaches.
 
-### 阶段 1：CLI 基础
+### Phase 1: CLI Foundation
 
-- [x] 建立单 crate 项目，禁止 unsafe Rust。
-- [x] 提供帮助和版本输出。
-- [x] 定义五个版本管理命令及参数数量约束。
-- [x] 明确占位命令和非法用法的退出行为。
-- [x] 添加 CLI 集成测试代码。
-- [ ] 记录项目要求的验证结果。
+- [x] Set up a single-crate project and forbid unsafe Rust.
+- [x] Provide help and version output.
+- [x] Define the five version-management commands and their argument-count constraints.
+- [x] Define exit behavior for placeholder commands and invalid usage.
+- [x] Add CLI integration test code.
+- [ ] Record the validation results required by the project.
 
-### 阶段 2：目标解析与本地状态
+### Phase 2: Target Parsing and Local State
 
-- [ ] 明确工具名称、版本格式及错误提示规则。
-- [ ] 决定是否支持 `node@22` 这样的部分版本，以及具体解析规则。
-- [ ] 实现 `<tool>@<version>` 解析与校验。
-- [ ] 确定安装目录、临时目录和当前版本状态的存储布局。
-- [ ] 确定版本切换方式及各平台差异。
-- [ ] 为解析、路径边界和本地状态行为补充测试。
+- [ ] Define tool names, version formats, and error-message rules.
+- [ ] Decide whether to support partial versions such as `node@22`, and define their resolution rules.
+- [ ] Implement parsing and validation for `<tool>@<version>`.
+- [ ] Define the storage layout for installation directories, temporary directories, and current-version state.
+- [ ] Define the version-switching mechanism and platform-specific differences.
+- [ ] Add tests for parsing, path boundaries, and local state behavior.
 
-### 阶段 3：Node.js 安装与查询
+### Phase 3: Node.js Installation and Queries
 
-- [ ] 根据操作系统和架构选择官方发行包。
-- [ ] 下载发行包并校验 checksum。
-- [ ] 安全解压，防止路径穿越和符号链接越界。
-- [ ] 完成安装提交和失败清理，避免暴露不完整安装。
-- [ ] 实现 `list`，展示已安装版本。
-- [ ] 实现 `uninstall`，明确当前使用版本的卸载规则。
-- [ ] 为正常流程、损坏下载、重复安装和失败清理补充测试。
+- [ ] Select the official distribution archive based on the operating system and architecture.
+- [ ] Download the distribution archive and verify its checksum.
+- [ ] Extract archives safely, preventing path traversal and symlinks from escaping the destination.
+- [ ] Finalize installations and clean up failures without exposing incomplete installations.
+- [ ] Implement `list` to display installed versions.
+- [ ] Implement `uninstall` and define the rules for uninstalling the currently active version.
+- [ ] Add tests for successful workflows, corrupted downloads, duplicate installations, and failure cleanup.
 
-### 阶段 4：版本切换
+### Phase 4: Version Switching
 
-- [ ] 实现 `use`，选择已安装的 Node.js 版本。
-- [ ] 实现 `current`，展示当前使用版本。
-- [ ] 明确未安装目标、未选择版本和切换失败时的行为。
-- [ ] 处理原子更新和 Windows 文件占用问题。
-- [ ] 为切换、状态一致性和失败后保留原状态补充测试。
+- [ ] Implement `use` to select an installed Node.js version.
+- [ ] Implement `current` to display the currently active version.
+- [ ] Define behavior for targets that are not installed, no version being selected, and switching failures.
+- [ ] Handle atomic updates and Windows file locking.
+- [ ] Add tests for switching, state consistency, and preserving the previous state after failure.
 
-### 阶段 5：跨平台交付
+### Phase 5: Cross-Platform Delivery
 
-- [ ] 在 Windows 验证安装 → 列出 → 切换 → 查询 → 卸载流程。
-- [ ] 在 macOS 验证同一流程。
-- [ ] 在 Linux 验证同一流程。
-- [ ] 完成路径、解压、校验和不可信远程数据的安全复核。
-- [ ] 更新安装说明、命令示例和已知限制。
-- [ ] 记录验证结果，确认发布范围和版本号。
+- [ ] Validate the install → list → switch → query → uninstall workflow on Windows.
+- [ ] Validate the same workflow on macOS.
+- [ ] Validate the same workflow on Linux.
+- [ ] Complete a security review of paths, archive extraction, checksum verification, and untrusted remote data.
+- [ ] Update installation instructions, command examples, and known limitations.
+- [ ] Record validation results and confirm the release scope and version number.
 
-## 开发流程
+## Development Workflow
 
-1. 明确任务范围、行为约定和验收标准；有未决设计时先记录决策。
-2. 将对应事项标为「进行中」，只实现当前任务需要的最小改动。
-3. 行为变化补充测试，缺陷修复补充回归测试。
-4. 实现后标为「待验证」，按项目要求执行验证并记录实际结果。
-5. 验收通过后将里程碑标为「已完成」，记录验证证据。
+1. Define the task scope, expected behavior, and acceptance criteria; record decisions for unresolved design questions first.
+2. Mark the relevant item as “In progress” and implement only the minimum changes required for the current task.
+3. Add tests for behavior changes and regression tests for bug fixes.
+4. After implementation, mark the item as “Awaiting validation”, run the checks required by the project, and record the actual results.
+5. Once acceptance criteria are met, mark the milestone as “Complete” and record validation evidence.
 
-每次任务状态变化时，同步更新进度总览、对应功能状态、清单勾选和里程碑计数，并追加进度记录。实现项落地即可勾选，但整个里程碑必须验收通过才能标为「已完成」。证据优先链接到对应代码、提交、PR 或 CI 结果；未运行的验证明确写「未执行」。
+Whenever a task changes status, update the progress overview, relevant feature status, checklist items, and milestone counts together, and append a progress log entry. Implementation items can be checked off once they are in place, but an entire milestone must pass acceptance before it is marked as “Complete”. Prefer links to the relevant code, commits, PRs, or CI results as evidence. Explicitly label checks that were not run as “Not run”.
 
-项目要求的实现验证命令如下。本文件列出流程要求，不代表这些命令已经执行。
+The project requires the following implementation validation commands. Listing them here documents the workflow requirements; it does not mean they have been executed.
 
 ```text
 cargo fmt --check
@@ -112,27 +112,27 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all
 ```
 
-遇到阻塞时，记录原因和解除条件；尚未实现或未经验证的内容不得记录为已交付。
+When work is blocked, record the cause and the conditions for unblocking it. Work that is not implemented or has not been validated must not be recorded as delivered.
 
-## 进度记录
+## Progress Log
 
-| 日期 | 事项 | 状态与结果 | 下一步或阻塞 |
+| Date | Item | Status and Results | Next Step or Blocker |
 | --- | --- | --- | --- |
-| 2026-09-18 | 建立路线与进度基线 | 已阅读现有代码和文档；CLI 骨架及测试代码已存在，本次未执行验证 | 明确目标解析、存储布局和切换方式 |
-| 2026-09-18 | 增加可追踪的进度视图 | 补充进度总览、功能状态、里程碑计数和代码依据；功能进度未变化，未执行验证 | M1 验证结果待记录，M2 待开始 |
+| 2026-09-18 | Establish the roadmap and progress baseline | Existing code and documentation reviewed; CLI skeleton and test code are present; validation was not run during this update | Define target parsing, storage layout, and the switching mechanism |
+| 2026-09-18 | Add a trackable progress view | Added the progress overview, feature status, milestone counts, and code evidence; feature progress is unchanged; validation was not run | M1 validation results have yet to be recorded; M2 has not started |
 
-后续每次更新追加一条记录，注明实际变更、验证结果和下一步；有提交或问题链接时一并附上。
+Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 
-## 范围约束
+## Scope Constraints
 
-仅实现版本管理。首个端到端支持对象为 Node.js；暂不规划其他 provider。保持单 crate、stable Rust，优先标准库，隔离平台差异，按实际需求引入依赖。
+Implement version management only. Node.js is the first target for end-to-end support; no other providers are currently planned. Keep a single crate, use stable Rust, prefer the standard library, isolate platform differences, and add dependencies only for actual requirements.
 
-不包含扩展系统、任务运行器、环境变量管理、dotenv、密钥管理、shell 脚本、遥测、异步运行时或 GUI。
+The scope excludes extension systems, task runners, environment-variable management, dotenv, secret management, shell scripts, telemetry, async runtimes, and GUIs.
 
-## 设计参考
+## Design References
 
-- [GitHub Projects 最佳实践](https://docs.github.com/en/issues/planning-and-tracking-with-projects/learning-about-projects/best-practices-for-projects)：明确依赖关系，维护状态更新，关联实际工作。
-- [GitHub 公开路线图](https://github.com/github/roadmap)：区分功能阶段，交付时提供对应的变更记录。
-- [Atlassian 敏捷路线图](https://www.atlassian.com/agile/product-management/roadmaps)：围绕目标组织路线，并随实际进展调整。
+- [GitHub Projects best practices](https://docs.github.com/en/issues/planning-and-tracking-with-projects/learning-about-projects/best-practices-for-projects): clarify dependencies, keep statuses updated, and link to actual work.
+- [GitHub public roadmap](https://github.com/github/roadmap): distinguish feature stages and provide corresponding changelog entries upon delivery.
+- [Atlassian agile roadmaps](https://www.atlassian.com/agile/product-management/roadmaps): organize the roadmap around goals and adjust it as work progresses.
 
-本项目采用适合当前规模的 Markdown 总览与清单，暂不引入额外项目管理系统。
+This project uses a Markdown overview and checklists suited to its current size, without introducing an additional project-management system for now.
