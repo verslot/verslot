@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
 
+use crate::target::Target;
+
 #[derive(Debug, Parser)]
 #[command(
     name = "verslot",
@@ -16,18 +18,18 @@ pub(crate) enum Command {
     /// Install a tool version (not implemented yet).
     Install {
         #[arg(value_name = "TOOL@VERSION")]
-        target: String,
+        target: Target,
     },
     /// Uninstall a tool version (not implemented yet).
     Uninstall {
         #[arg(value_name = "TOOL@VERSION")]
-        target: String,
+        target: Target,
     },
     /// Select a tool version (not implemented yet).
     #[command(name = "use")]
     Use {
         #[arg(value_name = "TOOL@VERSION")]
-        target: String,
+        target: Target,
     },
     /// List installed tool versions (not implemented yet).
     List,

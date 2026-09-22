@@ -6,10 +6,13 @@ A minimal, extensible tool version manager written in Rust.
 
 Verslot is currently under development.
 
-## v0.1 scope
+## v0.2.0 scope
 
-This release establishes the CLI contract only. Target parsing and provider
-behavior, including Node.js installation, are not implemented yet.
+The current package version is `0.2.0`. This version implements shared target
+validation, storage path boundaries, and internal current-version state reads.
+Node.js installation, uninstallation, switching, and CLI queries remain
+unimplemented. See the [v0.2 specification](docs/v0.2.md) and
+[roadmap](docs/roadmap.md) for scope and progress.
 
 ```text
 verslot --version
@@ -21,13 +24,20 @@ verslot list
 verslot current
 ```
 
-`install`, `uninstall`, and `use` require exactly one positional target. The
-target is accepted as an opaque string in this release; its format is not
-validated. `list` and `current` accept no positional arguments.
+`install`, `uninstall`, and `use` require exactly one target in the form
+`node@major.minor.patch`, such as `node@22.0.0`. Only full versions with three
+ASCII decimal components in the `u32` range are accepted; leading zeros,
+partial versions, aliases, prereleases, and build metadata are rejected.
+`list` and `current` accept no positional arguments.
 
 Help and version requests exit successfully. The five version-management
-commands report `not implemented: ...` on stderr and exit with code 1 without
-changing any tool installations. Invalid CLI usage exits with code 2.
+commands with valid arguments report `not implemented: ...` on stderr and exit
+with code 1 without changing any tool installations. Invalid targets and CLI
+usage report errors on stderr and exit with code 2.
+
+M2 local acceptance passed on Windows (44 tests). Linux/macOS validation remains
+incomplete and does not block M2 acceptance. The package version does not imply
+a published release; see the [validation record](docs/m2-validation-windows.md).
 
 ## Development
 

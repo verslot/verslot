@@ -1,4 +1,6 @@
 mod cli;
+pub mod storage;
+pub mod target;
 
 use clap::Parser;
 use cli::{Cli, Command};
