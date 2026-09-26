@@ -50,7 +50,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 The executed tests cover shared parser diagnostics, all three target commands, help and argument constraints, native storage roots, junction boundaries, missing and invalid current state, link loops, and preservation of existing contents. See the [acceptance mapping](v0.2.md#acceptance-mapping) for test names.
 
-## Remaining platform evidence
+## Platform evidence remaining at original acceptance
 
 At the original local acceptance on 2026-09-22, Linux and macOS checks had not run. WSL is not installed on this host; no macOS runtime is available in this task. The subsequent PR CI failure and repair are recorded below.
 
@@ -63,7 +63,7 @@ The following Unix-only tests were not compiled or executed on Windows:
 
 Shared filesystem tests also still need execution with Unix symlinks. Windows ACL-denial behavior has no dedicated fixture. Concurrent filesystem mutation safety remains outside M2, as documented in the specification.
 
-Windows local acceptance has passed. M2 is **Complete**. Linux/macOS validation remains incomplete and is recorded as a limitation, not a prerequisite for M2 acceptance. This corrects the earlier interpretation that all platform results were required to close M2. Full cross-platform delivery validation belongs to roadmap M5; M2 completion is not a release or a claim that installation and switching are implemented.
+At the original acceptance, Windows local acceptance had passed and M2 was **Complete**. Linux/macOS validation was incomplete and is recorded as a limitation, not a prerequisite for M2 acceptance. This corrects the earlier interpretation that all platform results were required to close M2. Full cross-platform delivery validation belongs to roadmap M5; M2 completion is not a release or a claim that installation and switching are implemented.
 
 ## PR CI repair: 2026-09-26
 
@@ -87,4 +87,12 @@ Local validation was rerun on Windows against package version `0.2.0` after the 
 
 The filesystem-backed `non_utf8_current_version_names_are_rejected` test now excludes macOS, whose filesystem rejects that fixture's name. Linux retains the regression test. The in-memory `unix_root_preserves_native_bytes_and_whitespace` test remains enabled on both Unix platforms. This changes test coverage only, not production behavior. macOS does not provide filesystem-backed non-UTF-8 version-name coverage; Windows ACL-denial and concurrent mutation coverage remain outside this repair.
 
-Validation of this additional fixture correction is pending CI. Windows checks were rerun successfully after both test-source edits (27 library tests and 17 CLI tests).
+[CI run 36239295127](https://github.com/verslot/verslot/actions/runs/36239295127) passed for repaired commit `f4888916545a1866b6a7f784cf2f9597afa4485c` on 2026-09-26. Formatting passed, and every platform passed check, Clippy, and tests:
+
+| Platform | Library tests | CLI tests | Result |
+| --- | --- | --- | --- |
+| Windows | 27 | 17 | Passed |
+| Linux | 30 | 17 | Passed |
+| macOS | 29 | 17 | Passed; non-UTF-8 directory fixture excluded as described above |
+
+All executed tests had zero failures and zero ignored tests. The permission-denial regression test passed on Linux and macOS. Windows checks were also rerun locally after both test-source edits (27 library tests and 17 CLI tests). These results refer to the repaired code commit; the subsequent evidence update changes documentation only.
