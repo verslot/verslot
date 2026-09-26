@@ -19,10 +19,7 @@ fn deadline() -> Instant {
 fn checksum_matching_is_exact_and_accepts_lf_crlf_and_ascii_whitespace() {
     for text in [
         format!("{ABC_DIGEST}  {FILENAME}\n"),
-        format!(
-            "\t{}\t{FILENAME} \r\n",
-            ABC_DIGEST.to_ascii_uppercase()
-        ),
+        format!("\t{}\t{FILENAME} \r\n", ABC_DIGEST.to_ascii_uppercase()),
         format!("ignored unrelated.zip\n{ABC_DIGEST} {FILENAME}\n"),
     ] {
         assert_eq!(parse_checksum(&text, FILENAME).unwrap(), ABC_DIGEST);
@@ -151,8 +148,7 @@ fn write_and_flush_failures_do_not_return_a_verified_digest() {
 #[test]
 fn expired_deadline_prevents_reads_and_writes() {
     let mut output = Vec::new();
-    let error =
-        copy_bounded(&mut Cursor::new(b"abc"), &mut output, 3, Instant::now()).unwrap_err();
+    let error = copy_bounded(&mut Cursor::new(b"abc"), &mut output, 3, Instant::now()).unwrap_err();
     assert!(error.contains("deadline"));
     assert!(output.is_empty());
 }
@@ -175,6 +171,7 @@ fn serve(responses: Vec<Vec<u8>>) -> (String, JoinHandle<()>) {
                     Err(error) => panic!("fixture accept: {error}"),
                 }
             };
+            socket.set_nonblocking(false).unwrap();
             socket
                 .set_read_timeout(Some(Duration::from_secs(2)))
                 .unwrap();
@@ -281,9 +278,7 @@ fn valid_download_creates_an_exclusive_file_and_returns_the_verified_digest() {
 fn invalid_checksums_stop_before_archive_download_or_file_creation() {
     for checksums in [
         format!("{ABC_DIGEST} other.zip\n").into_bytes(),
-        format!("{ABC_DIGEST} {FILENAME}\n")
-            .repeat(2)
-            .into_bytes(),
+        format!("{ABC_DIGEST} {FILENAME}\n").repeat(2).into_bytes(),
         format!("bad {FILENAME}\n").into_bytes(),
         vec![0xff],
         vec![b'a'; CHECKSUM_LIMIT as usize + 1],
@@ -312,7 +307,8 @@ fn mismatched_and_truncated_archives_are_not_verified() {
             "read response",
         ),
         (
-            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n4\r\nabc".to_vec(),
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n4\r\nabc"
+                .to_vec(),
             "read response",
         ),
     ] {
@@ -417,6 +413,7 @@ fn global_deadline_interrupts_a_stalled_http_body() {
                 Err(error) => panic!("fixture accept: {error}"),
             }
         };
+        socket.set_nonblocking(false).unwrap();
         socket
             .set_read_timeout(Some(Duration::from_secs(2)))
             .unwrap();
@@ -466,7 +463,11 @@ impl Transport for TimeoutRecorder {
 fn transport_reads_are_capped_without_extending_shorter_deadlines() {
     for (budget, expected, reason) in [
         (DOWNLOAD_TIMEOUT, READ_TIMEOUT, Timeout::RecvBody),
-        (Duration::from_secs(1), Duration::from_secs(1), Timeout::Global),
+        (
+            Duration::from_secs(1),
+            Duration::from_secs(1),
+            Timeout::Global,
+        ),
     ] {
         let recorded = std::sync::Arc::new(std::sync::Mutex::new(None));
         let mut transport = ReadTimeoutTransport(Box::new(TimeoutRecorder(recorded.clone())));

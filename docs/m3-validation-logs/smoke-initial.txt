@@ -1,0 +1,18 @@
+Isolated base: C:\Users\Jason\Documents\Codes\Program\verslot\target\m3-smoke-2ab5a3329e644ff2a69a40d6625a6154
+Command: C:\Users\Jason\Documents\Codes\Program\verslot\target\debug\verslot.exe list
+Exit: 0
+Stdout: 
+Stderr: 
+Command: C:\Users\Jason\Documents\Codes\Program\verslot\target\debug\verslot.exe install node@22.0.0
+Exit: 0
+Stdout: installed node@22.0.0
+
+Stderr: 
+Archive URL: https://nodejs.org/dist/v22.0.0/node-v22.0.0-win-x64.zip
+Checksum URL: https://nodejs.org/dist/v22.0.0/SHASUMS256.txt
+Receipt:
+verslot-install-v1
+node@22.0.0
+node-v22.0.0-win-x64.zip
+32d639b47d4c0a651ff8f8d7d41a454168a3d4045be37985f9a810cf8cef6174
+

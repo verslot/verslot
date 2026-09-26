@@ -1,22 +1,22 @@
 # Verslot Development Roadmap and Progress
 
-Last updated: 2026-09-26
+Last updated: 2026-09-27
 
 This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation; the [v0.4 design](v0.4.md) defines M4 switching and current-version queries. Later phases describe the planned development order; they do not indicate completed work or committed release dates.
 
 ## Progress Overview
 
-> **M2 is complete**: Windows local acceptance passed, and the subsequent repaired Windows/Linux/macOS CI matrix passed; see the [CI evidence and coverage limitations](m2-validation-windows.md#pr-ci-repair-2026-09-26). T1–T6 deliverables and test code are complete, including target validation, storage boundaries, internal state reads, and acceptance mapping; the M2 baseline did not implement version-management commands; M3 install code is now present but unvalidated.
+> **M2 and local M3 acceptance are complete**: M2 Windows checks and repaired three-platform CI passed. M3 install/list/uninstall passed local Windows checks, 120 tests and the official Node.js 22.0.0 smoke workflow; see [M3 evidence and platform limitations](m3-validation.md). M3 Unix and other architectures remain unverified.
 
 | Metric | Current Status |
 | --- | --- |
 | Package version | `0.2.0` (does not indicate a published release) |
-| Current milestone | M2 complete: T1–T6 complete (6 / 6 tasks), local Windows acceptance and repaired three-platform CI passed |
-| Core features implemented | **1 / 5**: install has code and tests; uninstall, switch, list, and current-version queries are not implemented |
-| Active development tasks | M3 In progress: T1–T4 distribution selection, verified downloads, safe extraction/completeness, and installation lifecycle/CLI code and tests complete; T5–T7 not started. M4 design recorded, implementation not started |
-| Next step | Implement [v0.3 T5](v0.3.md#task-plan): complete-installation inventory and list CLI; M3 implementation 4 / 7; M4 follows M3 acceptance |
+| Current milestone | M3 Complete: T1–T7 complete (7 / 7 tasks), local Windows checks, 120 tests and official 22.0.0 smoke passed; other M3 platforms unverified |
+| Core features implemented | **3 / 5**: install, list, and uninstall have code and tests; switch and current-version queries are not implemented |
+| Active development tasks | M3 T1–T7 code, tests and documentation complete (7 / 7); no implementation task remains active. M4 design recorded, implementation not started |
+| Next step | Begin M4 implementation after completed [local M3 acceptance](m3-validation.md); cross-platform delivery remains M5 |
 | Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; [M2 foundations](v0.2.md), [M4 switching and recovery](v0.4.md) |
-| Validation status | M2 checks passed: Windows 44, Linux 47, macOS 46 tests; macOS non-UTF-8 directory fixture excluded; [evidence](m2-validation-windows.md#pr-ci-repair-2026-09-26). M3/M4 checks Not run |
+| Validation status | M2 checks passed: Windows 44, Linux 47, macOS 46 tests; macOS non-UTF-8 directory fixture excluded; [evidence](m2-validation-windows.md#pr-ci-repair-2026-09-26). M3 Windows: all four checks and 120 tests passed, official 22.0.0 smoke passed; M3 Unix/other architectures and M4 unverified |
 
 Implementation counts reflect features users can actually use; placeholder commands do not count as implemented. Phases differ in effort, so task counts are not used to estimate an overall project completion percentage.
 
@@ -28,14 +28,15 @@ Implementation counts reflect features users can actually use; placeholder comma
 | Target parsing | Implemented; M2 three-platform CI passed | All three target commands validate full versions before dispatch; invalid targets report shared diagnostics on stderr with exit code `2` | [Parser and unit tests](../src/target.rs), [CLI definitions](../src/cli.rs), [CLI tests](../tests/cli.rs) |
 | Storage roots and paths | Implemented; M2 three-platform CI passed with recorded coverage limits | Native root resolution and read-only path construction enforce canonical directory boundaries | [Storage](../src/storage.rs), [tests](../src/storage/tests.rs) |
 | Internal current-version state | Implemented; M2 three-platform CI passed with recorded coverage limits | Reads native current links; distinguishes no selection from invalid state; not connected to the `current` command | [State reads](../src/storage.rs), [platform links](../src/storage/links.rs), [tests](../src/storage/tests.rs) |
-| Node.js distribution selection | T1 code and tests complete; validation Not run | Maps six build platforms to fixed official archive/checksum URLs; rejects unsupported platforms; not connected to the CLI | [Distribution selection and tests](../src/distribution.rs), [dependency decision](v0.3.md#t1-dependency-decision) |
-| Verified distribution downloads | T2 code and tests complete; validation Not run | Bounded synchronous HTTPS, no redirects/decoding, exact checksum selection and streaming SHA-256; not connected to the CLI | [Downloads](../src/download.rs), [offline tests](../src/download/tests.rs), [dependency record](v0.3.md#t2-implementation-and-dependency-record) |
-| Safe extraction and complete-installation checks | T3 code and tests complete; validation Not run | Native ZIP/tar decoding, containment/type/link policy, completion receipt and executable validation; not connected to the CLI | [Installation module](../src/installation.rs), [shared](../src/installation/tests.rs), [Unix](../src/installation/tests/unix.rs), [Windows](../src/installation/tests/windows.rs), [dependency record](v0.3.md#t3-implementation-and-dependency-record) |
-| `install` | T4 code and tests complete; validation Not run | Verified installation under an OS lock, atomic rename commit, operation-only cleanup; complete duplicates succeed without downloading; incomplete destinations preserved | [Install lifecycle](../src/install.rs), [mutation helpers](../src/mutation.rs), [offline tests](../src/install/tests.rs), [CLI tests](../tests/cli.rs) |
-| `uninstall` | Placeholder only | Valid targets return `not implemented` with exit code `1`; invalid targets exit with code `2`; no installations removed | [Command dispatch](../src/lib.rs) |
+| Node.js distribution selection | T1 code and tests complete; Windows acceptance passed; other platforms unverified | Maps six build platforms to fixed official archive/checksum URLs; rejects unsupported platforms; integrated into install | [Distribution selection and tests](../src/distribution.rs), [dependency decision](v0.3.md#t1-dependency-decision) |
+| Verified distribution downloads | T2 code and tests complete; Windows acceptance passed; other platforms unverified | Bounded synchronous HTTPS, no redirects/decoding, exact checksum selection and streaming SHA-256; integrated into install | [Downloads](../src/download.rs), [offline tests](../src/download/tests.rs), [dependency record](v0.3.md#t2-implementation-and-dependency-record) |
+| Safe extraction and complete-installation checks | T3 code and tests complete; Windows acceptance passed; other platforms unverified | Native ZIP/tar decoding, containment/type/link policy, completion receipt and executable validation; integrated into install/list/uninstall | [Installation module](../src/installation.rs), [shared](../src/installation/tests.rs), [Unix](../src/installation/tests/unix.rs), [Windows](../src/installation/tests/windows.rs), [dependency record](v0.3.md#t3-implementation-and-dependency-record) |
+| `install` | T4 code and tests complete; Windows acceptance passed; other platforms unverified | Verified installation under an OS lock, atomic rename commit, operation-only cleanup; complete duplicates succeed without downloading; incomplete destinations preserved | [Install lifecycle](../src/install.rs), [mutation helpers](../src/mutation.rs), [offline tests](../src/install/tests.rs), [CLI tests](../tests/cli.rs) |
+| `uninstall` | T6 code and tests complete; Windows acceptance passed; other platforms unverified | Shared-lock/current-state protection, complete inactive installations detached before deletion; selected/invalid/missing/incomplete targets rejected; rename failure preserves original installation, cleanup failure reports detached leftovers | [Uninstall](../src/uninstall.rs), [offline tests](../src/uninstall/tests.rs), [CLI tests](../tests/cli.rs) |
 | `use` | Placeholder only | Valid targets return `not implemented` with exit code `1`; invalid targets exit with code `2`; no version switching | [Command dispatch](../src/lib.rs) |
-| `list` | Placeholder only | Returns `not implemented` with exit code `1`; does not read the list of installed versions | [Command dispatch](../src/lib.rs) |
+| `list` | T5 code and tests complete; Windows acceptance passed; other platforms unverified | Read-only complete installations sorted numerically; missing/empty storage succeeds without writes; canonical incomplete entries and I/O/boundary errors fail without partial stdout; does not inspect current state | [Inventory](../src/inventory.rs), [offline tests](../src/inventory/tests.rs), [CLI tests](../tests/cli.rs) |
 | `current` | Placeholder only | Same as above; does not query the current version | [Command dispatch](../src/lib.rs) |
+| M3 workflow coverage and acceptance preparation | T7 tests and documentation complete; Windows acceptance passed; other platforms unverified | Isolated offline fresh-install lifecycle and seeded CLI workflow fixtures; actual test-name acceptance mapping and a separate official HTTPS smoke procedure | [Lifecycle tests](../src/install/tests.rs), [CLI tests](../tests/cli.rs), [acceptance mapping](v0.3.md#acceptance-mapping), [validation record](m3-validation.md) |
 
 “Implemented” only means that the code exists. Whether acceptance criteria have been met is recorded separately in the milestones and progress log.
 
@@ -47,7 +48,7 @@ Milestone statuses: Not started → In progress → Awaiting validation → Comp
 | --- | --- | --- | --- | --- |
 | M1 CLI foundation | Before M2 | Awaiting validation | 5 / 6 | Help, version, argument constraints, and placeholder behavior match the documentation and pass validation |
 | M2 Target parsing and local state | Before M3 | Complete | 6 / 6 | Valid targets can be parsed, invalid targets are rejected, and local state read/write rules are defined |
-| M3 Node.js installation and queries | After M2 | In progress | 4 / 7 | Specified versions can be installed safely, query results match disk state, and installed versions can be uninstalled |
+| M3 Node.js installation and queries | After M2 | Complete | 7 / 7 | Specified versions can be installed safely, query results match disk state, and installed versions can be uninstalled |
 | M4 Version switching | After M3 | Not started | 0 / 5 | Complete installed versions can be selected and queried; the fixed entry point and controlled PATH execute the selected version; failure recovery is validated |
 | M5 Cross-platform delivery | After M4 | Not started | 0 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
 
@@ -75,15 +76,15 @@ Design evidence: [v0.2 T1](v0.2.md#t1-finalize-parsing-and-local-state-conventio
 
 ### Phase 3: Node.js Installation and Queries
 
-Design: [v0.3](v0.3.md), with seven implementation tasks distinct from this capability checklist. M3 queries mean installed-version listing; `current` and `use` remain M4. T1–T4 distribution selection, verified downloads, safe extraction/completeness, and installation lifecycle/CLI code and tests are complete (4 / 7 tasks); T5–T7 have not started, and no M3 acceptance checks have run.
+Design: [v0.3](v0.3.md), with seven implementation tasks distinct from this capability checklist. M3 queries mean installed-version listing; `current` and `use` remain M4. T1–T7 code, tests, workflow coverage and documentation are complete (7 / 7 tasks). M3 local Windows acceptance passed: four checks, 120 tests and the official Node.js 22.0.0 smoke workflow; other platforms remain unverified. The [acceptance mapping](v0.3.md#acceptance-mapping) references actual test names, and [m3-validation.md](m3-validation.md) records pending checks, smoke procedure and coverage limitations.
 
 - [x] Select the official distribution archive based on the operating system and architecture.
 - [x] Download the distribution archive and verify its checksum.
 - [x] Extract archives safely, preventing path traversal and symlinks from escaping the destination.
 - [x] Finalize installations and clean up failures without exposing incomplete installations.
-- [ ] Implement `list` to display installed versions.
-- [ ] Implement `uninstall` and define the rules for uninstalling the currently active version.
-- [ ] Add tests for successful workflows, corrupted downloads, duplicate installations, and failure cleanup.
+- [x] Implement `list` to display installed versions.
+- [x] Implement `uninstall` and define the rules for uninstalling the currently active version.
+- [x] Add tests for successful workflows, corrupted downloads, duplicate installations, and failure cleanup.
 
 ### Phase 4: Version Switching
 
@@ -146,6 +147,10 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-09-26 | Implement v0.3 T2 verified downloads | M3 In progress: 2 / 7 capability items and 2 / 7 implementation tasks. Added [bounded HTTPS and streaming verification](../src/download.rs), [offline failure tests](../src/download/tests.rs), and [dependency rationale/review](v0.3.md#t2-implementation-and-dependency-record); added ureq 3.4.2 and sha2 0.11.0, resolved by `cargo fetch` | Next: T3 safe extraction and completeness. All four validation commands and smoke tests Not run under the M3 gate; CLI behavior and package version unchanged |
 | 2026-09-26 | Implement v0.3 T3 safe extraction and completeness | M3 In progress: 3 / 7 capability items and 3 / 7 implementation tasks. Added [installation module](../src/installation.rs), native ZIP/tar decoding, deferred Unix link resolution, receipt/executable checks, and [offline fixtures](v0.3.md#t3-implementation-and-dependency-record); recorded zip/flate2/tar dependency rationale and security guidance | Next: T4 installation lifecycle and CLI. Dependencies fetched and new source formatted; all four validation commands/tests and smoke tests Not run under the M3 gate; no CLI behavior changes or version bump |
 | 2026-09-26 | Implement v0.3 T4 installation lifecycle and CLI | M3 In progress: 4 / 7 capability items and 4 / 7 implementation tasks. Added [OS locking and bounded mutation paths](../src/mutation.rs), [install staging/commit/cleanup](../src/install.rs), [offline lifecycle and process-lock tests](../src/install/tests.rs), and install CLI regressions; complete duplicates skip downloads and invalid destinations are preserved | Next: T5 inventory/list. No dependencies or version bump; edited source formatted only. All four validation commands/tests and real-distribution smoke tests Not run under the M3 gate |
+| 2026-09-27 | Implement v0.3 T5 inventory and list CLI | M3 In progress: 5 / 7 capability items and 5 / 7 implementation tasks; 2 / 5 core commands have code and tests. Added [read-only complete-installation inventory](../src/inventory.rs), [offline inventory/native I/O tests](../src/inventory/tests.rs), and list CLI regressions; numeric ordering, missing-root success, invalid-entry errors with empty stdout, current-state independence and lock-free reads | Next: T6 protected uninstallation. Updated README and v0.3 task/evidence records; no dependencies or version bump. All four validation commands/tests and real-distribution smoke tests Not run under the M3 gate |
+| 2026-09-27 | Implement v0.3 T6 protected uninstallation | M3 In progress: 6 / 7 capability items and 6 / 7 implementation tasks; 3 / 5 core commands have code and tests. Added [uninstall lifecycle](../src/uninstall.rs), [native current/boundary/rename/delete and partial-cleanup tests](../src/uninstall/tests.rs), and CLI regressions; selected and invalid current state fail closed, only complete inactive installations are detached and removed | Next: T7 workflow coverage, acceptance mapping and validation preparation. Updated README and v0.3 task/evidence records; no dependencies or version bump. All four validation commands/tests and real-distribution smoke tests Not run under the M3 gate |
+| 2026-09-27 | Complete v0.3 T7 workflow coverage and acceptance preparation | M3 Awaiting validation: 7 / 7 capability items and 7 / 7 implementation tasks; 3 / 5 core commands have code and tests. Added isolated offline lifecycle and seeded CLI workflow fixtures, actual test-name [acceptance mapping](v0.3.md#acceptance-mapping), and [M3 validation preparation/results record](m3-validation.md); synchronized README | Next: separate M3 acceptance checks and official-distribution smoke workflow. All checks/tests/smoke Not run; no runtime/dependency/version changes or release. M4 remains Not started |
+| 2026-09-27 | Run M3 local Windows acceptance and repair initial failures | M3 Complete under local acceptance: Rust 1.98.1 / x86_64-pc-windows-msvc; four required checks passed; 100 library + 20 CLI tests passed; official 22.0.0 install/list/duplicate/absolute --version/uninstall/empty-list smoke passed. Repaired formatting, fixture digest encoding, Windows socket/lock/deletion assumptions and lock-entry type diagnostics; [initial and final evidence](m3-validation.md) | Next: M4. M3 Unix and other architectures unverified; no version bump or release. Initial sandbox PowerShell TLS fetch failed; official checksum fetched outside sandbox and compared successfully; production TLS verification retained |
 
 Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 

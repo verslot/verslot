@@ -225,8 +225,8 @@ fn lock_contents_are_preserved_and_contention_is_nonblocking() {
     fs::write(&path, b"lock sentinel").unwrap();
     let lock = acquire_lock(&fixture.0).unwrap();
     assert!(fixture.install().unwrap_err().contains("mutation lock"));
-    assert_eq!(fs::read(&path).unwrap(), b"lock sentinel");
     drop(lock);
+    assert_eq!(fs::read(&path).unwrap(), b"lock sentinel");
     fixture.install().unwrap();
 }
 
@@ -501,7 +501,10 @@ fn real_extraction_commits_bundled_payload_and_corruption_cleans_operation() {
         } else {
             archive_fixture(&fixture.target())
         };
-        let digest = format!("{:x}", Sha256::digest(&bytes));
+        let digest: String = Sha256::digest(&bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
         let result = install_at(
             &fixture.0,
             &fixture.target(),
@@ -574,4 +577,104 @@ fn malformed_receipts_and_non_directory_destinations_are_preserved() {
         assert_eq!(fs::read(&sentinel).unwrap(), b"malformed existing data");
         assert!(!fixture.0.join("tmp").exists());
     }
+}
+
+// Runs only in an isolated child process so environment changes cannot affect other tests.
+#[test]
+fn offline_workflow_child() {
+    let Some(source) = std::env::var_os("VERSLOT_TEST_WORKFLOW_ROOT") else {
+        return;
+    };
+    let storage = Storage::from_source(Some(&source)).unwrap();
+    assert_eq!(Storage::from_env().unwrap().root(), storage.root());
+    let target: Target = "node@22.0.0".parse().unwrap();
+    assert!(crate::inventory::list_installed().unwrap().is_empty());
+    assert!(!storage.root().exists());
+    fs::create_dir(storage.root()).unwrap();
+    let root = fs::canonicalize(storage.root()).unwrap();
+    let orphan = root.join("tmp/orphan");
+    fs::create_dir_all(&orphan).unwrap();
+    fs::write(orphan.join("sentinel"), b"preserved").unwrap();
+
+    for corrupt in [true, false] {
+        use sha2::{Digest, Sha256};
+        let bytes = if corrupt {
+            b"corrupt archive".to_vec()
+        } else {
+            archive_fixture(&target)
+        };
+        let digest: String = Sha256::digest(&bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let result = install_at(
+            &root,
+            &target,
+            |root, operation, staging| {
+                let archive = operation.join("archive");
+                fs::write(&archive, &bytes).unwrap();
+                extract_verified_archive(root, &archive, staging, target.version, &digest)
+                    .map_err(|error| error.to_string())
+            },
+            remove_operation,
+        );
+        if corrupt {
+            assert!(result.is_err());
+            assert!(crate::inventory::list_installed().unwrap().is_empty());
+        } else {
+            assert_eq!(result.unwrap(), "installed node@22.0.0");
+            assert_eq!(crate::inventory::list_installed().unwrap(), vec![target]);
+        }
+        assert_eq!(fs::read_dir(root.join("tmp")).unwrap().count(), 1);
+    }
+    let installation = root.join("installs/node/22.0.0");
+    let npm = installation.join(if cfg!(windows) {
+        "node_modules/npm/bin/npm-cli.js"
+    } else {
+        "lib/node_modules/npm/bin/npm-cli.js"
+    });
+    assert_eq!(fs::read(&npm).unwrap(), b"offline fixture");
+    let receipt = fs::read(installation.join(".verslot-install")).unwrap();
+    assert_eq!(install(&target).unwrap(), "already installed node@22.0.0");
+    assert_eq!(
+        fs::read(installation.join(".verslot-install")).unwrap(),
+        receipt
+    );
+    assert_eq!(fs::read(npm).unwrap(), b"offline fixture");
+    assert_eq!(
+        crate::uninstall::uninstall(&target).unwrap(),
+        "uninstalled node@22.0.0"
+    );
+    assert!(crate::inventory::list_installed().unwrap().is_empty());
+    assert!(!installation.exists());
+    assert!(
+        crate::uninstall::uninstall(&target)
+            .unwrap_err()
+            .contains("not installed")
+    );
+    assert_eq!(fs::read(orphan.join("sentinel")).unwrap(), b"preserved");
+    assert_eq!(fs::read_dir(root.join("tmp")).unwrap().count(), 1);
+    assert!(!root.join("current").exists());
+}
+
+#[test]
+fn offline_install_list_duplicate_uninstall_workflow_is_isolated() {
+    let fixture = Fixture::new();
+    let result = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "install::tests::offline_workflow_child",
+            "--nocapture",
+        ])
+        .env("VERSLOT_TEST_WORKFLOW_ROOT", &fixture.0)
+        .env("HOME", &fixture.0)
+        .env("LOCALAPPDATA", &fixture.0)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "workflow child failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
 }

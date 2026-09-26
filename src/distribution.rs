@@ -16,11 +16,7 @@ pub struct NodeDistribution {
 
 impl NodeDistribution {
     pub fn for_current_build(version: Version) -> Result<Self, String> {
-        let environment = if cfg!(target_env = "gnu") {
-            "gnu"
-        } else {
-            ""
-        };
+        let environment = if cfg!(target_env = "gnu") { "gnu" } else { "" };
         Self::for_platform(
             version,
             std::env::consts::OS,
@@ -186,11 +182,7 @@ mod tests {
     #[test]
     fn current_build_selection_uses_compile_time_platform() {
         let version = "node@22.0.0".parse::<Target>().unwrap().version;
-        let environment = if cfg!(target_env = "gnu") {
-            "gnu"
-        } else {
-            ""
-        };
+        let environment = if cfg!(target_env = "gnu") { "gnu" } else { "" };
         assert_eq!(
             NodeDistribution::for_current_build(version),
             NodeDistribution::for_platform(

@@ -35,6 +35,14 @@ pub(crate) fn create_directory(root: &Path, path: &Path) -> io::Result<()> {
 pub(crate) fn acquire_lock(root: &Path) -> io::Result<File> {
     real_directory(root, root)?;
     let path = root.join(".mutation.lock");
+    match fs::symlink_metadata(&path) {
+        Ok(metadata) if is_link(&metadata) || !metadata.is_file() => {
+            return Err(io::Error::other("mutation lock must be a regular file"));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
     match File::create_new(&path) {
         Ok(file) => drop(file),
         Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}

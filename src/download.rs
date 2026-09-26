@@ -99,7 +99,9 @@ fn fetch_response(
         status @ (404 | 410) => Err(format!(
             "download {url}: release or artifact unavailable (HTTP {status})"
         )),
-        status => Err(format!("download {url}: expected HTTP 200, received {status}")),
+        status => Err(format!(
+            "download {url}: expected HTTP 200, received {status}"
+        )),
     }
 }
 
