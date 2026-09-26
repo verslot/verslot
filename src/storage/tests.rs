@@ -463,7 +463,8 @@ fn current_links_to_files_are_rejected() {
     assert!(storage.read_current().is_err());
 }
 
-#[cfg(unix)]
+// macOS filesystems reject non-UTF-8 names before this fixture can be created.
+#[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn non_utf8_current_version_names_are_rejected() {
     use std::os::unix::ffi::OsStrExt;

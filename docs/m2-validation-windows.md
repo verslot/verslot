@@ -83,4 +83,8 @@ Local validation was rerun on Windows against package version `0.2.0` after the 
 | `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
 | `cargo test --all` | 0 | Passed: 27 library tests and 17 CLI integration tests; 0 failures, 0 ignored |
 
-Linux/macOS validation of the repaired code remains pending the replacement PR's CI run. The local Windows results do not establish that the Unix-only test compiles or passes.
+[Replacement PR #2](https://github.com/verslot/verslot/pull/2), [CI run 36239188356](https://github.com/verslot/verslot/actions/runs/36239188356), confirmed the octal-literal repair: Linux passed all checks and macOS passed Clippy, including the permission-denial test compilation. macOS then reached a previously skipped test and failed while creating the non-UTF-8 directory fixture (`Illegal byte sequence`, OS error 92), before `Storage::read_current` was called.
+
+The filesystem-backed `non_utf8_current_version_names_are_rejected` test now excludes macOS, whose filesystem rejects that fixture's name. Linux retains the regression test. The in-memory `unix_root_preserves_native_bytes_and_whitespace` test remains enabled on both Unix platforms. This changes test coverage only, not production behavior. macOS does not provide filesystem-backed non-UTF-8 version-name coverage; Windows ACL-denial and concurrent mutation coverage remain outside this repair.
+
+Validation of this additional fixture correction is pending CI. Windows checks were rerun successfully after both test-source edits (27 library tests and 17 CLI tests).
