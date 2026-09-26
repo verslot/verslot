@@ -136,7 +136,7 @@ pub(super) fn extract(archive: File, destination: &mut Extraction<'_>) -> io::Re
         }
         padding += count as u64;
     }
-    if padding < 512 || reader.total % 512 != 0 {
+    if padding < 512 || !reader.total.is_multiple_of(512) {
         return Err(invalid("truncated tar end marker or padding"));
     }
     Ok(())
@@ -163,10 +163,10 @@ fn validate_header_names(header: &::tar::Header) -> io::Result<()> {
         fields.push(&bytes[345..500]);
     }
     for field in fields {
-        if let Some(terminator) = field.iter().position(|byte| *byte == 0) {
-            if field[terminator..].iter().any(|byte| *byte != 0) {
-                return Err(invalid("tar name contains data after a NUL terminator"));
-            }
+        if let Some(terminator) = field.iter().position(|byte| *byte == 0)
+            && field[terminator..].iter().any(|byte| *byte != 0)
+        {
+            return Err(invalid("tar name contains data after a NUL terminator"));
         }
     }
     Ok(())

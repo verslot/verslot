@@ -151,7 +151,7 @@ fn tar_rejects_traversal_wrong_roots_reserved_paths_and_special_entries() {
         );
         assert!(!fixture.root.join("staging").join(RECEIPT).exists());
     }
-    for kind in [b'1', b'3', b'4', b'6', b'S', b'7'] {
+    for kind in *b"1346S7" {
         let fixture = Fixture::new();
         let mut member = Member::link(format!("{}/special", fixture.archive_root()), "bin/node");
         member.kind = kind;
@@ -238,7 +238,7 @@ fn tar_directory_links_allow_acyclic_targets_but_reject_indirect_directory_cycle
 
 #[test]
 fn gnu_and_pax_effective_names_are_validated_and_metadata_entries_count_toward_limits() {
-    for kind in [b'L', b'x'] {
+    for kind in *b"Lx" {
         for malicious in [false, true] {
             let fixture = Fixture::new();
             let root = fixture.archive_root();
@@ -457,7 +457,7 @@ fn tar_nul_suffixes_and_malformed_pax_records_are_rejected() {
 
 #[test]
 fn gnu_and_pax_link_targets_are_validated_after_resolution() {
-    for kind in [b'K', b'x'] {
+    for kind in *b"Kx" {
         for escaping in [false, true] {
             let fixture = Fixture::new();
             let root = fixture.archive_root();
