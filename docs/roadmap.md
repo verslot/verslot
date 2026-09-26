@@ -2,21 +2,21 @@
 
 Last updated: 2026-09-26
 
-This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation. Later phases describe the planned development order; they do not indicate completed work or committed release dates.
+This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation; the [v0.4 design](v0.4.md) defines M4 switching and current-version queries. Later phases describe the planned development order; they do not indicate completed work or committed release dates.
 
 ## Progress Overview
 
-> **M2 is complete with local acceptance passed**: Windows checks and 44 tests passed; Linux/macOS validation remains incomplete and does not block M2 acceptance. T1–T6 deliverables and test code are complete, including target validation, storage boundaries, internal state reads, and acceptance mapping; the CLI still cannot manage Node.js versions.
+> **M2 is complete**: Windows local acceptance passed, and the subsequent repaired Windows/Linux/macOS CI matrix passed; see the [CI evidence and coverage limitations](m2-validation-windows.md#pr-ci-repair-2026-09-26). T1–T6 deliverables and test code are complete, including target validation, storage boundaries, internal state reads, and acceptance mapping; the CLI still cannot manage Node.js versions.
 
 | Metric | Current Status |
 | --- | --- |
 | Package version | `0.2.0` (does not indicate a published release) |
-| Current milestone | M2 complete: T1–T6 complete (6 / 6 tasks), local Windows acceptance passed; Linux/macOS unverified (non-blocking) |
+| Current milestone | M2 complete: T1–T6 complete (6 / 6 tasks), local Windows acceptance and repaired three-platform CI passed |
 | Core features implemented | **0 / 5**: install, uninstall, switch, list, and current-version queries are not implemented |
-| Active development tasks | M2 complete; M3 not started; Linux/macOS validation remains a recorded limitation |
-| Next step | Implement [v0.3 T1](v0.3.md#task-plan): Node.js distribution selection; M3 design recorded, implementation 0 / 7; retain unverified platform limitations |
-| Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; see [v0.2](v0.2.md) |
-| Validation status | All four checks passed on Windows; 27 library + 17 CLI tests passed; [evidence](m2-validation-windows.md); Linux/macOS not run |
+| Active development tasks | M2 complete; M3 and M4 designs recorded, both implementations not started |
+| Next step | Implement [v0.3 T1](v0.3.md#task-plan): Node.js distribution selection; M3 implementation 0 / 7; M4 follows M3 acceptance |
+| Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; [M2 foundations](v0.2.md), [M4 switching and recovery](v0.4.md) |
+| Validation status | M2 checks passed: Windows 44, Linux 47, macOS 46 tests; macOS non-UTF-8 directory fixture excluded; [evidence](m2-validation-windows.md#pr-ci-repair-2026-09-26). M3/M4 checks Not run |
 
 Implementation counts reflect features users can actually use; placeholder commands do not count as implemented. Phases differ in effort, so task counts are not used to estimate an overall project completion percentage.
 
@@ -25,9 +25,9 @@ Implementation counts reflect features users can actually use; placeholder comma
 | Capability | Implementation Status | Current Behavior | Code / Test Evidence |
 | --- | --- | --- | --- |
 | Help, version, and argument-count constraints | Implemented | Provides help and version output; invalid CLI usage exits with code `2` | [CLI definitions](../src/cli.rs), [CLI tests](../tests/cli.rs) |
-| Target parsing | Implemented; Windows validated, Unix pending | All three target commands validate full versions before dispatch; invalid targets report shared diagnostics on stderr with exit code `2` | [Parser and unit tests](../src/target.rs), [CLI definitions](../src/cli.rs), [CLI tests](../tests/cli.rs) |
-| Storage roots and paths | Implemented; Windows validated, Unix pending | Native root resolution and read-only path construction enforce canonical directory boundaries | [Storage](../src/storage.rs), [tests](../src/storage/tests.rs) |
-| Internal current-version state | Implemented; Windows validated, Unix pending | Reads native current links; distinguishes no selection from invalid state; not connected to the `current` command | [State reads](../src/storage.rs), [platform links](../src/storage/links.rs), [tests](../src/storage/tests.rs) |
+| Target parsing | Implemented; M2 three-platform CI passed | All three target commands validate full versions before dispatch; invalid targets report shared diagnostics on stderr with exit code `2` | [Parser and unit tests](../src/target.rs), [CLI definitions](../src/cli.rs), [CLI tests](../tests/cli.rs) |
+| Storage roots and paths | Implemented; M2 three-platform CI passed with recorded coverage limits | Native root resolution and read-only path construction enforce canonical directory boundaries | [Storage](../src/storage.rs), [tests](../src/storage/tests.rs) |
+| Internal current-version state | Implemented; M2 three-platform CI passed with recorded coverage limits | Reads native current links; distinguishes no selection from invalid state; not connected to the `current` command | [State reads](../src/storage.rs), [platform links](../src/storage/links.rs), [tests](../src/storage/tests.rs) |
 | `install` | Placeholder only | Valid targets return `not implemented` with exit code `1`; invalid targets exit with code `2` | [Command dispatch](../src/lib.rs), [Exit handling](../src/main.rs) |
 | `uninstall` | Placeholder only | Same as above; does not remove any installations | [Command dispatch](../src/lib.rs) |
 | `use` | Placeholder only | Same as above; does not switch versions | [Command dispatch](../src/lib.rs) |
@@ -45,10 +45,10 @@ Milestone statuses: Not started → In progress → Awaiting validation → Comp
 | M1 CLI foundation | Before M2 | Awaiting validation | 5 / 6 | Help, version, argument constraints, and placeholder behavior match the documentation and pass validation |
 | M2 Target parsing and local state | Before M3 | Complete | 6 / 6 | Valid targets can be parsed, invalid targets are rejected, and local state read/write rules are defined |
 | M3 Node.js installation and queries | After M2 | Not started | 0 / 7 | Specified versions can be installed safely, query results match disk state, and installed versions can be uninstalled |
-| M4 Version switching | After M3 | Not started | 0 / 5 | Installed versions can be selected, and the version actually executed matches the current state |
+| M4 Version switching | After M3 | Not started | 0 / 5 | Complete installed versions can be selected and queried; the fixed entry point and controlled PATH execute the selected version; failure recovery is validated |
 | M5 Cross-platform delivery | After M4 | Not started | 0 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
 
-Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. M3 is planned in the v0.3 design; later milestones have no preset version numbers or dates. No planned version implies a release commitment.
+Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. M3 is planned in v0.3 and M4 in v0.4; M5 has no preset version number or date. No planned version implies a release commitment.
 
 ### Phase 1: CLI Foundation
 
@@ -83,6 +83,8 @@ Design: [v0.3](v0.3.md), with seven implementation tasks distinct from this capa
 - [ ] Add tests for successful workflows, corrupted downloads, duplicate installations, and failure cleanup.
 
 ### Phase 4: Version Switching
+
+Design: [v0.4](v0.4.md), with five implementation tasks distinct from this capability checklist. Covers complete-installation selection, current queries, native link replacement, locking, rollback, and manual PATH setup. M3 acceptance is a prerequisite; M4 implementation has not started, and no M4 checks have run.
 
 - [ ] Implement `use` to select an installed Node.js version.
 - [ ] Implement `current` to display the currently active version.
@@ -136,6 +138,7 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-09-22 | Clarify M2 acceptance scope | M2 Complete: local Windows checks and 44 tests passed; Linux/macOS remain unverified but do not block M2 acceptance; corrected the earlier stricter interpretation | Next: M3; full cross-platform delivery validation remains in M5; documentation only, no checks rerun |
 | 2026-09-22 | Bump package version to 0.2.0 | Updated Cargo.toml, the verslot entry in Cargo.lock, README, and version documentation; M2 local acceptance remains complete | Next: M3; validation evidence predates the metadata-only bump; checks not rerun and no release published |
 | 2026-09-26 | Design v0.3 / M3 | Added [M3 specification](v0.3.md): distribution mapping, verified downloads, safe extraction, completion receipts, install/list/uninstall contracts, failure rules, dependency rationale, seven tasks, and acceptance plan; M3 remains Not started, 0 / 7 capabilities and 0 / 7 implementation tasks | Next: v0.3 T1; documentation only, checks Not run; package remains 0.2.0 and platform limitations remain unchanged |
+| 2026-09-26 | Synchronize M2 CI evidence and design v0.4 / M4 | Linked the existing [repaired three-platform CI results](m2-validation-windows.md#pr-ci-repair-2026-09-26) in the current progress view; added [M4 design](v0.4.md) with explicit paths, use/current contracts, native link replacement, rollback, shared locking, unfinished-operation guards, five tasks and acceptance coverage | Next remains M3 T1; M4 Not started (0 / 5). Documentation only; no checks rerun, implementation, dependency changes, or version bump |
 
 Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 
