@@ -41,14 +41,16 @@ fn invalid_command_fails() {
 }
 
 #[test]
-fn install_is_explicitly_not_implemented_yet() {
+fn install_reports_storage_errors_without_network_access() {
     verslot_command()
         .args(["install", "node@22.0.0"])
+        .env_remove("HOME")
+        .env_remove("LOCALAPPDATA")
         .assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "not implemented: install node@22.0.0",
-        ));
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains("install node@22.0.0:"))
+        .stderr(predicate::str::contains("is missing"));
 }
 
 #[test]
@@ -121,7 +123,7 @@ fn target_commands_reject_extra_targets() {
 
 #[test]
 fn valid_targets_retain_placeholder_behavior() {
-    for command in ["install", "uninstall", "use"] {
+    for command in ["uninstall", "use"] {
         for target in [
             "node@22.0.0",
             "node@0.0.0",
@@ -205,7 +207,6 @@ fn commands_leave_storage_and_working_directory_unchanged() {
     fs::write(&sentinel, b"unchanged").unwrap();
 
     let cases = [
-        vec!["install", "node@22.0.0"],
         vec!["uninstall", "node@22.0.0"],
         vec!["use", "node@22.0.0"],
         vec!["list"],
@@ -291,12 +292,105 @@ fn each_command_provides_help() {
             format!("Usage: {binary_name} {command}")
         };
 
-        verslot_command()
+        let assertion = verslot_command()
             .args([command, "--help"])
             .assert()
             .success()
             .stdout(predicate::str::contains(expected_usage))
-            .stdout(predicate::str::contains("not implemented yet"))
             .stderr("");
+        if command == "install" {
+            assertion.stdout(predicate::str::contains("not implemented yet").not());
+        } else {
+            assertion.stdout(predicate::str::contains("not implemented yet"));
+        }
     }
+}
+
+#[test]
+fn install_cli_recognizes_complete_duplicate_and_preserves_invalid_destination() {
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let directory = std::env::temp_dir().join(format!(
+        "verslot-install-cli-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let root = directory.join(if cfg!(windows) { "verslot" } else { ".verslot" });
+    let installation = root.join("installs/node/22.0.0");
+    fs::create_dir_all(&installation).unwrap();
+    fs::write(installation.join("sentinel"), b"preserved").unwrap();
+    let current = root.join("current/node");
+    fs::create_dir_all(current.parent().unwrap()).unwrap();
+    fs::write(&current, b"invalid current state").unwrap();
+    verslot_command()
+        .args(["install", "node@22.0.0"])
+        .env("HOME", &directory)
+        .env("LOCALAPPDATA", &directory)
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains(
+            "existing destination is not a complete installation",
+        ));
+    assert_eq!(
+        fs::read(installation.join("sentinel")).unwrap(),
+        b"preserved"
+    );
+    assert!(!root.join("tmp").exists());
+    let executable = installation.join(if cfg!(windows) {
+        "node.exe"
+    } else {
+        "bin/node"
+    });
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(&executable, b"offline fixture").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let target = "node@22.0.0".parse::<verslot::target::Target>().unwrap();
+    let distribution =
+        verslot::distribution::NodeDistribution::for_current_build(target.version).unwrap();
+    fs::write(
+        installation.join(".verslot-install"),
+        format!(
+            "verslot-install-v1\n{target}\n{}\n{}\n",
+            distribution.archive_filename,
+            "a".repeat(64)
+        ),
+    )
+    .unwrap();
+    verslot_command()
+        .args(["install", "node@22.0.0"])
+        .env("HOME", &directory)
+        .env("LOCALAPPDATA", &directory)
+        .assert()
+        .success()
+        .stdout("already installed node@22.0.0\n")
+        .stderr("");
+    assert_eq!(fs::read(&current).unwrap(), b"invalid current state");
+    assert!(!root.join("tmp").exists());
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(root.join(".mutation.lock"))
+        .unwrap();
+    lock.try_lock().unwrap();
+    verslot_command()
+        .args(["install", "node@22.0.0"])
+        .env("HOME", &directory)
+        .env("LOCALAPPDATA", &directory)
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains("mutation lock"));
+    drop(lock);
+    let temporary = fs::canonicalize(std::env::temp_dir()).unwrap();
+    let resolved = fs::canonicalize(&directory).unwrap();
+    assert_eq!(resolved.parent(), Some(temporary.as_path()));
+    fs::remove_dir_all(resolved).unwrap();
 }

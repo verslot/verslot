@@ -15,7 +15,7 @@ pub(crate) struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
-    /// Install a tool version (not implemented yet).
+    /// Install a tool version.
     Install {
         #[arg(value_name = "TOOL@VERSION")]
         target: Target,
