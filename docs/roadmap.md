@@ -1,8 +1,8 @@
 # Verslot Development Roadmap and Progress
 
-Last updated: 2026-09-22
+Last updated: 2026-09-26
 
-This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and remaining M2 tasks are defined by the [v0.2 specification](v0.2.md). Later phases describe the planned development order; they do not indicate completed work or committed release dates.
+This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation. Later phases describe the planned development order; they do not indicate completed work or committed release dates.
 
 ## Progress Overview
 
@@ -14,7 +14,7 @@ This document tracks development phases, tasks, and delivery progress. The CLI f
 | Current milestone | M2 complete: T1–T6 complete (6 / 6 tasks), local Windows acceptance passed; Linux/macOS unverified (non-blocking) |
 | Core features implemented | **0 / 5**: install, uninstall, switch, list, and current-version queries are not implemented |
 | Active development tasks | M2 complete; M3 not started; Linux/macOS validation remains a recorded limitation |
-| Next step | Plan M3 Node.js installation and queries; retain unverified platform limitations |
+| Next step | Implement [v0.3 T1](v0.3.md#task-plan): Node.js distribution selection; M3 design recorded, implementation 0 / 7; retain unverified platform limitations |
 | Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; see [v0.2](v0.2.md) |
 | Validation status | All four checks passed on Windows; 27 library + 17 CLI tests passed; [evidence](m2-validation-windows.md); Linux/macOS not run |
 
@@ -48,7 +48,7 @@ Milestone statuses: Not started → In progress → Awaiting validation → Comp
 | M4 Version switching | After M3 | Not started | 0 / 5 | Installed versions can be selected, and the version actually executed matches the current state |
 | M5 Cross-platform delivery | After M4 | Not started | 0 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
 
-Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. Later milestones have no preset version numbers or dates; details will be refined as development approaches.
+Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. M3 is planned in the v0.3 design; later milestones have no preset version numbers or dates. No planned version implies a release commitment.
 
 ### Phase 1: CLI Foundation
 
@@ -71,6 +71,8 @@ Checklist progress counts the checked items below. It reflects completed tasks, 
 Design evidence: [v0.2 T1](v0.2.md#t1-finalize-parsing-and-local-state-conventions), [parsing rules](v0.2.md#target-format), [local state](v0.2.md#local-state), and [M4 switching contract](v0.2.md#version-switching). These four completed design items correspond to one v0.2 task (T1), not four implementation tasks. The fifth completed checklist item is the [T2 shared parser](../src/target.rs), including parser unit test code, now integrated into the CLI by [T3](../src/cli.rs) with [CLI regression tests](../tests/cli.rs); T4–T6 add [storage/state implementation](../src/storage.rs), [native link reads](../src/storage/links.rs), [storage/state test code](../src/storage/tests.rs), and [acceptance mapping](v0.2.md#acceptance-mapping), completing the sixth checklist item. M2 validation starts only after T1–T6 are complete, as defined by the [v0.2 validation gate](v0.2.md#m2-validation-gate).
 
 ### Phase 3: Node.js Installation and Queries
+
+Design: [v0.3](v0.3.md), with seven implementation tasks distinct from this capability checklist. M3 queries mean installed-version listing; `current` and `use` remain M4. Design is recorded; implementation has not started, and no M3 acceptance checks have run.
 
 - [ ] Select the official distribution archive based on the operating system and architecture.
 - [ ] Download the distribution archive and verify its checksum.
@@ -133,6 +135,7 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-09-22 | Run M2 validation on Windows | All four required checks passed on x86_64-pc-windows-msvc with Rust 1.98.1; 27 library and 17 CLI tests passed; repaired parser-test formatting after the initial fmt failure; [results and output](m2-validation-windows.md) | Local M2 acceptance passed; Linux/macOS and Unix-only tests not run (non-blocking); M1 milestone not separately reassessed |
 | 2026-09-22 | Clarify M2 acceptance scope | M2 Complete: local Windows checks and 44 tests passed; Linux/macOS remain unverified but do not block M2 acceptance; corrected the earlier stricter interpretation | Next: M3; full cross-platform delivery validation remains in M5; documentation only, no checks rerun |
 | 2026-09-22 | Bump package version to 0.2.0 | Updated Cargo.toml, the verslot entry in Cargo.lock, README, and version documentation; M2 local acceptance remains complete | Next: M3; validation evidence predates the metadata-only bump; checks not rerun and no release published |
+| 2026-09-26 | Design v0.3 / M3 | Added [M3 specification](v0.3.md): distribution mapping, verified downloads, safe extraction, completion receipts, install/list/uninstall contracts, failure rules, dependency rationale, seven tasks, and acceptance plan; M3 remains Not started, 0 / 7 capabilities and 0 / 7 implementation tasks | Next: v0.3 T1; documentation only, checks Not run; package remains 0.2.0 and platform limitations remain unchanged |
 
 Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 
