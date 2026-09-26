@@ -501,7 +501,7 @@ fn permission_failures_are_not_treated_as_missing_state() {
     let current = storage.root().join("current");
     fs::create_dir_all(&current).unwrap();
     let original = fs::metadata(&current).unwrap().permissions();
-    fs::set_permissions(&current, fs::Permissions::from_mode(0)).unwrap();
+    fs::set_permissions(&current, fs::Permissions::from_mode(0o0)).unwrap();
     let access = fs::read_dir(&current);
     let result = storage.read_current();
     fs::set_permissions(&current, original).unwrap();
