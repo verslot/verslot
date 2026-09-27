@@ -3,10 +3,12 @@
 Last updated: 2026-09-27
 
 M3 implementation tasks T1–T7 have code, test code, and documentation. The
-milestone is **Complete under local Windows acceptance**. The package version
-remains `0.2.0`; no release was published. The checks and official-distribution
+milestone is **Complete under local Windows acceptance**. Acceptance ran with
+package `0.2.0`; the separately requested metadata-only bump now sets `0.3.0`.
+No release was published. The checks and official-distribution
 smoke workflow passed on 2026-09-27 after the repairs recorded below. Unix and
-other architectures remain unverified for M3.
+other architectures lack official-distribution smoke evidence for M3. Repaired
+Windows/Linux/macOS CI passed subsequently, as recorded below.
 
 ## Required checks
 
@@ -75,6 +77,17 @@ for evidence; no user installation or selection was modified.
 
 ## Offline workflow scope
 
+### Subsequent GitHub CI
+
+[PR #3](https://github.com/verslot/verslot/pull/3) triggered the three-platform
+matrix. The initial `ed6401a` run failed on Unix-only Clippy warnings. Commit
+`59318c9` replaced manual modulo testing with `is_multiple_of`, collapsed the
+tar NUL-suffix conditional, and used byte string fixtures without changing
+archive behavior. The [repaired CI run](https://github.com/verslot/verslot/actions/runs/36259879124)
+passed fmt and Windows/Linux/macOS check, Clippy and test jobs. This evidence
+predates the metadata-only `0.3.0` bump; it does not establish a real Unix
+official-distribution smoke workflow or support for untested architectures.
+
 - `install::tests::offline_install_list_duplicate_uninstall_workflow_is_isolated`
   invokes `offline_workflow_child` with isolated HOME and LOCALAPPDATA. The
   private install preparation seam supplies a generated native archive and its
@@ -139,8 +152,8 @@ The Windows offline tests and the complete real HTTPS CLI workflow both passed.
 | --- | --- |
 | Windows x86_64 | Passed: four checks, 120 tests, native ZIP/junction/sharing/locking cases and official 22.0.0 smoke |
 | Windows aarch64 | Not run; mapping code alone is not acceptance evidence |
-| Linux GNU x86_64 / aarch64 | Not run; native tar/gzip, symlink, permission fixtures exist |
-| macOS x86_64 / aarch64 | Not run; Unix fixtures exist; non-UTF-8 directory-name fixture excluded |
+| Linux GNU | ubuntu-latest native CI check/Clippy/tests passed on `59318c9`; official smoke and other architectures not run |
+| macOS | macos-latest native CI check/Clippy/tests passed on `59318c9`; official smoke and other architectures not run; non-UTF-8 directory-name fixture excluded |
 
 Privileged Unix runners may bypass permission rejection fixtures; record this
 when reporting rename/read failure coverage. Case-alias rejection evidence also

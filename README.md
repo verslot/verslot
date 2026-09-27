@@ -6,16 +6,18 @@ A minimal, extensible tool version manager written in Rust.
 
 Verslot is currently under development.
 
-## v0.2.0 scope
+## v0.3.0 scope
 
-The current package version is `0.2.0`. This version implements shared target
+The current package version is `0.3.0`. This version implements shared target
 validation, storage path boundaries, and internal current-version state reads.
 The working tree also contains v0.3 T1–T7: verified Node.js installation,
 safe extraction, OS locking, rename commit, failure cleanup, read-only
 complete-installation listing, protected uninstallation, and offline workflow
 tests. M3 local Windows acceptance passed (7 / 7 tasks): four required checks,
-120 tests and the official Node.js 22.0.0 smoke workflow. Other platforms and
-architectures remain unverified for M3. Switching and CLI current-version queries remain unimplemented.
+120 tests and the official Node.js 22.0.0 smoke workflow. The repaired
+Windows/Linux/macOS CI matrix also passed before this metadata-only version
+bump; official-distribution smoke evidence remains Windows x86_64 only.
+Switching and CLI current-version queries remain unimplemented.
 See the [v0.3 design](docs/v0.3.md),
 [v0.2 specification](docs/v0.2.md), and
 [roadmap](docs/roadmap.md) for scope and progress.
