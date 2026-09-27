@@ -1,6 +1,13 @@
 mod cli;
+pub mod distribution;
+pub mod download;
+mod install;
+pub mod installation;
+mod inventory;
+mod mutation;
 pub mod storage;
 pub mod target;
+mod uninstall;
 
 use clap::Parser;
 use cli::{Cli, Command};
@@ -9,10 +16,24 @@ pub fn run() -> Result<(), String> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Install { target } => Err(format!("not implemented: install {target}")),
-        Command::Uninstall { target } => Err(format!("not implemented: uninstall {target}")),
+        Command::Install { target } => {
+            let message = install::install(&target)?;
+            println!("{message}");
+            Ok(())
+        }
+        Command::Uninstall { target } => {
+            let message = uninstall::uninstall(&target)?;
+            println!("{message}");
+            Ok(())
+        }
         Command::Use { target } => Err(format!("not implemented: use {target}")),
-        Command::List => Err("not implemented: list".to_owned()),
+        Command::List => {
+            let installations = inventory::list_installed()?;
+            for target in installations {
+                println!("{target}");
+            }
+            Ok(())
+        }
         Command::Current => Err("not implemented: current".to_owned()),
     }
 }

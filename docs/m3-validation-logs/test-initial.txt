@@ -1,0 +1,235 @@
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling typenum v1.20.1
+   Compiling zeroize v1.9.0
+   Compiling untrusted v0.9.0
+   Compiling itoa v1.0.18
+   Compiling log v0.4.34
+   Compiling bytes v1.12.1
+   Compiling getrandom v0.2.17
+   Compiling rustls-pki-types v1.15.1
+   Compiling ring v0.17.14
+   Compiling adler2 v2.0.1
+   Compiling simd-adler32 v0.3.10
+   Compiling crc32fast v1.5.2
+   Compiling aho-corasick v1.1.5
+   Compiling http v1.5.0
+   Compiling miniz_oxide v0.9.1
+   Compiling hybrid-array v0.4.15
+   Compiling httparse v1.10.1
+   Compiling base64 v0.23.1
+   Compiling subtle v2.6.1
+   Compiling once_cell v1.21.4
+   Compiling hashbrown v0.17.1
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling regex-automata v0.4.18
+   Compiling rustls-webpki v0.103.15
+   Compiling equivalent v1.0.2
+   Compiling indexmap v2.14.2
+   Compiling ureq-proto v0.6.4
+   Compiling flate2 v1.1.10
+   Compiling rustls v0.23.45
+   Compiling digest v0.11.3
+   Compiling webpki-roots v1.0.9
+   Compiling typed-path v0.12.3
+   Compiling percent-encoding v2.3.2
+   Compiling cpufeatures v0.3.1
+   Compiling utf8-zero v0.8.1
+   Compiling sha2 v0.11.0
+   Compiling regex v1.13.1
+   Compiling bstr v1.13.1
+   Compiling zip v8.6.0
+   Compiling predicates v3.1.4
+   Compiling assert_cmd v2.2.2
+   Compiling ureq v3.4.2
+   Compiling verslot v0.2.0 (C:\Users\Jason\Documents\Codes\Program\verslot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.47s
+     Running unittests src\lib.rs (target\debug\deps\verslot-0c9b1117846a9e21.exe)
+
+running 100 tests
+test distribution::tests::version_components_are_rendered_without_resolution_or_fallback ... ok
+test distribution::tests::supported_platforms_select_exact_official_archives_and_urls ... ok
+test distribution::tests::unsupported_platforms_return_errors_without_fallback ... ok
+test distribution::tests::current_build_selection_uses_compile_time_platform ... ok
+test download::tests::expired_deadline_prevents_reads_and_writes ... ok
+test download::tests::checksum_matching_is_exact_and_accepts_lf_crlf_and_ascii_whitespace ... ok
+test download::tests::duplicate_and_malformed_matching_checksums_are_rejected ... ok
+test download::tests::read_failures_and_timeouts_do_not_return_a_verified_digest ... ok
+test download::tests::streaming_verifies_known_sha256_and_enforces_the_actual_byte_limit ... ok
+test download::tests::production_transport_requires_https_and_certificate_verification ... ok
+test download::tests::transport_reads_are_capped_without_extending_shorter_deadlines ... ok
+test download::tests::global_deadline_interrupts_a_stalled_http_body ... FAILED
+test download::tests::write_and_flush_failures_do_not_return_a_verified_digest ... ok
+test download::tests::existing_archive_is_preserved ... FAILED
+test download::tests::invalid_checksums_stop_before_archive_download_or_file_creation ... FAILED
+test download::tests::non_200_responses_are_rejected_and_redirects_are_not_followed ... FAILED
+test download::tests::mismatched_and_truncated_archives_are_not_verified ... FAILED
+test download::tests::valid_download_creates_an_exclusive_file_and_returns_the_verified_digest ... FAILED
+test install::tests::cleanup_refuses_shared_tmp_and_does_not_follow_links ... ok
+test install::tests::existing_incomplete_destination_is_preserved_without_download ... ok
+test install::tests::lock_directory_and_linked_mutation_paths_are_rejected ... FAILED
+test install::tests::destination_appearing_before_commit_is_preserved ... ok
+test install::tests::cleanup_failure_reports_leftover_and_preserves_committed_installation ... ok
+test install::tests::lock_contents_are_preserved_and_contention_is_nonblocking ... FAILED
+test install::tests::commits_complete_installation_and_duplicate_skips_preparation ... ok
+test download::tests::sha256_matches_the_million_a_vector_across_multiple_buffers ... ok
+test install::tests::offline_workflow_child ... ok
+test install::tests::lock_file_link_is_rejected ... ok
+test install::tests::process_lock_holder ... ok
+test install::tests::precommit_cleanup_failure_retains_primary_error_and_leftover_path ... ok
+test install::tests::linked_storage_root_is_supported_and_linked_destination_is_rejected ... ok
+test install::tests::operation_allocation_is_exclusive_and_existing_operations_are_preserved ... ok
+test install::tests::malformed_receipts_and_non_directory_destinations_are_preserved ... ok
+test installation::tests::byte_entry_and_truncation_limits_fail_without_a_receipt ... ok
+test installation::tests::duplicates_conflicts_and_implicit_parent_rules_are_enforced ... ok
+test install::tests::windows_locked_payload_causes_commit_failure_without_final_installation ... ok
+test installation::tests::existing_receipts_are_preserved_by_exclusive_creation ... ok
+test install::tests::preparation_and_validation_failures_clean_only_the_operation ... ok
+test installation::tests::receipts_require_exact_fields_target_platform_and_lowercase_digest ... ok
+test installation::tests::filesystem_case_aliases_are_rejected_when_the_filesystem_aliases_them ... ok
+test installation::tests::unsafe_entry_names_and_reserved_receipt_paths_are_rejected ... ok
+test install::tests::process_lock_is_released_after_exit_or_termination ... ok
+test installation::tests::staging_must_be_new_and_within_the_canonical_boundary ... ok
+test installation::tests::windows::duplicate_zip_records_cannot_be_hidden_by_the_library_name_index ... ok
+test installation::tests::windows::linked_staging_ancestors_are_rejected_and_canonicalized_storage_root_junctions_work ... ok
+test install::tests::real_extraction_commits_bundled_payload_and_corruption_cleans_operation ... ok
+test installation::tests::complete_installations_require_a_bounded_receipt_and_nonempty_regular_executable ... ok
+test installation::tests::windows::zip64_directory_records_are_bounded_and_supported ... ok
+test installation::tests::windows::windows_junction_mutation_ancestors_and_final_installations_are_rejected ... ok
+test installation::tests::windows::zip_byte_and_entry_limits_are_enforced_before_payload_writes ... ok
+test install::tests::offline_install_list_duplicate_uninstall_workflow_is_isolated ... ok
+test inventory::tests::files_in_inventory_ancestors_are_errors_not_empty_inventory ... ok
+test inventory::tests::missing_and_empty_inventory_paths_do_not_create_storage ... ok
+test installation::tests::windows::zip_rejects_symlinks_and_filesystem_case_aliases ... ok
+test installation::tests::windows::zip_crc_truncation_encryption_and_unsupported_compression_fail_before_receipt_creation ... ok
+test installation::tests::windows::stored_and_deflated_zip_preserve_bundled_files_and_write_valid_receipts ... ok
+test inventory::tests::canonical_entries_require_complete_installations ... ok
+test storage::tests::absent_current_state_is_read_without_creating_directories ... ok
+test inventory::tests::receipt_read_sharing_failure_is_reported ... ok
+test storage::tests::current_directory_cannot_escape_even_when_the_entry_is_missing ... ok
+test storage::tests::current_links_to_external_installations_are_rejected ... ok
+test storage::tests::current_links_to_files_are_rejected ... ok
+test storage::tests::current_reads_reject_an_escaped_installation_ancestor ... ok
+test storage::tests::current_reads_use_the_canonical_storage_root ... ok
+test inventory::tests::versions_sort_numerically_and_ignore_noncanonical_entries_and_other_state ... ok
+test inventory::tests::root_links_are_resolved_and_internal_links_are_rejected ... ok
+test storage::tests::current_link_returns_the_resolved_version_without_checking_install_contents ... ok
+test storage::tests::current_version_is_derived_from_the_resolved_name ... ok
+test storage::tests::dangling_current_link_is_an_error_not_no_selection ... ok
+test storage::tests::existing_invalid_intermediate_directories_cannot_be_hidden_by_later_links ... ok
+test storage::tests::descendants_cannot_escape_through_directory_links ... ok
+test storage::tests::io_errors_are_not_treated_as_missing_state ... ok
+test storage::tests::invalid_current_ancestors_do_not_report_no_selection ... ok
+test storage::tests::link_loops_are_errors ... ok
+test storage::tests::current_targets_must_be_direct_canonical_version_directories ... ok
+test storage::tests::links_within_the_storage_boundary_are_allowed ... ok
+test storage::tests::missing_roots_check_their_nearest_existing_ancestor ... ok
+test storage::tests::missing_descendants_do_not_hide_broken_links_or_files ... ok
+test storage::tests::linked_storage_root_is_the_boundary ... ok
+test storage::tests::root_sources_must_be_present_and_absolute ... ok
+test storage::tests::windows_roots_accept_drive_and_unc_but_reject_drive_relative_paths ... ok
+test target::tests::diagnostics_match_the_specification ... ok
+test target::tests::full_versions_return_numeric_data_and_canonical_names ... ok
+test target::tests::malformed_targets_report_the_first_failed_rule ... ok
+test storage::tests::native_root_and_version_paths_are_constructed_without_writes ... ok
+test storage::tests::ordinary_current_entries_are_errors ... ok
+test uninstall::tests::cleanup_never_traverses_payload_links ... ok
+test installation::tests::windows::zip_rejects_unsafe_paths_and_preserves_an_external_sentinel ... ok
+test uninstall::tests::linked_storage_root_is_supported ... ok
+test uninstall::tests::linked_installation_ancestors_destination_and_tmp_are_rejected ... ok
+test uninstall::tests::lock_contention_preserves_the_installation ... ok
+test uninstall::tests::missing_and_incomplete_installations_are_preserved ... ok
+test uninstall::tests::selected_versions_are_protected_even_without_a_receipt ... ok
+test uninstall::tests::invalid_current_state_blocks_unrelated_removal ... ok
+test uninstall::tests::partial_cleanup_failure_reports_detachment_and_retains_the_leftover_path ... ok
+test storage::tests::environment_root_is_read_in_an_isolated_process ... ok
+test uninstall::tests::uninstall_removes_only_the_inactive_installation_and_own_operation ... ok
+test uninstall::tests::windows_readonly_payload_reports_native_cleanup_failure_after_detachment ... FAILED
+test uninstall::tests::windows_locked_payload_preserves_installation_when_detachment_fails ... ok
+test download::tests::transport_failure_and_expired_request_deadline_are_reported ... ok
+
+failures:
+
+---- download::tests::global_deadline_interrupts_a_stalled_http_body stdout ----
+
+thread '<unnamed>' (13316) panicked at src\download\tests.rs:419:43:
+called `Result::unwrap()` on an `Err` value: Os { code: 10035, kind: WouldBlock, message: "无法立即完成一个非阻止性套接字操作。" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'download::tests::global_deadline_interrupts_a_stalled_http_body' (31620) panicked at src\download\tests.rs:426:68:
+called `Result::unwrap()` on an `Err` value: "download http://127.0.0.1:54135: transport failure: io: 远程主机强迫关闭了一个现有的连接。 (os error 10054)"
+
+---- download::tests::existing_archive_is_preserved stdout ----
+
+thread '<unnamed>' (25440) panicked at src\download\tests.rs:183:51:
+called `Result::unwrap()` on an `Err` value: Os { code: 10035, kind: WouldBlock, message: "无法立即完成一个非阻止性套接字操作。" }
+
+thread 'download::tests::existing_archive_is_preserved' (6900) panicked at src\download\tests.rs:336:5:
+assertion failed: download_distribution(&local_agent(), &local_distribution(&url),
+            &directory.archive_path()).unwrap_err().contains("create archive")
+
+---- download::tests::invalid_checksums_stop_before_archive_download_or_file_creation stdout ----
+
+thread '<unnamed>' (9684) panicked at src\download\tests.rs:183:51:
+called `Result::unwrap()` on an `Err` value: Os { code: 10035, kind: WouldBlock, message: "无法立即完成一个非阻止性套接字操作。" }
+
+thread 'download::tests::invalid_checksums_stop_before_archive_download_or_file_creation' (20228) panicked at src\download\tests.rs:296:21:
+called `Result::unwrap()` on an `Err` value: Any { .. }
+
+---- download::tests::non_200_responses_are_rejected_and_redirects_are_not_followed stdout ----
+
+thread '<unnamed>' (16840) panicked at src\download\tests.rs:183:51:
+called `Result::unwrap()` on an `Err` value: Os { code: 10035, kind: WouldBlock, message: "无法立即完成一个非阻止性套接字操作。" }
+
+thread 'download::tests::non_200_responses_are_rejected_and_redirects_are_not_followed' (29692) panicked at src\download\tests.rs:363:9:
+assertion failed: fetch_response(&local_agent(), &url,
+            deadline()).unwrap_err().contains(expected)
+
+---- download::tests::mismatched_and_truncated_archives_are_not_verified stdout ----
+
+thread '<unnamed>' (7612) panicked at src\download\tests.rs:183:51:
+called `Result::unwrap()` on an `Err` value: Os { code: 10035, kind: WouldBlock, message: "无法立即完成一个非阻止性套接字操作。" }
+
+thread 'download::tests::mismatched_and_truncated_archives_are_not_verified' (31624) panicked at src\download\tests.rs:317:9:
+assertion failed: download_distribution(&local_agent(), &local_distribution(&url),
+            &directory.archive_path()).unwrap_err().contains(expected)
+
+---- download::tests::valid_download_creates_an_exclusive_file_and_returns_the_verified_digest stdout ----
+
+thread '<unnamed>' (31588) panicked at src\download\tests.rs:183:51:
+called `Result::unwrap()` on an `Err` value: Os { code: 10035, kind: WouldBlock, message: "无法立即完成一个非阻止性套接字操作。" }
+
+thread 'download::tests::valid_download_creates_an_exclusive_file_and_returns_the_verified_digest' (29180) panicked at src\download\tests.rs:268:85:
+called `Result::unwrap()` on an `Err` value: "download http://127.0.0.1:54138/node-v22.0.0-win-x64.zip: transport failure: io: 你的主机中的软件中止了一个已建立的连接。 (os error 10053)"
+
+---- install::tests::lock_directory_and_linked_mutation_paths_are_rejected stdout ----
+
+thread 'install::tests::lock_directory_and_linked_mutation_paths_are_rejected' (16616) panicked at src\install\tests.rs:237:5:
+assertion failed: fixture.install().unwrap_err().contains("regular file")
+
+---- install::tests::lock_contents_are_preserved_and_contention_is_nonblocking stdout ----
+
+thread 'install::tests::lock_contents_are_preserved_and_contention_is_nonblocking' (26320) panicked at src\install\tests.rs:228:32:
+called `Result::unwrap()` on an `Err` value: Os { code: 33, kind: Uncategorized, message: "另一个程序已锁定文件的一部分，进程无法访问。" }
+
+---- uninstall::tests::windows_readonly_payload_reports_native_cleanup_failure_after_detachment stdout ----
+
+thread 'uninstall::tests::windows_readonly_payload_reports_native_cleanup_failure_after_detachment' (14436) panicked at src\uninstall\tests.rs:391:37:
+called `Result::unwrap_err()` on an `Ok` value: "uninstalled node@22.0.0"
+
+
+failures:
+    download::tests::existing_archive_is_preserved
+    download::tests::global_deadline_interrupts_a_stalled_http_body
+    download::tests::invalid_checksums_stop_before_archive_download_or_file_creation
+    download::tests::mismatched_and_truncated_archives_are_not_verified
+    download::tests::non_200_responses_are_rejected_and_redirects_are_not_followed
+    download::tests::valid_download_creates_an_exclusive_file_and_returns_the_verified_digest
+    install::tests::lock_contents_are_preserved_and_contention_is_nonblocking
+    install::tests::lock_directory_and_linked_mutation_paths_are_rejected
+    uninstall::tests::windows_readonly_payload_reports_native_cleanup_failure_after_detachment
+
+test result: FAILED. 91 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.06s
+
+error: test failed, to rerun pass `--lib`

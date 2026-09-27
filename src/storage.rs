@@ -26,7 +26,7 @@ impl Storage {
         Self::from_source(std::env::var_os(ROOT_VARIABLE).as_deref())
     }
 
-    fn from_source(source: Option<&OsStr>) -> io::Result<Self> {
+    pub(crate) fn from_source(source: Option<&OsStr>) -> io::Result<Self> {
         let source = source.ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -65,8 +65,7 @@ impl Storage {
         Ok(self.checked_directory(&["current"])?.join("node"))
     }
 
-    // M2 state reads stay internal until the current command is implemented.
-    #[allow(dead_code)]
+    // Internal state reads also protect the selected version during uninstall.
     pub(crate) fn read_current(&self) -> io::Result<Option<Version>> {
         let link = self.current_link_path()?;
         match fs::symlink_metadata(&link) {

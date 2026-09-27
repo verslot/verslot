@@ -1,0 +1,2 @@
+    Checking verslot v0.2.0 (C:\Users\Jason\Documents\Codes\Program\verslot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.84s

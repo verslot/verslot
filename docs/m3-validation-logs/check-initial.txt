@@ -1,0 +1,93 @@
+    Checking cfg-if v1.0.5
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v2.0.1
+    Checking memchr v2.8.3
+    Checking typenum v1.20.1
+    Checking zeroize v1.9.0
+    Checking untrusted v0.9.0
+   Compiling httparse v1.10.1
+    Checking getrandom v0.2.17
+   Compiling crc32fast v1.5.2
+    Checking rustls-pki-types v1.15.1
+    Checking log v0.4.34
+    Checking itoa v1.0.18
+    Checking aho-corasick v1.1.5
+    Checking adler2 v2.0.1
+   Compiling cc v1.5.1
+    Checking simd-adler32 v0.3.10
+   Compiling rustls v0.23.45
+    Checking bytes v1.12.1
+    Checking hybrid-array v0.4.15
+    Checking miniz_oxide v0.9.1
+    Checking base64 v0.23.1
+    Checking regex-automata v0.4.18
+    Checking http v1.5.0
+    Checking once_cell v1.21.4
+    Checking subtle v2.6.1
+    Checking hashbrown v0.17.1
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+    Checking equivalent v1.0.2
+    Checking flate2 v1.1.10
+    Checking webpki-roots v1.0.9
+    Checking cpufeatures v0.3.1
+    Checking typed-path v0.12.3
+    Checking percent-encoding v2.3.2
+    Checking utf8-zero v0.8.1
+    Checking indexmap v2.14.2
+    Checking ureq-proto v0.6.4
+    Checking digest v0.11.3
+   Compiling ring v0.17.14
+    Checking sha2 v0.11.0
+    Checking zip v8.6.0
+    Checking regex v1.13.1
+    Checking bstr v1.13.1
+    Checking predicates v3.1.4
+    Checking assert_cmd v2.2.2
+    Checking rustls-webpki v0.103.15
+    Checking ureq v3.4.2
+    Checking verslot v0.2.0 (C:\Users\Jason\Documents\Codes\Program\verslot)
+error[E0277]: the trait bound `Array<u8, UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>>: LowerHex` is not satisfied
+   --> src\install\tests.rs:504:38
+    |
+504 |         let digest = format!("{:x}", Sha256::digest(&bytes));
+    |                               ----   ^^^^^^^^^^^^^^^^^^^^^^ the trait `LowerHex` is not implemented for `Array<u8, UInt<UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>, ...>>`
+    |                               |
+    |                               required by this formatting parameter
+    |
+    = help: the following other types implement trait `LowerHex`:
+              &T
+              &mut T
+              Saturating<T>
+              Wrapping<T>
+              bytes::bytes::Bytes
+              bytes::bytes_mut::BytesMut
+              compiler_builtins::math::libm_math::support::big::i256
+              compiler_builtins::math::libm_math::support::big::u256
+            and 14 others
+    = note: the full name for the type has been written to 'C:\Users\Jason\Documents\Codes\Program\verslot\target\debug\deps\verslot-0e399f03979538f0.long-type-553244594835164658.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `Array<u8, UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>>: LowerHex` is not satisfied
+   --> src\install\tests.rs:603:38
+    |
+603 |         let digest = format!("{:x}", Sha256::digest(&bytes));
+    |                               ----   ^^^^^^^^^^^^^^^^^^^^^^ the trait `LowerHex` is not implemented for `Array<u8, UInt<UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>, ...>>`
+    |                               |
+    |                               required by this formatting parameter
+    |
+    = help: the following other types implement trait `LowerHex`:
+              &T
+              &mut T
+              Saturating<T>
+              Wrapping<T>
+              bytes::bytes::Bytes
+              bytes::bytes_mut::BytesMut
+              compiler_builtins::math::libm_math::support::big::i256
+              compiler_builtins::math::libm_math::support::big::u256
+            and 14 others
+    = note: the full name for the type has been written to 'C:\Users\Jason\Documents\Codes\Program\verslot\target\debug\deps\verslot-0e399f03979538f0.long-type-553244594835164658.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `verslot` (lib test) due to 2 previous errors

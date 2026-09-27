@@ -15,12 +15,12 @@ pub(crate) struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
-    /// Install a tool version (not implemented yet).
+    /// Install a tool version.
     Install {
         #[arg(value_name = "TOOL@VERSION")]
         target: Target,
     },
-    /// Uninstall a tool version (not implemented yet).
+    /// Uninstall a tool version.
     Uninstall {
         #[arg(value_name = "TOOL@VERSION")]
         target: Target,
@@ -31,7 +31,7 @@ pub(crate) enum Command {
         #[arg(value_name = "TOOL@VERSION")]
         target: Target,
     },
-    /// List installed tool versions (not implemented yet).
+    /// List installed tool versions.
     List,
     /// Show the current tool versions (not implemented yet).
     Current,

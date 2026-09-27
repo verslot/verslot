@@ -1,6 +1,6 @@
 [package]
 name = "verslot"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "A minimal, extensible tool version manager written in Rust."
 license = "MIT OR Apache-2.0"
@@ -8,9 +8,16 @@ repository = "https://github.com/verslot/verslot"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+sha2 = { version = "0.11", default-features = false }
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
 
 [target.'cfg(windows)'.dependencies]
 junction = "2"
+zip = { version = "8.6", default-features = false, features = ["deflate-flate2"] }
+
+[target.'cfg(unix)'.dependencies]
+tar = { version = "0.4.46", default-features = false }
 
 [dev-dependencies]
 assert_cmd = "2"
