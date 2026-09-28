@@ -308,6 +308,7 @@ fn unfinished_switch_blocks_queries_and_writers_but_keeps_list_available() {
     for name in [".node-next", ".node-previous"] {
         let residue = fixture.root.join("current").join(name);
         fs::write(&residue, b"preserved residue").unwrap();
+        let diagnostic_path = fs::canonicalize(&residue).unwrap();
         for arguments in [
             vec!["current"],
             vec!["use", "node@22.0.0"],
@@ -321,7 +322,9 @@ fn unfinished_switch_blocks_queries_and_writers_but_keeps_list_available() {
                 .code(1)
                 .stdout("")
                 .stderr(predicate::str::contains("unfinished switch"))
-                .stderr(predicate::str::contains(residue.display().to_string()));
+                .stderr(predicate::str::contains(
+                    diagnostic_path.display().to_string(),
+                ));
             assert_eq!(fs::read(&residue).unwrap(), b"preserved residue");
         }
         fixture
