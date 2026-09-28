@@ -1,0 +1,13 @@
+    Checking verslot v0.3.0 (D:\code\verslot)
+error: the borrowed expression implements the required traits
+   --> tests\selection_cli.rs:215:55
+    |
+215 |         let observed = winapi_util::file::information(&open_junction()).unwrap();
+    |                                                       ^^^^^^^^^^^^^^^^ help: change this to: `open_junction()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: could not compile `verslot` (test "selection_cli") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

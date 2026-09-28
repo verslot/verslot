@@ -3,9 +3,17 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use crate::installation::validate_installation;
+use crate::mutation::{acquire_read_lock, reject_switch_residue};
 use crate::target::{Target, Version};
 
 mod links;
+
+#[cfg(unix)]
+mod switching;
+
+#[cfg(windows)]
+mod switching_windows;
 
 #[cfg(windows)]
 const ROOT_VARIABLE: &str = "LOCALAPPDATA";
@@ -63,6 +71,53 @@ impl Storage {
     // Inspect the current entry separately: a dangling link is a state error.
     pub fn current_link_path(&self) -> io::Result<PathBuf> {
         Ok(self.checked_directory(&["current"])?.join("node"))
+    }
+
+    /// Reads a complete selection under a shared lock without creating any files.
+    pub fn read_selected(&self) -> io::Result<Option<Version>> {
+        // Validate even missing ancestors using the existing read-only path rules.
+        self.current_link_path()?;
+        match fs::symlink_metadata(&self.root) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+            Ok(_) => {}
+        }
+        let root = fs::canonicalize(&self.root)?;
+        let lock = acquire_read_lock(&root)?;
+        reject_switch_residue(&root)?;
+        if lock.is_none() {
+            match fs::symlink_metadata(root.join("current/node")) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+                Err(error) => return Err(error),
+                Ok(_) => {
+                    return Err(io::Error::other(
+                        "current selection exists without mutation lock",
+                    ));
+                }
+            }
+        }
+        self.read_complete_current(&root)
+    }
+
+    // The caller holds the mutation lock; never reacquire it during a switch.
+    pub(crate) fn read_complete_current(
+        &self,
+        canonical_root: &Path,
+    ) -> io::Result<Option<Version>> {
+        let version = self.read_current()?;
+        if let Some(version) = version {
+            let target = Target {
+                tool: crate::target::Tool::Node,
+                version,
+            };
+            validate_installation(canonical_root, &target).map_err(|error| {
+                io::Error::new(
+                    error.kind(),
+                    format!("current installation is not complete: {error}"),
+                )
+            })?;
+        }
+        Ok(version)
     }
 
     // Internal state reads also protect the selected version during uninstall.
@@ -159,3 +214,6 @@ fn resolve_directory(path: &Path) -> io::Result<PathBuf> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod selection_tests;

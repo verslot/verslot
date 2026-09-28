@@ -311,6 +311,24 @@ fn linked_storage_root_is_supported() {
 }
 
 #[test]
+fn switch_residue_blocks_uninstall_without_removing_installations() {
+    for name in [".node-next", ".node-previous"] {
+        let fixture = Fixture::new();
+        let directory = fixture.install("22.0.0");
+        fs::create_dir(fixture.root().join("current")).unwrap();
+        let residue = fixture.root().join("current").join(name);
+        link_directory(&directory, &residue);
+        let error = fixture.uninstall().unwrap_err();
+        assert!(error.contains("unfinished switch"));
+        assert!(error.contains(&residue.display().to_string()));
+        validate_installation(fixture.root(), &fixture.target()).unwrap();
+        assert!(!fixture.root().join("tmp").exists());
+        assert!(fs::symlink_metadata(&residue).is_ok());
+        remove_link(&residue);
+    }
+}
+
+#[test]
 fn cleanup_never_traverses_payload_links() {
     let fixture = Fixture::new();
     let directory = fixture.install("22.0.0");

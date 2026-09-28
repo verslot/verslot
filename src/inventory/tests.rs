@@ -92,6 +92,9 @@ fn versions_sort_numerically_and_ignore_noncanonical_entries_and_other_state() {
     fs::create_dir_all(fixture.root.join("tmp/orphan/staging")).unwrap();
     fs::create_dir(fixture.root.join("current")).unwrap();
     fs::write(fixture.root.join("current/node"), b"broken selection").unwrap();
+    for name in [".node-next", ".node-previous"] {
+        fs::write(fixture.root.join("current").join(name), b"switch residue").unwrap();
+    }
     let versions: Vec<_> = read_installations(&fixture.root)
         .unwrap()
         .iter()

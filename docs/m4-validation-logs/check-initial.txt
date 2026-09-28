@@ -1,0 +1,21 @@
+    Checking verslot v0.3.0 (D:\code\verslot)
+error[E0521]: borrowed data escapes outside of method
+  --> tests\selection_cli.rs:87:9
+   |
+86 |       fn assert_current(&self, stdout: &str) {
+   |                                ------  - let's call the lifetime of this reference `'1`
+   |                                |
+   |                                `stdout` is a reference that is only valid in the method body
+87 | /         self.command()
+88 | |             .arg("current")
+89 | |             .assert()
+90 | |             .success()
+91 | |             .stdout(stdout)
+   | |                           ^
+   | |                           |
+   | |___________________________`stdout` escapes the method body here
+   |                             argument requires that `'1` must outlive `'static`
+
+For more information about this error, try `rustc --explain E0521`.
+error: could not compile `verslot` (test "selection_cli") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

@@ -53,9 +53,62 @@ pub(crate) fn acquire_lock(root: &Path) -> io::Result<File> {
         return Err(io::Error::other("mutation lock must be a regular file"));
     }
     let file = OpenOptions::new().read(true).write(true).open(path)?;
-    file.try_lock()
-        .map_err(|error| io::Error::other(format!("cannot acquire mutation lock: {error}")))?;
+    file.try_lock().map_err(lock_error)?;
+    reject_switch_residue(root)?;
     Ok(file)
+}
+
+fn lock_error(error: std::fs::TryLockError) -> io::Error {
+    match error {
+        std::fs::TryLockError::WouldBlock => io::Error::other(
+            "storage is busy; retry after the active operation finishes (mutation lock)",
+        ),
+        std::fs::TryLockError::Error(error) => {
+            io::Error::other(format!("cannot acquire mutation lock: {error}"))
+        }
+    }
+}
+
+// Open an existing persistent lock read-only; queries never create it.
+pub(crate) fn acquire_read_lock(root: &Path) -> io::Result<Option<File>> {
+    real_directory(root, root)?;
+    let path = root.join(".mutation.lock");
+    match fs::symlink_metadata(&path) {
+        Ok(metadata) if is_link(&metadata) || !metadata.is_file() => {
+            return Err(io::Error::other("mutation lock must be a regular file"));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    }
+    let file = File::open(&path)?;
+    file.try_lock_shared().map_err(lock_error)?;
+    Ok(Some(file))
+}
+
+// Check ancestors before entries, and never follow or remove reserved links.
+pub(crate) fn reject_switch_residue(root: &Path) -> io::Result<()> {
+    real_directory(root, root)?;
+    let current = root.join("current");
+    match fs::symlink_metadata(&current) {
+        Ok(_) => real_directory(root, &current)?,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    }
+    for name in [".node-next", ".node-previous"] {
+        let path = current.join(name);
+        match fs::symlink_metadata(&path) {
+            Ok(_) => {
+                return Err(io::Error::other(format!(
+                    "unfinished switch at {}; inspect the links and referenced installations before manual recovery",
+                    path.display()
+                )));
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn allocate_operation(root: &Path) -> io::Result<PathBuf> {

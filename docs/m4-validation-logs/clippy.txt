@@ -1,0 +1,2 @@
+    Checking verslot v0.3.0 (D:\code\verslot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.17s

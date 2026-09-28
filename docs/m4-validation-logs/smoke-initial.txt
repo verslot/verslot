@@ -1,0 +1,7 @@
+M4 Windows x86_64 smoke 2026-09-28T11:27:34.1231651+08:00
+base=D:\code\verslot\target\m4-smoke-c10e5ea6b2ec4149a19019a11b89a088
+binary=D:\code\verslot\target\debug\verslot.exe
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["list"],"exit":0,"stdout":"","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["current"],"exit":0,"stdout":"","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["install","node@22.0.0"],"exit":0,"stdout":"installed node@22.0.0\n","stderr":""}
+Initial sandbox PowerShell checksum fetch failed: Invoke-WebRequest Authentication failed, see inner exception. Production install A succeeded; partial fixture retained. Full smoke did not pass on this attempt.

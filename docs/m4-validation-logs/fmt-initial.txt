@@ -1,0 +1,82 @@
+Diff in \\?\D:\code\verslot\src\install\tests.rs:778:
+     );
+     assert_eq!(crate::inventory::list_installed().unwrap(), vec![second]);
+     assert_eq!(storage.read_selected().unwrap(), Some(second.version));
+-    assert_eq!(fs::read(installation.join(".verslot-install")).unwrap(), receipt);
++    assert_eq!(
++        fs::read(installation.join(".verslot-install")).unwrap(),
++        receipt
++    );
+     assert_eq!(fs::read(executable).unwrap(), payload);
+     let npm = installation.join(if cfg!(windows) {
+         "node_modules/npm/bin/npm-cli.js"
+Diff in \\?\D:\code\verslot\tests\selection_cli.rs:156:
+         .assert()
+         .code(1)
+         .stdout("")
+-        .stderr(predicate::str::contains("cannot uninstall current version: node@24.0.0"));
++        .stderr(predicate::str::contains(
++            "cannot uninstall current version: node@24.0.0",
++        ));
+     fixture
+         .command()
+         .args(["uninstall", "node@22.0.0"])
+Diff in \\?\D:\code\verslot\tests\selection_cli.rs:243:
+         .assert()
+         .code(1)
+         .stdout("")
+-        .stderr(predicate::str::contains("receipt format, target, or platform"));
++        .stderr(predicate::str::contains(
++            "receipt format, target, or platform",
++        ));
+     fixture.assert_current("node@22.0.0\n");
+     assert_eq!(fs::read(&receipt).unwrap(), b"invalid receipt");
+     fs::write(
+Diff in \\?\D:\code\verslot\tests\selection_cli.rs:258:
+             .assert()
+             .code(1)
+             .stdout("")
+-            .stderr(predicate::str::contains("current installation is not complete"))
++            .stderr(predicate::str::contains(
++                "current installation is not complete",
++            ))
+             .stderr(predicate::str::contains("not installed").not());
+     }
+     fixture.finish();
+Diff in \\?\D:\code\verslot\tests\selection_cli.rs:371:
+         fixture.select(version);
+         for program in [entry.join(executable_name), PathBuf::from(executable_name)] {
+             Command::new(program)
+-                .args(["--exact", "synthetic_node_reports_its_receipt", "--nocapture"])
++                .args([
++                    "--exact",
++                    "synthetic_node_reports_its_receipt",
++                    "--nocapture",
++                ])
+                 .current_dir(&fixture.directory)
+                 .env("HOME", &fixture.directory)
+                 .env("LOCALAPPDATA", &fixture.directory)
+Diff in \\?\D:\code\verslot\tests\selection_cli.rs:379:
+                 .env("VERSLOT_TEST_NODE_EXECUTION", "1")
+                 .assert()
+                 .success()
+-                .stdout(predicate::str::contains(format!("synthetic node@{version}\n")))
++                .stdout(predicate::str::contains(format!(
++                    "synthetic node@{version}\n"
++                )))
+                 .stderr("");
+         }
+         fixture.assert_current(&format!("node@{version}\n"));
+Diff in \\?\D:\code\verslot\tests\selection_cli.rs:387:
+     let competing_directory = fixture.executable_directory("22.0.0");
+     let competing_path = std::env::join_paths([&competing_directory, &entry]).unwrap();
+     Command::new(executable_name)
+-        .args(["--exact", "synthetic_node_reports_its_receipt", "--nocapture"])
++        .args([
++            "--exact",
++            "synthetic_node_reports_its_receipt",
++            "--nocapture",
++        ])
+         .current_dir(&fixture.directory)
+         .env("PATH", &competing_path)
+         .env("VERSLOT_TEST_NODE_EXECUTION", "1")
