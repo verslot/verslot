@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use assert_cmd::Command;
@@ -12,13 +13,15 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         let directory = std::env::temp_dir().join(format!(
-            "verslot-selection-cli-{}-{nonce}",
-            std::process::id()
+            "verslot-selection-cli-{}-{nonce}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir(&directory).unwrap();
         let root = directory.join(if cfg!(windows) { "verslot" } else { ".verslot" });
