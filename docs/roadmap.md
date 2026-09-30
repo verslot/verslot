@@ -1,8 +1,8 @@
 # Verslot Development Roadmap and Progress
 
-Last updated: 2026-09-28
+Last updated: 2026-10-01
 
-This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation; the [v0.4 design](v0.4.md) defines M4 switching and current-version queries. Later phases describe the planned development order; they do not indicate completed work or committed release dates.
+This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation; the [v0.4 design](v0.4.md) defines M4 switching and current-version queries; the [v0.5 design](v0.5.md) defines M5 cross-platform delivery and release-scope validation. Planned work does not indicate completed delivery or a committed release date.
 
 ## Progress Overview
 
@@ -11,12 +11,12 @@ This document tracks development phases, tasks, and delivery progress. The CLI f
 | Metric | Current Status |
 | --- | --- |
 | Package version | `0.4.0` (does not indicate published binaries) |
-| Current milestone | M4 Complete under local Windows acceptance: 5 / 5 tasks and 5 / 5 capability code items. Four checks, 160 tests and official 22.0.0 / 24.0.0 smoke passed; Unix/other architectures remain unverified |
+| Current milestone | M5 In progress: 1 / 6 tasks complete. Windows T1 reuses verified M4 official A/B evidence plus exact-candidate CI; macOS T2 is in progress; Linux T3 has not started under the requested sequence |
 | Core features implemented | **5 / 5**: install, list, uninstall, use, and current have code and tests; local Windows M4 acceptance passed; full cross-platform delivery remains M5 |
-| Active development tasks | M4 T1–T5 complete and locally accepted on Windows; next M5 cross-platform delivery |
-| Next step | M5 cross-platform workflow/security/delivery validation; retain explicit Unix/architecture limits. [M4 evidence](m4-validation.md) |
+| Active development tasks | M5 T1 complete; T2 macOS native official workflow pending; T3 waits for T2 |
+| Next step | Complete [v0.5 T2 macOS native validation](v0.5.md#platform-specific-acceptance), then execute T3 Linux validation. [M5 evidence](m5-validation.md) |
 | Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; [M2 foundations](v0.2.md), [M4 switching and recovery](v0.4.md) |
-| Validation status | M2 checks passed: Windows 44, Linux 47, macOS 46 tests; macOS non-UTF-8 directory fixture excluded; [evidence](m2-validation-windows.md#pr-ci-repair-2026-09-26). M3 Windows: all four checks and 120 tests passed, official 22.0.0 smoke passed. [M4 local Windows validation](m4-validation.md): four checks, 160 tests and official 22.0.0 / 24.0.0 switch/current/PATH/uninstall smoke passed; Unix and other architectures remain unverified |
+| Validation status | Exact `v0.4.0` candidate CI passed Check/Clippy/Test on Windows, macOS and Ubuntu; formatting passed. [M5 T1](m5-validation.md) verified production-source equivalence and reused [M4 Windows validation](m4-validation.md): 160 tests plus official 22.0.0 / 24.0.0 switch/current/PATH/uninstall smoke. macOS/Linux official workflows and other architectures remain unverified |
 
 Implementation counts reflect features users can actually use; placeholder commands do not count as implemented. Phases differ in effort, so task counts are not used to estimate an overall project completion percentage.
 
@@ -54,9 +54,9 @@ Milestone statuses: Not started → In progress → Awaiting validation → Comp
 | M2 Target parsing and local state | Before M3 | Complete | 6 / 6 | Valid targets can be parsed, invalid targets are rejected, and local state read/write rules are defined |
 | M3 Node.js installation and queries | After M2 | Complete | 7 / 7 | Specified versions can be installed safely, query results match disk state, and installed versions can be uninstalled |
 | M4 Version switching | After M3 | Complete under local Windows acceptance | 5 / 5 capability code items; 5 / 5 tasks | Complete installed versions can be selected and queried; the fixed entry point and controlled PATH execute the selected version; failure recovery is validated |
-| M5 Cross-platform delivery | After M4 | Not started | 0 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
+| M5 Cross-platform delivery | After M4 | In progress | 1 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
 
-Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. M3 is planned in v0.3 and M4 in v0.4; M5 has no preset version number or date. No planned version implies a release commitment.
+Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. M3 is planned in v0.3, M4 in v0.4, and M5 in [v0.5](v0.5.md); M5 has no preset package version or date. No planned version implies a release commitment.
 
 ### Phase 1: CLI Foundation
 
@@ -102,7 +102,9 @@ Design: [v0.4](v0.4.md), with five implementation tasks distinct from this capab
 
 ### Phase 5: Cross-Platform Delivery
 
-- [ ] Validate the install → list → switch → query → uninstall workflow on Windows.
+Design: [v0.5](v0.5.md), with six delivery tasks corresponding to this checklist. The minimum gate requires native Windows x86_64, macOS arm64, and Linux x86_64 GNU checks and official two-version workflows, followed by a security review, evidence-based documentation, and an explicit release decision. T1 Windows is complete through exact-candidate CI and a documented M4-equivalence decision; T2 macOS is in progress. See [current evidence](m5-validation.md).
+
+- [x] Validate the install → list → switch → query → uninstall workflow on Windows.
 - [ ] Validate the same workflow on macOS.
 - [ ] Validate the same workflow on Linux.
 - [ ] Complete a security review of paths, archive extraction, checksum verification, and untrusted remote data.
@@ -164,6 +166,8 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-09-28 | Complete M4 T5 workflow/failure coverage and acceptance preparation | M4 Awaiting validation: 5 / 5 tasks and 5 / 5 capability code items. Added generated-archive fresh selection workflow, cross-process select/install/uninstall/current contention at native switch checkpoints, synthetic native fixed-entry/PATH execution and competing-PATH tests; [actual mapping](v0.4.md#acceptance-mapping), README/manual PATH and [M4 validation preparation](m4-validation.md) | Next: separate acceptance checks and official 22.0.0 / 24.0.0 smoke when requested. All T4/T5 checks/tests and full smoke Not run; prior T1–T3 Windows evidence remains separate; no runtime/dependency/version changes |
 | 2026-09-28 | Complete local Windows M4 acceptance | Four required checks, 133 library + 19 CLI + 8 selection CLI tests (160 total) and official Node.js 22.0.0 / 24.0.0 A/B switch/current/direct-entry/PATH/no-op/protected-uninstall smoke passed on Rust 1.98.1 / x86_64-pc-windows-msvc / NTFS. Repaired formatting, borrowed expected output and a needless borrow in tests; retained sandbox lock/TLS failures and successful reruns; [full evidence](m4-validation.md) | M4 Complete under local Windows acceptance; next M5 cross-platform delivery. Unix/other architectures and other filesystems unverified; no dependency/version change, release or persistent PATH modification |
 | 2026-09-30 | Bump package version to 0.4.0 and tag M4 | Updated Cargo.toml, only the verslot entry in Cargo.lock, README, roadmap and current v0.4 status; created the `v0.4.0` tag for the M4 implementation | M4 validation evidence predates this metadata-only bump; checks were not rerun. M5 cross-platform delivery remains next; no binaries were published |
+| 2026-10-01 | Design v0.5 / M5 | Added [M5 specification](v0.5.md): minimum native platform matrix, isolated official A/B workflow, platform evidence rules, security review, documentation/release criteria, six tasks and acceptance gate | M5 remains Not started (0 / 6); documentation only, checks/workflows/security review Not run; no version change, tag, binary, or release publication. Next: T1–T3 native platform validation |
+| 2026-10-01 | Complete M5 T1 Windows delivery validation and start T2 | Exact `v0.4.0` CI passed formatting and Windows/macOS/Linux Check, Clippy and Test steps. All production source hashes match retained M4 acceptance; T1 reuses the recorded Windows 22.0.0 / 24.0.0 A/B smoke. Local fmt passed; local Cargo resolution failed on Schannel/index availability without disabling TLS | M5 In progress (1 / 6). T2 candidate macOS CI passed but native Apple-silicon official workflow/environment evidence remains missing; T3 not started under the requested sequence. [Evidence](m5-validation.md) |
 
 Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 
