@@ -4,7 +4,7 @@ Last updated: 2026-10-01
 
 ## Status
 
-M5 is **In progress (1 / 6 tasks)**. T1 Windows delivery validation is complete by candidate-CI evidence plus the documented M4-equivalence decision below. T2 macOS delivery validation is in progress: the candidate passed the existing macOS CI job, but the required native official-distribution workflow and complete environment record are still missing. T3 Linux validation has not started because the requested execution order is T1 → T2 → T3.
+M5 is **In progress (2 / 6 tasks)**. T1 Windows delivery validation is complete by candidate-CI evidence plus the documented M4-equivalence decision below. T2 macOS delivery validation is complete through native Apple-silicon checks and the official two-version workflow. T3 Linux validation is next under the requested T1 → T2 → T3 order.
 
 No package version, tag, binary publication, or persistent PATH state changed during this validation update.
 
@@ -12,9 +12,10 @@ No package version, tag, binary publication, or persistent PATH state changed du
 
 | Field | Value |
 | --- | --- |
-| Candidate commit | `cf5760d930585cf31fd9de39d50e076cfd5b5270` (`v0.4.0`) |
+| Product candidate commit | `cf5760d930585cf31fd9de39d50e076cfd5b5270` (`v0.4.0`) |
+| macOS validation commit | `7dc4272b1009d11d421c53f865c1f48ba4a4fcb4`; differs from the product candidate only by M5 workflow and documentation commits |
 | Candidate CI | [run 36698517158](https://github.com/verslot/verslot/actions/runs/36698517158), push workflow, completed successfully on 2026-09-30 |
-| Local documentation state | `docs/v0.5.md`, this record, and roadmap updates are uncommitted; they do not change the executable |
+| Documentation state | This record, `docs/v0.5.md`, and the roadmap are synchronized after T2; they do not change the executable |
 | Package version | `0.4.0` |
 | Publication status | No Verslot binaries published |
 
@@ -57,24 +58,46 @@ The executable behavior used by the Windows smoke workflow is therefore unchange
 
 ## T2 macOS delivery validation
 
-**In progress.** Candidate CI [job 109832162310](https://github.com/verslot/verslot/actions/runs/36698517158/job/109832162310) completed its Check, Clippy, and Test steps successfully on `macos-latest` for the exact candidate commit.
+**Complete.** [Manual run 36777691817](https://github.com/verslot/verslot/actions/runs/36777691817) validated merge commit `7dc4272b1009d11d421c53f865c1f48ba4a4fcb4` on a GitHub-hosted `macos-15-arm64` runner. That commit adds only the manual validation workflow and M5 documentation to the unchanged `v0.4.0` product source.
 
-This is not sufficient to complete T2:
+### Native environment and checks
 
-- the existing CI workflow does not run the official Node.js A/B install/list/use/current/PATH/uninstall workflow;
-- the public job metadata labels the runner only as `macos-latest`, so Apple-silicon architecture and filesystem details are not established;
-- raw logs and exact test totals were unavailable with the current invalid GitHub CLI credential;
-- this Windows host has no native macOS execution environment.
+| Evidence | Result |
+| --- | --- |
+| Runner | macOS 15.7.9 (24G830), image `macos15` version `20260907.0337.1`, `arm64` |
+| Filesystem | Runner temporary directory on `/System/Volumes/Data`; root reports APFS; direct filename probe records `case_sensitive=false` |
+| Rust | `rustc 1.98.1`, host `aarch64-apple-darwin`; Cargo 1.98.1; Clippy 0.1.98 |
+| `cargo fmt --check` | Passed |
+| `cargo check --all-targets` | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | Passed |
+| `cargo test --all` | Passed: 136 library + 19 CLI + 8 selection CLI tests, 163 total; 0 failed or ignored |
+| Build | `cargo build --bin verslot` passed |
+| Artifact | `m5-t2-macos-arm64-36777691817-1`, artifact ID `11126770830`, uploaded ZIP SHA-256 `dcc0dd8f6539d27bc7a209488423adb91e204cad959a01c7b433133b51b5ebb2`, retained by GitHub Actions for 30 days |
 
-T2 requires a native macOS run that records OS version, Apple-silicon architecture, filesystem and case-sensitivity, Rust toolchain, exact test totals, official archive URLs/digests, command outputs, symlink identity/no-op behavior, fixed-entry and controlled-PATH execution, uninstall protection, payload preservation, and residue checks. Until that evidence exists, T2 remains In progress and the macOS roadmap checkbox remains unchecked.
+The run's only annotation is GitHub's notice that macOS arm64 capacity can cause longer queue times. The updated workflow uses `actions/checkout@v5` and `actions/upload-artifact@v6`; the earlier Node 20 deprecation warnings are absent.
 
-The manual-only [M5 T2 macOS validation workflow](../.github/workflows/m5-t2-macos.yml) prepares this evidence on a `macos-15` runner, asserts `arm64`, uses an isolated HOME, runs all four required checks, performs the complete official 22.0.0 / 24.0.0 workflow, and uploads text evidence without archives or extracted installations. Adding the workflow is preparation only; its results must be recorded below before T2 is complete.
+### Official two-version workflow
+
+- Empty `list` and `current` were read-only and did not create the isolated storage root.
+- Official Node.js `22.0.0` and `24.0.0` `darwin-arm64.tar.gz` archives installed successfully. The exact official SHA-256 values were `ea96d349cfaa67aa87ceeaa3e5b52c9167f7ac302fd8d1ff162d0785e9dc0785` and `194e2f3dd3ec8c2adcaa713ed40f44c5ca38467880e160974ceac1659be60121`.
+- Duplicate installation returned `already installed`; numeric listing returned 22.0.0 before 24.0.0.
+- Selecting each version made `current`, the fixed entry, and a controlled PATH execute the expected version. Re-selecting 24.0.0 returned `already using` and preserved the link inode.
+- A deliberately competing PATH resolved Node 22.0.0 while Verslot still reported 24.0.0, confirming the documented PATH precedence limitation; restoring the controlled PATH executed 24.0.0.
+- Receipt and executable hashes for both installations were unchanged after switching and the no-op selection.
+- Uninstalling the active 24.0.0 version failed with the expected protection error. Uninstalling inactive 22.0.0 succeeded; 24.0.0 remained selected and executable with unchanged bytes.
+- The final state contained no removed A installation, no reserved switch siblings, and an empty temporary directory. The smoke record ended with `PASS`.
+
+### Repairs and retained limitations
+
+The first workflow revision failed to parse because multiline expected-output literals escaped YAML block indentation. The repaired workflow then passed in [run 36776678819](https://github.com/verslot/verslot/actions/runs/36776678819), but its filesystem filter captured no filesystem or case-sensitivity fields, so it was not accepted as complete. PR [#8](https://github.com/verslot/verslot/pull/8) added raw filesystem output, a direct case probe, and Node 24 Action versions. Its CI passed after one Ubuntu rerun for a transient lock-release timing failure, and the final native rerun supplied the missing evidence without changing product code.
+
+macOS x86_64, case-sensitive APFS, other macOS versions, non-APFS filesystems, persistent shell-profile changes, and hostile same-user races remain unverified. The non-UTF-8 on-disk fixture remains excluded on macOS as specified; in-memory native-byte coverage is supporting evidence only.
 
 ## T3 Linux delivery validation
 
 **Not started.** The exact candidate's [ubuntu-latest job 109832162362](https://github.com/verslot/verslot/actions/runs/36698517158/job/109832162362) reports successful Check, Clippy, and Test steps. This is supporting evidence only; it does not include the official A/B workflow or the required GNU Linux environment/filesystem/permission record.
 
-Per the requested order, T3 begins only after T2 is complete or the user explicitly changes the order.
+Per the requested order, T3 is now the next development task.
 
 ## Progress log
 
@@ -84,3 +107,4 @@ Per the requested order, T3 begins only after T2 is complete or the user explici
 | 2026-10-01 | Start T2 macOS delivery validation | Exact-candidate macOS Check/Clippy/Test steps passed, but native Apple-silicon official workflow and full environment/log evidence are missing; provide a native macOS runner or an authorized way to run the candidate workflow before T3 |
 | 2026-10-01 | Repair initial manual-workflow parse failure | The first merged workflow produced run 36776022008 with no jobs and rejected dispatch because multiline expected-output literals escaped the YAML block indentation. Replaced them with single-line Bash ANSI-C newline expressions; no product code or acceptance result changed |
 | 2026-10-01 | Run repaired T2 workflow | [Run 36776678819](https://github.com/verslot/verslot/actions/runs/36776678819) passed arm64 assertion, all four checks, 163 tests, build, official 22.0.0 / 24.0.0 workflow and evidence upload. Evidence review found the filesystem filter recorded no filesystem/case-sensitivity fields, so T2 remains In progress pending a focused rerun; update deprecated Node 20 actions during that evidence repair |
+| 2026-10-01 | Complete T2 macOS delivery validation | PR [#8](https://github.com/verslot/verslot/pull/8) repaired filesystem/case evidence and updated Actions. [Run 36777691817](https://github.com/verslot/verslot/actions/runs/36777691817) passed on macOS 15.7.9 arm64 / APFS: all four checks, 163 tests, build, official Node.js 22.0.0 / 24.0.0 workflow, payload/residue assertions and evidence upload. T2 Complete; begin T3 Linux validation next |
