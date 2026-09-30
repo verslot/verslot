@@ -3,6 +3,7 @@ use crate::distribution::NodeDistribution;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc;
 
 struct Fixture {
     base: PathBuf,
@@ -488,34 +489,59 @@ fn native_atomic_replacement_exposes_only_old_or_new_link() {
     let fixture = Fixture::new();
     let first = fixture.install("22.0.0");
     let second = fixture.install("24.0.0");
-    fixture.storage.select(&Fixture::target("22.0.0")).unwrap();
+    fs::create_dir(fixture.storage.root().join("current")).unwrap();
+    std::os::unix::fs::symlink(&first, fixture.current()).unwrap();
     let finished = AtomicBool::new(false);
-    let barrier = std::sync::Barrier::new(2);
+    let (start_observing, observation_started) = mpsc::channel();
+    let (old_observed, old_observation) = mpsc::channel();
+    let (new_observed, new_observation) = mpsc::channel();
     std::thread::scope(|scope| {
-        let observer = scope.spawn(|| {
-            barrier.wait();
-            let mut reads = 0;
-            while !finished.load(Ordering::Acquire) || reads == 0 {
-                let destination = fs::canonicalize(fixture.current()).unwrap();
-                assert!(destination == first || destination == second);
+        let current = fixture.current();
+        let observed_first = first.clone();
+        let observed_second = second.clone();
+        let finished = &finished;
+        let observer = scope.spawn(move || -> io::Result<usize> {
+            if observation_started.recv().is_err() {
+                return Ok(0);
+            }
+            let mut reads = 1;
+            let destination = fs::canonicalize(&current)?;
+            if destination != observed_first && destination != observed_second {
+                return Err(io::Error::other("observed an unexpected selection"));
+            }
+            old_observed.send(destination).map_err(io::Error::other)?;
+            let mut reported_new = false;
+            while !finished.load(Ordering::Acquire) {
+                let destination = fs::canonicalize(&current)?;
+                if destination != observed_first && destination != observed_second {
+                    return Err(io::Error::other("observed an unexpected selection"));
+                }
+                if destination == observed_second && !reported_new {
+                    new_observed.send(()).map_err(io::Error::other)?;
+                    reported_new = true;
+                }
                 reads += 1;
             }
-            reads
+            Ok(reads)
         });
-        barrier.wait();
-        let result = (0..40).try_for_each(|index| {
-            fixture
-                .storage
-                .select(&Fixture::target(if index % 2 == 0 {
-                    "24.0.0"
-                } else {
-                    "22.0.0"
-                }))
-                .map(|_| ())
-        });
+        let result = fixture
+            .storage
+            .select_unix(&Fixture::target("24.0.0"), |step| {
+                if step == SwitchStep::Publish {
+                    start_observing.send(()).map_err(io::Error::other)?;
+                    if old_observation.recv().map_err(io::Error::other)? != first {
+                        return Err(io::Error::other("observer did not see the old selection"));
+                    }
+                } else if step == SwitchStep::ReadBack {
+                    new_observation.recv().map_err(io::Error::other)?;
+                }
+                Ok(())
+            });
         finished.store(true, Ordering::Release);
-        assert!(observer.join().unwrap() > 0);
+        drop(start_observing);
+        let observer_result = observer.join();
         result.unwrap();
+        assert!(observer_result.unwrap().unwrap() > 1);
     });
     fixture.no_residue();
     fixture.unchanged_installations();
