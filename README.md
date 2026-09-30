@@ -8,16 +8,16 @@ Verslot is currently under development.
 
 ## Current implementation
 
-The current package version is `0.3.0`. This version implements shared target
+The current package version is `0.4.0`. This version implements shared target
 validation, storage path boundaries, and internal current-version state reads.
-The working tree also contains v0.3 T1–T7: verified Node.js installation,
+It also contains v0.3 T1–T7: verified Node.js installation,
 safe extraction, OS locking, rename commit, failure cleanup, read-only
 complete-installation listing, protected uninstallation, and offline workflow
 tests. M3 local Windows acceptance passed (7 / 7 tasks): four required checks,
 120 tests and the official Node.js 22.0.0 smoke workflow. The repaired
-Windows/Linux/macOS CI matrix also passed before this metadata-only version
-bump; official-distribution smoke evidence remains Windows x86_64 only.
-The working tree now also contains M4 T1–T5: version switching, complete
+Windows/Linux/macOS CI matrix also passed before the earlier `0.3.0`
+metadata-only bump; official-distribution smoke evidence remains Windows
+x86_64 only. Version `0.4.0` adds M4 T1–T5: version switching, complete
 selected-version queries, recovery/locking tests and acceptance preparation.
 M4 is **Complete under local Windows acceptance**: four required checks,
 160 tests and the official Node.js 22.0.0 / 24.0.0 switching/PATH/uninstall

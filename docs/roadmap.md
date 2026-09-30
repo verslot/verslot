@@ -10,7 +10,7 @@ This document tracks development phases, tasks, and delivery progress. The CLI f
 
 | Metric | Current Status |
 | --- | --- |
-| Package version | `0.3.0` (does not indicate a published release) |
+| Package version | `0.4.0` (does not indicate published binaries) |
 | Current milestone | M4 Complete under local Windows acceptance: 5 / 5 tasks and 5 / 5 capability code items. Four checks, 160 tests and official 22.0.0 / 24.0.0 smoke passed; Unix/other architectures remain unverified |
 | Core features implemented | **5 / 5**: install, list, uninstall, use, and current have code and tests; local Windows M4 acceptance passed; full cross-platform delivery remains M5 |
 | Active development tasks | M4 T1–T5 complete and locally accepted on Windows; next M5 cross-platform delivery |
@@ -163,6 +163,7 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-09-28 | Complete M4 T4 use/current CLI integration | M4 In progress: 4 / 5 tasks, 5 / 5 capability code items and 5 / 5 core commands. Integrated existing selection/query APIs, exact success/no-op/empty-query output and contextual errors; updated help and placeholder regressions; added isolated offline CLI selection, state, locking, residue and M3 integration tests | Next: T5 workflow coverage, acceptance mapping and documentation. All T4 validation commands/tests Not run; prior T1–T3 evidence remains separate; no dependencies or package version change |
 | 2026-09-28 | Complete M4 T5 workflow/failure coverage and acceptance preparation | M4 Awaiting validation: 5 / 5 tasks and 5 / 5 capability code items. Added generated-archive fresh selection workflow, cross-process select/install/uninstall/current contention at native switch checkpoints, synthetic native fixed-entry/PATH execution and competing-PATH tests; [actual mapping](v0.4.md#acceptance-mapping), README/manual PATH and [M4 validation preparation](m4-validation.md) | Next: separate acceptance checks and official 22.0.0 / 24.0.0 smoke when requested. All T4/T5 checks/tests and full smoke Not run; prior T1–T3 Windows evidence remains separate; no runtime/dependency/version changes |
 | 2026-09-28 | Complete local Windows M4 acceptance | Four required checks, 133 library + 19 CLI + 8 selection CLI tests (160 total) and official Node.js 22.0.0 / 24.0.0 A/B switch/current/direct-entry/PATH/no-op/protected-uninstall smoke passed on Rust 1.98.1 / x86_64-pc-windows-msvc / NTFS. Repaired formatting, borrowed expected output and a needless borrow in tests; retained sandbox lock/TLS failures and successful reruns; [full evidence](m4-validation.md) | M4 Complete under local Windows acceptance; next M5 cross-platform delivery. Unix/other architectures and other filesystems unverified; no dependency/version change, release or persistent PATH modification |
+| 2026-09-30 | Bump package version to 0.4.0 and tag M4 | Updated Cargo.toml, only the verslot entry in Cargo.lock, README, roadmap and current v0.4 status; created the `v0.4.0` tag for the M4 implementation | M4 validation evidence predates this metadata-only bump; checks were not rerun. M5 cross-platform delivery remains next; no binaries were published |
 
 Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 
