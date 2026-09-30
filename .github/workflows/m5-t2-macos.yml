@@ -123,8 +123,7 @@ jobs:
           test ! -e "$root"
 
           for version in "$NODE_A" "$NODE_B"; do
-            run_expect 0 "installed node@$version
-" '' "$verslot" install "node@$version"
+            run_expect 0 "installed node@$version"$'\n' '' "$verslot" install "node@$version"
             archive="node-v$version-darwin-arm64.tar.gz"
             checksum_url="https://nodejs.org/dist/v$version/SHASUMS256.txt"
             checksum_file="$base/SHASUMS256-$version.txt"
@@ -149,33 +148,25 @@ jobs:
             run_expect 0 '' '' "$verslot" current
           done
 
-          run_expect 0 "already installed node@$NODE_A
-" '' "$verslot" install "node@$NODE_A"
-          run_expect 0 "node@$NODE_A
-node@$NODE_B
-" '' "$verslot" list
+          run_expect 0 "already installed node@$NODE_A"$'\n' '' "$verslot" install "node@$NODE_A"
+          run_expect 0 "node@$NODE_A"$'\n'"node@$NODE_B"$'\n' '' "$verslot" list
           run_expect 0 '' '' "$verslot" current
 
           entry_directory="$root/current/node/bin"
           entry_executable="$entry_directory/node"
           controlled_path="$entry_directory:/usr/bin:/bin"
           for version in "$NODE_A" "$NODE_B"; do
-            run_expect 0 "using node@$version
-" '' "$verslot" use "node@$version"
-            run_expect 0 "node@$version
-" '' "$verslot" current
-            run_expect 0 "v$version
-" '' "$entry_executable" --version
+            run_expect 0 "using node@$version"$'\n' '' "$verslot" use "node@$version"
+            run_expect 0 "node@$version"$'\n' '' "$verslot" current
+            run_expect 0 "v$version"$'\n' '' "$entry_executable" --version
             resolved=$(PATH="$controlled_path" command -v node)
             test "$resolved" = "$entry_executable"
             printf 'resolvedNode=%s\n' "$resolved" >> "$smoke_log"
-            run_expect 0 "v$version
-" '' env PATH="$controlled_path" node --version
+            run_expect 0 "v$version"$'\n' '' env PATH="$controlled_path" node --version
           done
 
           selected_inode=$(stat -f '%i' "$root/current/node")
-          run_expect 0 "already using node@$NODE_B
-" '' "$verslot" use "node@$NODE_B"
+          run_expect 0 "already using node@$NODE_B"$'\n' '' "$verslot" use "node@$NODE_B"
           test "$(stat -f '%i' "$root/current/node")" = "$selected_inode"
 
           competing_directory="$root/installs/node/$NODE_A/bin"
@@ -183,12 +174,9 @@ node@$NODE_B
           resolved=$(PATH="$competing_path" command -v node)
           test "$resolved" = "$competing_directory/node"
           printf 'competingNode=%s\n' "$resolved" >> "$smoke_log"
-          run_expect 0 "v$NODE_A
-" '' env PATH="$competing_path" node --version
-          run_expect 0 "node@$NODE_B
-" '' "$verslot" current
-          run_expect 0 "v$NODE_B
-" '' env PATH="$controlled_path" node --version
+          run_expect 0 "v$NODE_A"$'\n' '' env PATH="$competing_path" node --version
+          run_expect 0 "node@$NODE_B"$'\n' '' "$verslot" current
+          run_expect 0 "v$NODE_B"$'\n' '' env PATH="$controlled_path" node --version
 
           for version in "$NODE_A" "$NODE_B"; do
             installation="$root/installs/node/$version"
@@ -201,16 +189,11 @@ node@$NODE_B
 
           run_expect 1 '' "cannot uninstall current version: node@$NODE_B" \
             "$verslot" uninstall "node@$NODE_B"
-          run_expect 0 "uninstalled node@$NODE_A
-" '' "$verslot" uninstall "node@$NODE_A"
-          run_expect 0 "node@$NODE_B
-" '' "$verslot" list
-          run_expect 0 "node@$NODE_B
-" '' "$verslot" current
-          run_expect 0 "v$NODE_B
-" '' "$entry_executable" --version
-          run_expect 0 "v$NODE_B
-" '' env PATH="$controlled_path" node --version
+          run_expect 0 "uninstalled node@$NODE_A"$'\n' '' "$verslot" uninstall "node@$NODE_A"
+          run_expect 0 "node@$NODE_B"$'\n' '' "$verslot" list
+          run_expect 0 "node@$NODE_B"$'\n' '' "$verslot" current
+          run_expect 0 "v$NODE_B"$'\n' '' "$entry_executable" --version
+          run_expect 0 "v$NODE_B"$'\n' '' env PATH="$controlled_path" node --version
 
           test ! -e "$root/installs/node/$NODE_A"
           remaining="$root/installs/node/$NODE_B"
