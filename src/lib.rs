@@ -26,7 +26,19 @@ pub fn run() -> Result<(), String> {
             println!("{message}");
             Ok(())
         }
-        Command::Use { target } => Err(format!("not implemented: use {target}")),
+        Command::Use { target } => {
+            let storage =
+                storage::Storage::from_env().map_err(|error| format!("use {target}: {error}"))?;
+            let changed = storage
+                .select(&target)
+                .map_err(|error| format!("use {target}: {error}"))?;
+            if changed {
+                println!("using {target}");
+            } else {
+                println!("already using {target}");
+            }
+            Ok(())
+        }
         Command::List => {
             let installations = inventory::list_installed()?;
             for target in installations {
@@ -34,6 +46,16 @@ pub fn run() -> Result<(), String> {
             }
             Ok(())
         }
-        Command::Current => Err("not implemented: current".to_owned()),
+        Command::Current => {
+            let storage =
+                storage::Storage::from_env().map_err(|error| format!("current: {error}"))?;
+            if let Some(version) = storage
+                .read_selected()
+                .map_err(|error| format!("current: {error}"))?
+            {
+                println!("node@{version}");
+            }
+            Ok(())
+        }
     }
 }

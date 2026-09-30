@@ -18,7 +18,7 @@ fn help_describes_the_cli() {
         .stdout(predicate::str::contains("uninstall"))
         .stdout(predicate::str::contains("use"))
         .stdout(predicate::str::contains("list"))
-        .stdout(predicate::str::contains("not implemented yet"))
+        .stdout(predicate::str::contains("not implemented yet").not())
         .stdout(predicate::str::contains("current"));
 }
 
@@ -67,12 +67,16 @@ fn uninstall_reports_storage_errors() {
 }
 
 #[test]
-fn use_is_explicitly_not_implemented_yet() {
+fn use_reports_storage_errors() {
     verslot_command()
         .args(["use", "node@22.0.0"])
+        .env_remove("HOME")
+        .env_remove("LOCALAPPDATA")
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("not implemented: use node@22.0.0"));
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains("use node@22.0.0:"))
+        .stderr(predicate::str::contains("is missing"));
 }
 
 #[test]
@@ -89,12 +93,16 @@ fn list_reports_storage_errors() {
 }
 
 #[test]
-fn current_is_explicitly_not_implemented_yet() {
+fn current_reports_storage_errors() {
     verslot_command()
         .arg("current")
+        .env_remove("HOME")
+        .env_remove("LOCALAPPDATA")
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("not implemented: current"));
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains("current:"))
+        .stderr(predicate::str::contains("is missing"));
 }
 
 #[test]
@@ -128,7 +136,7 @@ fn target_commands_reject_extra_targets() {
 }
 
 #[test]
-fn valid_targets_retain_placeholder_behavior() {
+fn valid_use_targets_reach_storage_resolution() {
     for target in [
         "node@22.0.0",
         "node@0.0.0",
@@ -136,10 +144,13 @@ fn valid_targets_retain_placeholder_behavior() {
     ] {
         verslot_command()
             .args(["use", target])
+            .env_remove("HOME")
+            .env_remove("LOCALAPPDATA")
             .assert()
             .code(1)
             .stdout("")
-            .stderr(format!("not implemented: use {target}\n"));
+            .stderr(predicate::str::contains(format!("use {target}:")))
+            .stderr(predicate::str::contains("is missing"));
     }
 }
 
@@ -229,7 +240,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
             .assert()
             .code(if invalid {
                 2
-            } else if arguments[0] == "list" {
+            } else if matches!(arguments[0], "list" | "current") {
                 0
             } else {
                 1
@@ -246,7 +257,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
     fs::create_dir_all(current.parent().unwrap()).unwrap();
     let installed_file = installation.join("existing-content");
     fs::write(&installed_file, b"installed").unwrap();
-    // Neither placeholders nor list inspect current state.
+    // List ignores current state; selection commands must preserve invalid entries.
     fs::write(&current, b"not a link").unwrap();
     for arguments in &cases {
         let invalid = arguments.last() == Some(&"node@22");
@@ -279,16 +290,6 @@ fn query_commands_reject_targets() {
             .code(2)
             .stderr(predicate::str::contains("unexpected argument"));
     }
-}
-
-#[test]
-fn current_reports_unimplemented_status() {
-    verslot_command()
-        .arg("current")
-        .assert()
-        .code(1)
-        .stdout("")
-        .stderr("not implemented: current\n");
 }
 
 #[test]
@@ -441,17 +442,13 @@ fn each_command_provides_help() {
             format!("Usage: {binary_name} {command}")
         };
 
-        let assertion = verslot_command()
+        verslot_command()
             .args([command, "--help"])
             .assert()
             .success()
             .stdout(predicate::str::contains(expected_usage))
-            .stderr("");
-        if matches!(command, "install" | "uninstall" | "list") {
-            assertion.stdout(predicate::str::contains("not implemented yet").not());
-        } else {
-            assertion.stdout(predicate::str::contains("not implemented yet"));
-        }
+            .stderr("")
+            .stdout(predicate::str::contains("not implemented yet").not());
     }
 }
 

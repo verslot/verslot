@@ -314,14 +314,42 @@ fn process_lock_is_released_after_exit_or_termination() {
             line.clear();
         }
         assert!(acquire_lock(&fixture.0).is_err());
+        assert!(crate::mutation::acquire_read_lock(&fixture.0).is_err());
         if terminate {
             child.kill().unwrap();
         } else {
             drop(child.stdin.take());
         }
         child.wait().unwrap();
+        assert!(
+            crate::mutation::acquire_read_lock(&fixture.0)
+                .unwrap()
+                .is_some()
+        );
         let _lock = acquire_lock(&fixture.0).unwrap();
         assert!(fixture.0.join(".mutation.lock").is_file());
+    }
+}
+
+#[test]
+fn switch_residue_blocks_install_before_download_or_directory_creation() {
+    for name in [".node-next", ".node-previous"] {
+        let fixture = Fixture::new();
+        fs::create_dir(fixture.0.join("current")).unwrap();
+        let residue = fixture.0.join("current").join(name);
+        fs::write(&residue, b"preserved").unwrap();
+        let error = install_at(
+            &fixture.0,
+            &fixture.target(),
+            |_, _, _| panic!("residue must block downloads"),
+            |_, _| panic!("residue must not allocate an operation"),
+        )
+        .unwrap_err();
+        assert!(error.contains("unfinished switch"));
+        assert!(error.contains(&residue.display().to_string()));
+        assert_eq!(fs::read(residue).unwrap(), b"preserved");
+        assert!(!fixture.0.join("installs").exists());
+        assert!(!fixture.0.join("tmp").exists());
     }
 }
 
@@ -674,6 +702,124 @@ fn offline_install_list_duplicate_uninstall_workflow_is_isolated() {
     assert!(
         result.status.success(),
         "workflow child failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+}
+
+// Uses real extraction and mutation APIs in a child with an isolated native root.
+#[test]
+fn offline_install_switch_query_uninstall_child() {
+    let Some(source) = std::env::var_os("VERSLOT_TEST_SELECTION_WORKFLOW_ROOT") else {
+        return;
+    };
+    let storage = Storage::from_env().unwrap();
+    assert_eq!(
+        storage.root(),
+        Storage::from_source(Some(&source)).unwrap().root()
+    );
+    let first: Target = "node@22.0.0".parse().unwrap();
+    let second: Target = "node@24.0.0".parse().unwrap();
+    assert_eq!(storage.read_selected().unwrap(), None);
+    assert!(crate::inventory::list_installed().unwrap().is_empty());
+    assert!(!storage.root().exists());
+
+    for target in [&first, &second] {
+        use sha2::{Digest, Sha256};
+        let bytes = archive_fixture(target);
+        let digest: String = Sha256::digest(&bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(
+            install_at(
+                storage.root(),
+                target,
+                |root, operation, staging| {
+                    let archive = operation.join("archive");
+                    fs::write(&archive, &bytes).unwrap();
+                    extract_verified_archive(root, &archive, staging, target.version, &digest)
+                        .map_err(|error| error.to_string())
+                },
+                remove_operation,
+            )
+            .unwrap(),
+            format!("installed {target}")
+        );
+        assert_eq!(storage.read_selected().unwrap(), None);
+    }
+    assert_eq!(
+        crate::inventory::list_installed().unwrap(),
+        vec![first, second]
+    );
+    let installation = storage.installation_path(&second).unwrap();
+    let receipt = fs::read(installation.join(".verslot-install")).unwrap();
+    let executable = installation.join(if cfg!(windows) {
+        "node.exe"
+    } else {
+        "bin/node"
+    });
+    let payload = fs::read(&executable).unwrap();
+    assert!(storage.select(&first).unwrap());
+    assert_eq!(storage.read_selected().unwrap(), Some(first.version));
+    assert_eq!(install(&second).unwrap(), "already installed node@24.0.0");
+    assert_eq!(storage.read_selected().unwrap(), Some(first.version));
+    assert!(storage.select(&second).unwrap());
+    assert!(!storage.select(&second).unwrap());
+    assert_eq!(storage.read_selected().unwrap(), Some(second.version));
+    assert!(
+        crate::uninstall::uninstall(&second)
+            .unwrap_err()
+            .contains("cannot uninstall current version")
+    );
+    assert_eq!(
+        crate::uninstall::uninstall(&first).unwrap(),
+        "uninstalled node@22.0.0"
+    );
+    assert_eq!(crate::inventory::list_installed().unwrap(), vec![second]);
+    assert_eq!(storage.read_selected().unwrap(), Some(second.version));
+    assert_eq!(
+        fs::read(installation.join(".verslot-install")).unwrap(),
+        receipt
+    );
+    assert_eq!(fs::read(executable).unwrap(), payload);
+    let npm = installation.join(if cfg!(windows) {
+        "node_modules/npm/bin/npm-cli.js"
+    } else {
+        "lib/node_modules/npm/bin/npm-cli.js"
+    });
+    assert_eq!(fs::read(npm).unwrap(), b"offline fixture");
+    assert!(!storage.installation_path(&first).unwrap().exists());
+    for name in [".node-next", ".node-previous"] {
+        assert_eq!(
+            fs::symlink_metadata(storage.root().join("current").join(name))
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::NotFound
+        );
+    }
+    assert_eq!(fs::read_dir(storage.root().join("tmp")).unwrap().count(), 0);
+    println!("selection workflow completed");
+}
+
+#[test]
+fn offline_install_switch_query_uninstall_workflow_is_isolated() {
+    let fixture = Fixture::new();
+    let result = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "install::tests::offline_install_switch_query_uninstall_child",
+            "--nocapture",
+        ])
+        .env("VERSLOT_TEST_SELECTION_WORKFLOW_ROOT", &fixture.0)
+        .env("HOME", &fixture.0)
+        .env("LOCALAPPDATA", &fixture.0)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success()
+            && String::from_utf8_lossy(&result.stdout).contains("selection workflow completed"),
+        "selection workflow child failed: stdout={} stderr={}",
         String::from_utf8_lossy(&result.stdout),
         String::from_utf8_lossy(&result.stderr)
     );

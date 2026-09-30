@@ -25,7 +25,7 @@ pub(crate) enum Command {
         #[arg(value_name = "TOOL@VERSION")]
         target: Target,
     },
-    /// Select a tool version (not implemented yet).
+    /// Select an installed tool version.
     #[command(name = "use")]
     Use {
         #[arg(value_name = "TOOL@VERSION")]
@@ -33,6 +33,6 @@ pub(crate) enum Command {
     },
     /// List installed tool versions.
     List,
-    /// Show the current tool versions (not implemented yet).
+    /// Show the selected tool version.
     Current,
 }

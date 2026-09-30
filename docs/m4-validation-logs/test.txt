@@ -1,0 +1,192 @@
+   Compiling verslot v0.3.0 (D:\code\verslot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.24s
+     Running unittests src\lib.rs (target\debug\deps\verslot-32fe876a0bb1f051.exe)
+
+running 133 tests
+test distribution::tests::unsupported_platforms_return_errors_without_fallback ... ok
+test distribution::tests::current_build_selection_uses_compile_time_platform ... ok
+test distribution::tests::supported_platforms_select_exact_official_archives_and_urls ... ok
+test download::tests::duplicate_and_malformed_matching_checksums_are_rejected ... ok
+test download::tests::expired_deadline_prevents_reads_and_writes ... ok
+test download::tests::checksum_matching_is_exact_and_accepts_lf_crlf_and_ascii_whitespace ... ok
+test distribution::tests::version_components_are_rendered_without_resolution_or_fallback ... ok
+test download::tests::read_failures_and_timeouts_do_not_return_a_verified_digest ... ok
+test download::tests::transport_reads_are_capped_without_extending_shorter_deadlines ... ok
+test download::tests::streaming_verifies_known_sha256_and_enforces_the_actual_byte_limit ... ok
+test download::tests::write_and_flush_failures_do_not_return_a_verified_digest ... ok
+test download::tests::production_transport_requires_https_and_certificate_verification ... ok
+test install::tests::offline_install_switch_query_uninstall_child ... ok
+test download::tests::existing_archive_is_preserved ... ok
+test download::tests::non_200_responses_are_rejected_and_redirects_are_not_followed ... ok
+test install::tests::offline_workflow_child ... ok
+test install::tests::lock_file_link_is_rejected ... ok
+test install::tests::existing_incomplete_destination_is_preserved_without_download ... ok
+test install::tests::process_lock_holder ... ok
+test install::tests::lock_directory_and_linked_mutation_paths_are_rejected ... ok
+test download::tests::sha256_matches_the_million_a_vector_across_multiple_buffers ... ok
+test install::tests::cleanup_refuses_shared_tmp_and_does_not_follow_links ... ok
+test download::tests::mismatched_and_truncated_archives_are_not_verified ... ok
+test download::tests::valid_download_creates_an_exclusive_file_and_returns_the_verified_digest ... ok
+test install::tests::operation_allocation_is_exclusive_and_existing_operations_are_preserved ... ok
+test install::tests::precommit_cleanup_failure_retains_primary_error_and_leftover_path ... ok
+test install::tests::malformed_receipts_and_non_directory_destinations_are_preserved ... ok
+test installation::tests::byte_entry_and_truncation_limits_fail_without_a_receipt ... ok
+test install::tests::cleanup_failure_reports_leftover_and_preserves_committed_installation ... ok
+test installation::tests::receipts_require_exact_fields_target_platform_and_lowercase_digest ... ok
+test installation::tests::duplicates_conflicts_and_implicit_parent_rules_are_enforced ... ok
+test install::tests::switch_residue_blocks_install_before_download_or_directory_creation ... ok
+test installation::tests::unsafe_entry_names_and_reserved_receipt_paths_are_rejected ... ok
+test installation::tests::filesystem_case_aliases_are_rejected_when_the_filesystem_aliases_them ... ok
+test installation::tests::existing_receipts_are_preserved_by_exclusive_creation ... ok
+test install::tests::destination_appearing_before_commit_is_preserved ... ok
+test installation::tests::staging_must_be_new_and_within_the_canonical_boundary ... ok
+test download::tests::invalid_checksums_stop_before_archive_download_or_file_creation ... ok
+test install::tests::linked_storage_root_is_supported_and_linked_destination_is_rejected ... ok
+test install::tests::lock_contents_are_preserved_and_contention_is_nonblocking ... ok
+test installation::tests::windows::duplicate_zip_records_cannot_be_hidden_by_the_library_name_index ... ok
+test installation::tests::windows::linked_staging_ancestors_are_rejected_and_canonicalized_storage_root_junctions_work ... ok
+test installation::tests::windows::zip64_directory_records_are_bounded_and_supported ... ok
+test install::tests::commits_complete_installation_and_duplicate_skips_preparation ... ok
+test installation::tests::windows::zip_byte_and_entry_limits_are_enforced_before_payload_writes ... ok
+test install::tests::process_lock_is_released_after_exit_or_termination ... ok
+test inventory::tests::missing_and_empty_inventory_paths_do_not_create_storage ... ok
+test installation::tests::windows::zip_crc_truncation_encryption_and_unsupported_compression_fail_before_receipt_creation ... ok
+test installation::tests::windows::windows_junction_mutation_ancestors_and_final_installations_are_rejected ... ok
+test install::tests::windows_locked_payload_causes_commit_failure_without_final_installation ... ok
+test inventory::tests::files_in_inventory_ancestors_are_errors_not_empty_inventory ... ok
+test storage::selection_tests::mutations_during_switch_child ... ok
+test installation::tests::windows::zip_rejects_symlinks_and_filesystem_case_aliases ... ok
+test inventory::tests::receipt_read_sharing_failure_is_reported ... ok
+test storage::selection_tests::empty_queries_create_nothing_with_or_without_a_lock ... ok
+test storage::selection_tests::complete_queries_require_an_existing_lock_and_preserve_its_contents ... ok
+test storage::selection_tests::residue_beside_a_complete_selection_is_not_silently_ignored ... ok
+test install::tests::real_extraction_commits_bundled_payload_and_corruption_cleans_operation ... ok
+test installation::tests::windows::stored_and_deflated_zip_preserve_bundled_files_and_write_valid_receipts ... ok
+test inventory::tests::canonical_entries_require_complete_installations ... ok
+test storage::selection_tests::invalid_lock_files_and_current_ancestors_are_preserved ... ok
+test storage::selection_tests::complete_queries_support_a_linked_root_but_reject_linked_descendants ... ok
+test install::tests::preparation_and_validation_failures_clean_only_the_operation ... ok
+test storage::selection_tests::readers_share_locks_and_exclude_writers_without_truncation ... ok
+test installation::tests::complete_installations_require_a_bounded_receipt_and_nonempty_regular_executable ... ok
+test inventory::tests::root_links_are_resolved_and_internal_links_are_rejected ... ok
+test inventory::tests::versions_sort_numerically_and_ignore_noncanonical_entries_and_other_state ... ok
+test storage::switching_windows::tests::native_junction_rename_and_removal_preserve_target_and_free_entry_name ... ok
+test storage::switching_windows::tests::native_removal_of_known_dangling_junction_leaves_no_directory_residue ... ok
+test install::tests::offline_install_list_duplicate_uninstall_workflow_is_isolated ... ok
+test storage::selection_tests::invalid_current_entries_never_become_empty_selection ... ok
+test storage::selection_tests::structural_state_remains_distinct_from_complete_selection ... ok
+test installation::tests::windows::zip_rejects_unsafe_paths_and_preserves_an_external_sentinel ... ok
+test storage::switching_windows::tests::first_selection_rollback_failure_reports_the_current_path_without_a_backup ... ok
+test storage::selection_tests::residues_are_errors_even_without_a_lock_or_current_selection ... ok
+test storage::tests::absent_current_state_is_read_without_creating_directories ... ok
+test storage::tests::current_directory_cannot_escape_even_when_the_entry_is_missing ... ok
+test storage::switching_windows::tests::actual_incomplete_readback_rolls_back_without_repairing_installation ... ok
+test storage::switching_windows::tests::native_handle_without_delete_sharing_blocks_old_junction_backup ... ok
+test storage::switching_windows::tests::missing_incomplete_and_invalid_old_selections_fail_before_candidate_creation ... ok
+test storage::tests::current_links_to_files_are_rejected ... ok
+test storage::tests::current_links_to_external_installations_are_rejected ... ok
+test storage::tests::current_reads_reject_an_escaped_installation_ancestor ... ok
+test storage::switching_windows::tests::externally_held_backup_requires_confirmed_removal_before_success ... ok
+test storage::switching_windows::tests::an_open_payload_handle_does_not_imply_that_switching_must_fail ... ok
+test storage::tests::current_reads_use_the_canonical_storage_root ... ok
+test storage::tests::current_version_is_derived_from_the_resolved_name ... ok
+test storage::tests::current_link_returns_the_resolved_version_without_checking_install_contents ... ok
+test storage::tests::existing_invalid_intermediate_directories_cannot_be_hidden_by_later_links ... ok
+test storage::tests::dangling_current_link_is_an_error_not_no_selection ... ok
+test storage::tests::io_errors_are_not_treated_as_missing_state ... ok
+test storage::switching_windows::tests::native_candidate_sharing_failure_restores_old_selection_and_reports_cleanup ... ok
+test storage::tests::linked_storage_root_is_the_boundary ... ok
+test storage::tests::links_within_the_storage_boundary_are_allowed ... ok
+test storage::tests::invalid_current_ancestors_do_not_report_no_selection ... ok
+test storage::tests::link_loops_are_errors ... ok
+test storage::tests::missing_roots_check_their_nearest_existing_ancestor ... ok
+test storage::tests::root_sources_must_be_present_and_absolute ... ok
+test storage::tests::windows_roots_accept_drive_and_unc_but_reject_drive_relative_paths ... ok
+test target::tests::diagnostics_match_the_specification ... ok
+test target::tests::full_versions_return_numeric_data_and_canonical_names ... ok
+test target::tests::malformed_targets_report_the_first_failed_rule ... ok
+test storage::tests::missing_descendants_do_not_hide_broken_links_or_files ... ok
+test storage::tests::descendants_cannot_escape_through_directory_links ... ok
+test storage::tests::native_root_and_version_paths_are_constructed_without_writes ... ok
+test storage::tests::ordinary_current_entries_are_errors ... ok
+test storage::switching_windows::tests::first_selection_switch_and_noop_preserve_junction_identity_and_installations ... ok
+test storage::tests::environment_root_is_read_in_an_isolated_process ... ok
+test storage::switching_windows::tests::publish_gap_is_locked_and_failed_publish_restores_previous_junction ... ok
+test uninstall::tests::missing_and_incomplete_installations_are_preserved ... ok
+test storage::switching_windows::tests::same_target_backup_replacement_is_detected_by_file_id ... ok
+test storage::tests::current_targets_must_be_direct_canonical_version_directories ... ok
+test uninstall::tests::linked_storage_root_is_supported ... ok
+test storage::switching_windows::tests::native_candidate_and_backup_collisions_preserve_unexpected_directories ... ok
+test uninstall::tests::lock_contention_preserves_the_installation ... ok
+test uninstall::tests::cleanup_never_traverses_payload_links ... ok
+test uninstall::tests::linked_installation_ancestors_destination_and_tmp_are_rejected ... ok
+test uninstall::tests::switch_residue_blocks_uninstall_without_removing_installations ... ok
+test storage::switching_windows::tests::cleanup_failures_report_residue_and_preserve_committed_or_old_selection ... ok
+test uninstall::tests::selected_versions_are_protected_even_without_a_receipt ... ok
+test uninstall::tests::invalid_current_state_blocks_unrelated_removal ... ok
+test uninstall::tests::partial_cleanup_failure_reports_detachment_and_retains_the_leftover_path ... ok
+test uninstall::tests::windows_locked_detached_payload_reports_native_cleanup_failure ... ok
+test uninstall::tests::uninstall_removes_only_the_inactive_installation_and_own_operation ... ok
+test storage::switching_windows::tests::readback_failure_restores_old_selection_or_absence ... ok
+test install::tests::offline_install_switch_query_uninstall_workflow_is_isolated ... ok
+test storage::switching_windows::tests::rollback_and_restore_failures_keep_backup_and_report_observed_state ... ok
+test storage::switching_windows::tests::unexpected_current_entries_are_preserved_during_publish_and_rollback ... ok
+test storage::switching_windows::tests::candidate_backup_and_publish_failures_preserve_or_restore_old_junction ... ok
+test uninstall::tests::windows_locked_payload_preserves_installation_when_detachment_fails ... ok
+test storage::switching_windows::tests::native_sharing_failures_during_readback_rollback_restore_and_cleanup_keep_backup ... ok
+test download::tests::global_deadline_interrupts_a_stalled_http_body ... ok
+test download::tests::transport_failure_and_expired_request_deadline_are_reported ... ok
+
+test result: ok. 133 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.07s
+
+     Running unittests src\main.rs (target\debug\deps\verslot-b473c87c0e873cf5.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\cli.rs (target\debug\deps\cli-ffc67f22a876e290.exe)
+
+running 19 tests
+test invalid_command_fails ... ok
+test missing_command_reports_usage ... ok
+test help_describes_the_cli ... ok
+test current_reports_storage_errors ... ok
+test list_reports_storage_errors ... ok
+test install_reports_storage_errors_without_network_access ... ok
+test uninstall_reports_storage_errors ... ok
+test version_reports_the_package_version ... ok
+test use_reports_storage_errors ... ok
+test query_commands_reject_targets ... ok
+test target_commands_require_a_target ... ok
+test target_commands_reject_extra_targets ... ok
+test valid_use_targets_reach_storage_resolution ... ok
+test each_command_provides_help ... ok
+test offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory ... ok
+test uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versions ... ok
+test install_and_list_preserve_invalid_entries_and_current_state ... ok
+test failed_commands_preserve_existing_contents_and_list_does_not_create_storage ... ok
+test invalid_targets_report_shared_diagnostics_before_execution ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.22s
+
+     Running tests\selection_cli.rs (target\debug\deps\selection_cli-f850acb7bac448a5.exe)
+
+running 8 tests
+test synthetic_node_reports_its_receipt ... ok
+test missing_selection_is_read_only_and_use_does_not_install ... ok
+test selecting_same_version_does_not_replace_current_link ... ok
+test missing_or_incomplete_target_preserves_selection_and_invalid_current_takes_precedence ... ok
+test current_and_use_fail_while_writer_holds_lock_then_succeed_after_release ... ok
+test unfinished_switch_blocks_queries_and_writers_but_keeps_list_available ... ok
+test fixed_entry_and_controlled_path_execute_selected_payload_after_switch ... ok
+test selection_cli_switches_and_preserves_m3_behavior ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+
+   Doc-tests verslot
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

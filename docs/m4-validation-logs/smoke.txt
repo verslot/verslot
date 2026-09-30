@@ -1,0 +1,37 @@
+M4 Windows x86_64 smoke 2026-09-28T11:28:51.8921576+08:00
+base=D:\code\verslot\target\m4-smoke-0c7a734c06644092b98a0aca3a12fa15
+binary=D:\code\verslot\target\debug\verslot.exe
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["list"],"exit":0,"stdout":"","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["current"],"exit":0,"stdout":"","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["install","node@22.0.0"],"exit":0,"stdout":"installed node@22.0.0\n","stderr":""}
+official=https://nodejs.org/dist/v22.0.0/node-v22.0.0-win-x64.zip checksum=https://nodejs.org/dist/v22.0.0/SHASUMS256.txt sha256=32d639b47d4c0a651ff8f8d7d41a454168a3d4045be37985f9a810cf8cef6174 receiptHash=7A46A75B191F937D06D04D4729840A108313E1EA4A143D9865618A03F92A8EE2 executableHash=DB174445B3D28314772BC3918E39D8543CFBD18D542CF2A662F431F5CDC259EA
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["current"],"exit":0,"stdout":"","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["install","node@24.0.0"],"exit":0,"stdout":"installed node@24.0.0\n","stderr":""}
+official=https://nodejs.org/dist/v24.0.0/node-v24.0.0-win-x64.zip checksum=https://nodejs.org/dist/v24.0.0/SHASUMS256.txt sha256=3d0fff80c87bb9a8d7f49f2f27832aa34a1477d137af46f5b14df5498be81304 receiptHash=17448C88C32A96ADAB169ECC3D2677B4A54D5385844FBB8A0753D1DAF6C4AC97 executableHash=ADE7CE4D4FF97447AA4FDCF2AE9E9094CBFACA0B135475CAC621349BC2D335AB
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["current"],"exit":0,"stdout":"","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["list"],"exit":0,"stdout":"node@22.0.0\nnode@24.0.0\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["use","node@22.0.0"],"exit":0,"stdout":"using node@22.0.0\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["current"],"exit":0,"stdout":"node@22.0.0\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\m4-smoke-0c7a734c06644092b98a0aca3a12fa15\\verslot\\current\\node\\node.exe","arguments":["--version"],"exit":0,"stdout":"v22.0.0\r\n","stderr":""}
+resolvedNode=D:\code\verslot\target\m4-smoke-0c7a734c06644092b98a0aca3a12fa15\verslot\current\node\node.exe
+{"executable":"C:\\WINDOWS\\System32\\where.exe","arguments":["node"],"exit":0,"stdout":"D:\\code\\verslot\\target\\m4-smoke-0c7a734c06644092b98a0aca3a12fa15\\verslot\\current\\node\\node.exe\r\nC:\\Users\\admin\\AppData\\Local\\mise\\shims\\node.exe\r\nC:\\Users\\admin\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe\r\n","stderr":""}
+{"executable":"node.exe","arguments":["--version"],"exit":0,"stdout":"v22.0.0\r\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["use","node@24.0.0"],"exit":0,"stdout":"using node@24.0.0\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["current"],"exit":0,"stdout":"node@24.0.0\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\m4-smoke-0c7a734c06644092b98a0aca3a12fa15\\verslot\\current\\node\\node.exe","arguments":["--version"],"exit":0,"stdout":"v24.0.0\r\n","stderr":""}
+resolvedNode=D:\code\verslot\target\m4-smoke-0c7a734c06644092b98a0aca3a12fa15\verslot\current\node\node.exe
+{"executable":"C:\\WINDOWS\\System32\\where.exe","arguments":["node"],"exit":0,"stdout":"D:\\code\\verslot\\target\\m4-smoke-0c7a734c06644092b98a0aca3a12fa15\\verslot\\current\\node\\node.exe\r\nC:\\Users\\admin\\AppData\\Local\\mise\\shims\\node.exe\r\nC:\\Users\\admin\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe\r\n","stderr":""}
+{"executable":"node.exe","arguments":["--version"],"exit":0,"stdout":"v24.0.0\r\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["use","node@24.0.0"],"exit":0,"stdout":"already using node@24.0.0\n","stderr":""}
+competingNode=D:\code\verslot\target\m4-smoke-0c7a734c06644092b98a0aca3a12fa15\verslot\installs\node\22.0.0\node.exe
+{"executable":"node.exe","arguments":["--version"],"exit":0,"stdout":"v22.0.0\r\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["current"],"exit":0,"stdout":"node@24.0.0\n","stderr":""}
+{"executable":"node.exe","arguments":["--version"],"exit":0,"stdout":"v24.0.0\r\n","stderr":""}
+A and B receipt/executable hashes unchanged after switching and no-op.
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["uninstall","node@24.0.0"],"exit":1,"stdout":"","stderr":"uninstall node@24.0.0: cannot uninstall current version: node@24.0.0\n"}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["uninstall","node@22.0.0"],"exit":0,"stdout":"uninstalled node@22.0.0\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["list"],"exit":0,"stdout":"node@24.0.0\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\debug\\verslot.exe","arguments":["current"],"exit":0,"stdout":"node@24.0.0\n","stderr":""}
+{"executable":"D:\\code\\verslot\\target\\m4-smoke-0c7a734c06644092b98a0aca3a12fa15\\verslot\\current\\node\\node.exe","arguments":["--version"],"exit":0,"stdout":"v24.0.0\r\n","stderr":""}
+{"executable":"node.exe","arguments":["--version"],"exit":0,"stdout":"v24.0.0\r\n","stderr":""}
+PASS: B selected/executable; A absent; B receipt/executable unchanged; tmp empty; no reserved siblings. Owned fixture retained for evidence; no cleanup or user PATH changes.
