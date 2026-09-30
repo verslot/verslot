@@ -496,7 +496,7 @@ fn native_atomic_replacement_exposes_only_old_or_new_link() {
             barrier.wait();
             let mut reads = 0;
             while !finished.load(Ordering::Acquire) || reads == 0 {
-                let destination = fs::read_link(fixture.current()).unwrap();
+                let destination = fs::canonicalize(fixture.current()).unwrap();
                 assert!(destination == first || destination == second);
                 reads += 1;
             }
