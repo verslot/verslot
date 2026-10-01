@@ -11,12 +11,12 @@ This document tracks development phases, tasks, and delivery progress. The CLI f
 | Metric | Current Status |
 | --- | --- |
 | Package version | `0.4.0` (does not indicate published binaries) |
-| Current milestone | M5 In progress: 2 / 6 tasks complete. Windows T1 reuses verified M4 official A/B evidence plus exact-candidate CI; macOS T2 passed native Apple-silicon checks and the official A/B workflow; Linux T3 validation workflow is prepared and awaits a native run |
+| Current milestone | M5 In progress: 3 / 6 tasks complete. Windows T1 and macOS T2 are complete; Linux T3 validation workflow awaits a native run; T4 security review completed with no release-blocking finding |
 | Core features implemented | **5 / 5**: install, list, uninstall, use, and current have code and tests; local Windows M4 acceptance passed; full cross-platform delivery remains M5 |
-| Active development tasks | M5 T1–T2 complete; T3 Linux native validation is in progress |
-| Next step | Run and review the prepared [v0.5 T3 Linux native validation](v0.5.md#platform-specific-acceptance). [M5 evidence](m5-validation.md) |
+| Active development tasks | M5 T1–T2 and T4 complete; T3 Linux native validation is in progress |
+| Next step | Run and review the prepared [v0.5 T3 Linux native validation](v0.5.md#platform-specific-acceptance); then begin T5 documentation. [M5 evidence](m5-validation.md) |
 | Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; [M2 foundations](v0.2.md), [M4 switching and recovery](v0.4.md) |
-| Validation status | Exact `v0.4.0` candidate CI passed Check/Clippy/Test on Windows, macOS and Ubuntu; formatting passed. [M5 T1](m5-validation.md) verified production-source equivalence and reused [M4 Windows validation](m4-validation.md): 160 tests plus the official A/B smoke. [M5 T2](m5-validation.md#t2-macos-delivery-validation) passed all four checks, 163 tests and the official Node.js 22.0.0 / 24.0.0 workflow on macOS 15.7.9 arm64 / APFS; Linux official workflow and other architectures remain unverified |
+| Validation status | Exact `v0.4.0` candidate CI passed Check/Clippy/Test on Windows, macOS and Ubuntu; formatting passed. [M5 T1](m5-validation.md) reused verified M4 Windows evidence; [M5 T2](m5-validation.md#t2-macos-delivery-validation) passed 163 tests and the official A/B workflow on macOS arm64. [M5 T4](m5-validation.md#t4-security-review) found no release blocker and scanned 99 locked dependencies with no RustSec vulnerability or warning. Linux official workflow and other architectures remain unverified |
 
 Implementation counts reflect features users can actually use; placeholder commands do not count as implemented. Phases differ in effort, so task counts are not used to estimate an overall project completion percentage.
 
@@ -40,6 +40,7 @@ Implementation counts reflect features users can actually use; placeholder comma
 | `list` | T5 code and tests complete; Windows acceptance passed; other platforms unverified | Read-only complete installations sorted numerically; missing/empty storage succeeds without writes; canonical incomplete entries and I/O/boundary errors fail without partial stdout; does not inspect current state | [Inventory](../src/inventory.rs), [offline tests](../src/inventory/tests.rs), [CLI tests](../tests/cli.rs) |
 | `current` | M4 T4 code/tests complete; Windows acceptance passed | Read-only complete-selection query; prints selected target or empty output; invalid state, residue and busy storage fail | [Command dispatch](../src/lib.rs), [CLI regressions](../tests/selection_cli.rs) |
 | M4 workflow coverage and acceptance preparation | M4 T5 tests/docs complete; Windows checks/tests/smoke passed | Adds fresh offline install/select/query/uninstall, synthetic native entry/PATH execution and cross-process switch contention; manual PATH guidance and real A/B smoke procedure prepared | [Install workflow](../src/install/tests.rs), [CLI execution](../tests/selection_cli.rs), [acceptance mapping](v0.4.md#acceptance-mapping), [validation results](m4-validation.md) |
+| M5 security review | T4 complete; no release-blocking finding | Reviewed path boundaries, archives, transport/checksums, completeness, mutations, switching, dependencies and smoke harness; 99 locked dependencies produced no RustSec vulnerability or warning | [Security review](m5-validation.md#t4-security-review), [M5 design criteria](v0.5.md#security-review) |
 | M3 workflow coverage and acceptance preparation | T7 tests and documentation complete; Windows acceptance passed; other platforms unverified | Isolated offline fresh-install lifecycle and seeded CLI workflow fixtures; actual test-name acceptance mapping and a separate official HTTPS smoke procedure | [Lifecycle tests](../src/install/tests.rs), [CLI tests](../tests/cli.rs), [acceptance mapping](v0.3.md#acceptance-mapping), [validation record](m3-validation.md) |
 
 “Implemented” only means that the code exists. Whether acceptance criteria have been met is recorded separately in the milestones and progress log.
@@ -54,7 +55,7 @@ Milestone statuses: Not started → In progress → Awaiting validation → Comp
 | M2 Target parsing and local state | Before M3 | Complete | 6 / 6 | Valid targets can be parsed, invalid targets are rejected, and local state read/write rules are defined |
 | M3 Node.js installation and queries | After M2 | Complete | 7 / 7 | Specified versions can be installed safely, query results match disk state, and installed versions can be uninstalled |
 | M4 Version switching | After M3 | Complete under local Windows acceptance | 5 / 5 capability code items; 5 / 5 tasks | Complete installed versions can be selected and queried; the fixed entry point and controlled PATH execute the selected version; failure recovery is validated |
-| M5 Cross-platform delivery | After M4 | In progress | 2 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
+| M5 Cross-platform delivery | After M4 | In progress | 3 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
 
 Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. M3 is planned in v0.3, M4 in v0.4, and M5 in [v0.5](v0.5.md); M5 has no preset package version or date. No planned version implies a release commitment.
 
@@ -107,7 +108,7 @@ Design: [v0.5](v0.5.md), with six delivery tasks corresponding to this checklist
 - [x] Validate the install → list → switch → query → uninstall workflow on Windows.
 - [x] Validate the same workflow on macOS.
 - [ ] Validate the same workflow on Linux.
-- [ ] Complete a security review of paths, archive extraction, checksum verification, and untrusted remote data.
+- [x] Complete a security review of paths, archive extraction, checksum verification, and untrusted remote data.
 - [ ] Update installation instructions, command examples, and known limitations.
 - [ ] Record validation results and confirm the release scope and version number.
 
@@ -170,6 +171,7 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-10-01 | Complete M5 T1 Windows delivery validation and start T2 | Exact `v0.4.0` CI passed formatting and Windows/macOS/Linux Check, Clippy and Test steps. All production source hashes match retained M4 acceptance; T1 reuses the recorded Windows 22.0.0 / 24.0.0 A/B smoke. Local fmt passed; local Cargo resolution failed on Schannel/index availability without disabling TLS | M5 In progress (1 / 6). T2 candidate macOS CI passed but native Apple-silicon official workflow/environment evidence remains missing; T3 not started under the requested sequence. [Evidence](m5-validation.md) |
 | 2026-10-01 | Complete M5 T2 macOS delivery validation | [Manual run 36777691817](https://github.com/verslot/verslot/actions/runs/36777691817) on merge commit `7dc4272` passed formatting, Check, Clippy, 163 tests, build, and the official Node.js 22.0.0 / 24.0.0 install/list/use/current/PATH/uninstall workflow on macOS 15.7.9 arm64 / APFS; recorded case-insensitive runner storage, exact official digests, payload preservation and clean residue | M5 In progress (2 / 6). T3 Linux x86_64 GNU native validation is next; macOS x86_64 and other mapped architectures remain unverified. [Evidence](m5-validation.md#t2-macos-delivery-validation) |
 | 2026-10-01 | Start M5 T3 Linux delivery validation | Added a manual Ubuntu 24.04 x86_64 GNU workflow with non-root/glibc assertions, environment and filesystem/mount evidence, all four required checks, executable-permission coverage and the official Node.js 22.0.0 / 24.0.0 workflow | M5 remains In progress (2 / 6). Run the workflow and review its evidence before completing T3. [Evidence](m5-validation.md#t3-linux-delivery-validation) |
+| 2026-10-01 | Complete M5 T4 security review | Reviewed native paths, archives, transport/checksums, completeness, mutations, switching, dependencies and smoke harness against mapped tests; `cargo-audit 0.22.2` scanned 99 locked dependencies using RustSec commit `9b3a3b7` and reported no vulnerabilities or warnings | M5 In progress (3 / 6), with no release-blocking security finding. T3 Linux native evidence remains pending; T5 follows T3. [Evidence](m5-validation.md#t4-security-review) |
 
 Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 
