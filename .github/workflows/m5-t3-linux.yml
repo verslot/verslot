@@ -92,8 +92,8 @@ jobs:
 
       - name: Run official two-version workflow
         env:
-          NODE_A: ${{ inputs.node_a }}
-          NODE_B: ${{ inputs.node_b }}
+          NODE_A: ${{ inputs.node_a || '22.0.0' }}
+          NODE_B: ${{ inputs.node_b || '24.0.0' }}
         run: |
           set -euo pipefail
 
