@@ -207,6 +207,7 @@ impl Storage {
                 "switch completed but cleanup failed{cleanup_error}"
             )));
         }
+        lock.unlock()?;
         Ok(true)
     }
 }
