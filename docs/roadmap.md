@@ -11,10 +11,10 @@ This document tracks development phases, tasks, and delivery progress. The CLI f
 | Metric | Current Status |
 | --- | --- |
 | Package version | `0.4.0` (does not indicate published binaries) |
-| Current milestone | M5 In progress: 2 / 6 tasks complete. Windows T1 reuses verified M4 official A/B evidence plus exact-candidate CI; macOS T2 passed native Apple-silicon checks and the official A/B workflow; Linux T3 is next |
+| Current milestone | M5 In progress: 2 / 6 tasks complete. Windows T1 reuses verified M4 official A/B evidence plus exact-candidate CI; macOS T2 passed native Apple-silicon checks and the official A/B workflow; Linux T3 validation workflow is prepared and awaits a native run |
 | Core features implemented | **5 / 5**: install, list, uninstall, use, and current have code and tests; local Windows M4 acceptance passed; full cross-platform delivery remains M5 |
-| Active development tasks | M5 T1–T2 complete; T3 Linux native validation is next |
-| Next step | Execute [v0.5 T3 Linux native validation](v0.5.md#platform-specific-acceptance). [M5 evidence](m5-validation.md) |
+| Active development tasks | M5 T1–T2 complete; T3 Linux native validation is in progress |
+| Next step | Run and review the prepared [v0.5 T3 Linux native validation](v0.5.md#platform-specific-acceptance). [M5 evidence](m5-validation.md) |
 | Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; [M2 foundations](v0.2.md), [M4 switching and recovery](v0.4.md) |
 | Validation status | Exact `v0.4.0` candidate CI passed Check/Clippy/Test on Windows, macOS and Ubuntu; formatting passed. [M5 T1](m5-validation.md) verified production-source equivalence and reused [M4 Windows validation](m4-validation.md): 160 tests plus the official A/B smoke. [M5 T2](m5-validation.md#t2-macos-delivery-validation) passed all four checks, 163 tests and the official Node.js 22.0.0 / 24.0.0 workflow on macOS 15.7.9 arm64 / APFS; Linux official workflow and other architectures remain unverified |
 
@@ -102,7 +102,7 @@ Design: [v0.4](v0.4.md), with five implementation tasks distinct from this capab
 
 ### Phase 5: Cross-Platform Delivery
 
-Design: [v0.5](v0.5.md), with six delivery tasks corresponding to this checklist. The minimum gate requires native Windows x86_64, macOS arm64, and Linux x86_64 GNU checks and official two-version workflows, followed by a security review, evidence-based documentation, and an explicit release decision. T1 Windows is complete through exact-candidate CI and a documented M4-equivalence decision; T2 macOS is complete through native Apple-silicon checks and the official two-version workflow. See [current evidence](m5-validation.md).
+Design: [v0.5](v0.5.md), with six delivery tasks corresponding to this checklist. The minimum gate requires native Windows x86_64, macOS arm64, and Linux x86_64 GNU checks and official two-version workflows, followed by a security review, evidence-based documentation, and an explicit release decision. T1 Windows is complete through exact-candidate CI and a documented M4-equivalence decision; T2 macOS is complete through native Apple-silicon checks and the official two-version workflow; T3 Linux is in progress with its native validation workflow prepared. See [current evidence](m5-validation.md).
 
 - [x] Validate the install → list → switch → query → uninstall workflow on Windows.
 - [x] Validate the same workflow on macOS.
@@ -169,6 +169,7 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-10-01 | Design v0.5 / M5 | Added [M5 specification](v0.5.md): minimum native platform matrix, isolated official A/B workflow, platform evidence rules, security review, documentation/release criteria, six tasks and acceptance gate | M5 remains Not started (0 / 6); documentation only, checks/workflows/security review Not run; no version change, tag, binary, or release publication. Next: T1–T3 native platform validation |
 | 2026-10-01 | Complete M5 T1 Windows delivery validation and start T2 | Exact `v0.4.0` CI passed formatting and Windows/macOS/Linux Check, Clippy and Test steps. All production source hashes match retained M4 acceptance; T1 reuses the recorded Windows 22.0.0 / 24.0.0 A/B smoke. Local fmt passed; local Cargo resolution failed on Schannel/index availability without disabling TLS | M5 In progress (1 / 6). T2 candidate macOS CI passed but native Apple-silicon official workflow/environment evidence remains missing; T3 not started under the requested sequence. [Evidence](m5-validation.md) |
 | 2026-10-01 | Complete M5 T2 macOS delivery validation | [Manual run 36777691817](https://github.com/verslot/verslot/actions/runs/36777691817) on merge commit `7dc4272` passed formatting, Check, Clippy, 163 tests, build, and the official Node.js 22.0.0 / 24.0.0 install/list/use/current/PATH/uninstall workflow on macOS 15.7.9 arm64 / APFS; recorded case-insensitive runner storage, exact official digests, payload preservation and clean residue | M5 In progress (2 / 6). T3 Linux x86_64 GNU native validation is next; macOS x86_64 and other mapped architectures remain unverified. [Evidence](m5-validation.md#t2-macos-delivery-validation) |
+| 2026-10-01 | Start M5 T3 Linux delivery validation | Added a manual Ubuntu 24.04 x86_64 GNU workflow with non-root/glibc assertions, environment and filesystem/mount evidence, all four required checks, executable-permission coverage and the official Node.js 22.0.0 / 24.0.0 workflow | M5 remains In progress (2 / 6). Run the workflow and review its evidence before completing T3. [Evidence](m5-validation.md#t3-linux-delivery-validation) |
 
 Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 

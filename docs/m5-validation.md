@@ -4,7 +4,7 @@ Last updated: 2026-10-01
 
 ## Status
 
-M5 is **In progress (2 / 6 tasks)**. T1 Windows delivery validation is complete by candidate-CI evidence plus the documented M4-equivalence decision below. T2 macOS delivery validation is complete through native Apple-silicon checks and the official two-version workflow. T3 Linux validation is next under the requested T1 → T2 → T3 order.
+M5 is **In progress (2 / 6 tasks)**. T1 Windows delivery validation is complete by candidate-CI evidence plus the documented M4-equivalence decision below. T2 macOS delivery validation is complete through native Apple-silicon checks and the official two-version workflow. The T3 Linux validation workflow is prepared and awaits a native run and evidence review.
 
 No package version, tag, binary publication, or persistent PATH state changed during this validation update.
 
@@ -95,9 +95,9 @@ macOS x86_64, case-sensitive APFS, other macOS versions, non-APFS filesystems, p
 
 ## T3 Linux delivery validation
 
-**Not started.** The exact candidate's [ubuntu-latest job 109832162362](https://github.com/verslot/verslot/actions/runs/36698517158/job/109832162362) reports successful Check, Clippy, and Test steps. This is supporting evidence only; it does not include the official A/B workflow or the required GNU Linux environment/filesystem/permission record.
+**In progress.** The exact candidate's [ubuntu-latest job 109832162362](https://github.com/verslot/verslot/actions/runs/36698517158/job/109832162362) reports successful Check, Clippy, and Test steps. This is supporting evidence only; it does not include the official A/B workflow or the required GNU Linux environment/filesystem/permission record.
 
-Per the requested order, T3 is now the next development task.
+The prepared manual workflow targets Ubuntu 24.04 x86_64 as a non-root user, asserts GNU libc, records distribution, kernel, filesystem, mount options and virtualization, runs all four required checks, and exercises executable permissions plus the official Node.js 22.0.0 / 24.0.0 A/B workflow. T3 remains incomplete until that workflow passes and its uploaded evidence is reviewed.
 
 ## Progress log
 
@@ -108,3 +108,4 @@ Per the requested order, T3 is now the next development task.
 | 2026-10-01 | Repair initial manual-workflow parse failure | The first merged workflow produced run 36776022008 with no jobs and rejected dispatch because multiline expected-output literals escaped the YAML block indentation. Replaced them with single-line Bash ANSI-C newline expressions; no product code or acceptance result changed |
 | 2026-10-01 | Run repaired T2 workflow | [Run 36776678819](https://github.com/verslot/verslot/actions/runs/36776678819) passed arm64 assertion, all four checks, 163 tests, build, official 22.0.0 / 24.0.0 workflow and evidence upload. Evidence review found the filesystem filter recorded no filesystem/case-sensitivity fields, so T2 remains In progress pending a focused rerun; update deprecated Node 20 actions during that evidence repair |
 | 2026-10-01 | Complete T2 macOS delivery validation | PR [#8](https://github.com/verslot/verslot/pull/8) repaired filesystem/case evidence and updated Actions. [Run 36777691817](https://github.com/verslot/verslot/actions/runs/36777691817) passed on macOS 15.7.9 arm64 / APFS: all four checks, 163 tests, build, official Node.js 22.0.0 / 24.0.0 workflow, payload/residue assertions and evidence upload. T2 Complete; begin T3 Linux validation next |
+| 2026-10-01 | Start T3 Linux delivery validation | Added a manual Ubuntu 24.04 x86_64 GNU workflow that asserts a non-root glibc environment, records filesystem/mount and virtualization evidence, runs all four checks, and performs the official A/B workflow. Native execution and evidence review remain pending |

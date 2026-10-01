@@ -1,0 +1,238 @@
+name: M5 T3 Linux validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      node_a:
+        description: First full Node.js version
+        required: true
+        default: 22.0.0
+        type: string
+      node_b:
+        description: Second full Node.js version
+        required: true
+        default: 24.0.0
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate-linux-x64-gnu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Record environment
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m5-t3-evidence"
+          {
+            echo "commit=$GITHUB_SHA"
+            echo "runner_image=${ImageOS:-unknown}"
+            echo "runner_image_version=${ImageVersion:-unknown}"
+            echo "architecture=$(uname -m)"
+            if test -z "$(git status --porcelain=v1)"; then
+              echo "working_tree=clean"
+            else
+              echo "working_tree=dirty"
+              git status --porcelain=v1
+              exit 1
+            fi
+            cat /etc/os-release
+            uname -a
+            id
+            getconf GNU_LIBC_VERSION
+            ldd --version
+            df -PT "$RUNNER_TEMP"
+            findmnt -T "$RUNNER_TEMP" -o SOURCE,FSTYPE,OPTIONS,TARGET
+            systemd-detect-virt || true
+            rustc -Vv
+            cargo -V
+            cargo clippy -V
+          } | tee "$RUNNER_TEMP/m5-t3-evidence/environment.txt"
+          test "$(uname -m)" = x86_64
+          test "$(id -u)" -ne 0
+          test "$(getconf GNU_LIBC_VERSION | awk '{print $1}')" = glibc
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Check all targets
+        run: cargo check --all-targets --locked
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+
+      - name: Run tests
+        run: cargo test --all --locked
+
+      - name: Build validation binary
+        run: cargo build --locked
+
+      - name: Run official two-version workflow
+        env:
+          NODE_A: ${{ inputs.node_a }}
+          NODE_B: ${{ inputs.node_b }}
+        run: |
+          set -euo pipefail
+
+          evidence="$RUNNER_TEMP/m5-t3-evidence"
+          base="$RUNNER_TEMP/verslot-m5-t3-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          isolated_home="$base/home"
+          work="$base/work"
+          verslot="$GITHUB_WORKSPACE/target/debug/verslot"
+          root="$isolated_home/.verslot"
+          smoke_log="$evidence/smoke.txt"
+          mkdir -p "$isolated_home" "$work"
+          test ! -e "$root"
+          cd "$work"
+          export HOME="$isolated_home"
+          [[ "$NODE_A" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [[ "$NODE_B" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          test "$NODE_A" != "$NODE_B"
+
+          run_expect() {
+            expected_status="$1"
+            expected_stdout="$2"
+            expected_error="$3"
+            shift 3
+            stdout_file="$base/stdout"
+            stderr_file="$base/stderr"
+            expected_file="$base/expected"
+            printf '%s' "$expected_stdout" > "$expected_file"
+            set +e
+            "$@" > "$stdout_file" 2> "$stderr_file"
+            status=$?
+            set -e
+            {
+              printf 'command:'
+              printf ' %q' "$@"
+              printf '\nexit=%s\nstdout:\n' "$status"
+              cat "$stdout_file"
+              printf 'stderr:\n'
+              cat "$stderr_file"
+              printf '%s\n' '---'
+            } >> "$smoke_log"
+            test "$status" -eq "$expected_status"
+            cmp -s "$stdout_file" "$expected_file"
+            if test -n "$expected_error"; then
+              grep -F "$expected_error" "$stderr_file" > /dev/null
+            else
+              test ! -s "$stderr_file"
+            fi
+          }
+
+          hash_file() {
+            sha256sum "$1" | awk '{print $1}'
+          }
+
+          printf 'M5 T3 Linux x86_64 GNU smoke\ncommit=%s\nbase=%s\nbinary=%s\n' \
+            "$GITHUB_SHA" "$base" "$verslot" > "$smoke_log"
+          "$verslot" --version | tee -a "$smoke_log"
+
+          run_expect 0 '' '' "$verslot" list
+          run_expect 0 '' '' "$verslot" current
+          test ! -e "$root"
+
+          for version in "$NODE_A" "$NODE_B"; do
+            run_expect 0 "installed node@$version"$'\n' '' "$verslot" install "node@$version"
+            archive="node-v$version-linux-x64.tar.gz"
+            checksum_url="https://nodejs.org/dist/v$version/SHASUMS256.txt"
+            checksum_file="$base/SHASUMS256-$version.txt"
+            curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+              "$checksum_url" --output "$checksum_file"
+            matching=$(tr -d '\r' < "$checksum_file" | grep -F "  $archive")
+            test "$(printf '%s\n' "$matching" | awk 'NF { count++ } END { print count + 0 }')" -eq 1
+            digest=${matching%% *}
+            test "$matching" = "$digest  $archive"
+            [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+            installation="$root/installs/node/$version"
+            receipt="$installation/.verslot-install"
+            printf 'verslot-install-v1\nnode@%s\n%s\n%s\n' \
+              "$version" "$archive" "$digest" > "$base/expected-receipt"
+            cmp -s "$receipt" "$base/expected-receipt"
+            test -x "$installation/bin/node"
+            hash_file "$receipt" > "$base/receipt-$version.sha256"
+            hash_file "$installation/bin/node" > "$base/node-$version.sha256"
+            printf 'official=https://nodejs.org/dist/v%s/%s checksum=%s expectedSha256=%s observedReceiptSha256=%s receiptHash=%s executableHash=%s\n' \
+              "$version" "$archive" "$checksum_url" "$digest" \
+              "$(tail -n 1 "$receipt")" \
+              "$(cat "$base/receipt-$version.sha256")" \
+              "$(cat "$base/node-$version.sha256")" >> "$smoke_log"
+            run_expect 0 '' '' "$verslot" current
+          done
+
+          run_expect 0 "already installed node@$NODE_A"$'\n' '' "$verslot" install "node@$NODE_A"
+          run_expect 0 "node@$NODE_A"$'\n'"node@$NODE_B"$'\n' '' "$verslot" list
+          run_expect 0 '' '' "$verslot" current
+
+          entry_directory="$root/current/node/bin"
+          entry_executable="$entry_directory/node"
+          controlled_path="$entry_directory:/usr/bin:/bin"
+          for version in "$NODE_A" "$NODE_B"; do
+            run_expect 0 "using node@$version"$'\n' '' "$verslot" use "node@$version"
+            run_expect 0 "node@$version"$'\n' '' "$verslot" current
+            run_expect 0 "v$version"$'\n' '' "$entry_executable" --version
+            resolved=$(PATH="$controlled_path" command -v node)
+            test "$resolved" = "$entry_executable"
+            printf 'resolvedNode=%s\n' "$resolved" >> "$smoke_log"
+            run_expect 0 "v$version"$'\n' '' env PATH="$controlled_path" node --version
+          done
+
+          selected_inode=$(stat -c '%i' "$root/current/node")
+          run_expect 0 "already using node@$NODE_B"$'\n' '' "$verslot" use "node@$NODE_B"
+          test "$(stat -c '%i' "$root/current/node")" = "$selected_inode"
+
+          competing_directory="$root/installs/node/$NODE_A/bin"
+          competing_path="$competing_directory:$entry_directory:/usr/bin:/bin"
+          resolved=$(PATH="$competing_path" command -v node)
+          test "$resolved" = "$competing_directory/node"
+          printf 'competingNode=%s\n' "$resolved" >> "$smoke_log"
+          run_expect 0 "v$NODE_A"$'\n' '' env PATH="$competing_path" node --version
+          run_expect 0 "node@$NODE_B"$'\n' '' "$verslot" current
+          run_expect 0 "v$NODE_B"$'\n' '' env PATH="$controlled_path" node --version
+
+          for version in "$NODE_A" "$NODE_B"; do
+            installation="$root/installs/node/$version"
+            test "$(hash_file "$installation/.verslot-install")" = \
+              "$(cat "$base/receipt-$version.sha256")"
+            test "$(hash_file "$installation/bin/node")" = \
+              "$(cat "$base/node-$version.sha256")"
+          done
+          echo 'A and B receipt/executable hashes unchanged after switching and no-op.' >> "$smoke_log"
+
+          run_expect 1 '' "cannot uninstall current version: node@$NODE_B" \
+            "$verslot" uninstall "node@$NODE_B"
+          run_expect 0 "uninstalled node@$NODE_A"$'\n' '' "$verslot" uninstall "node@$NODE_A"
+          run_expect 0 "node@$NODE_B"$'\n' '' "$verslot" list
+          run_expect 0 "node@$NODE_B"$'\n' '' "$verslot" current
+          run_expect 0 "v$NODE_B"$'\n' '' "$entry_executable" --version
+          run_expect 0 "v$NODE_B"$'\n' '' env PATH="$controlled_path" node --version
+
+          test ! -e "$root/installs/node/$NODE_A"
+          remaining="$root/installs/node/$NODE_B"
+          test "$(hash_file "$remaining/.verslot-install")" = \
+            "$(cat "$base/receipt-$NODE_B.sha256")"
+          test "$(hash_file "$remaining/bin/node")" = \
+            "$(cat "$base/node-$NODE_B.sha256")"
+          for name in .node-next .node-previous; do
+            test ! -e "$root/current/$name"
+            test ! -L "$root/current/$name"
+          done
+          test -d "$root/tmp"
+          test -z "$(find "$root/tmp" -mindepth 1 -print -quit)"
+
+          echo 'PASS: B selected/executable; A absent; B bytes unchanged; tmp empty; no reserved siblings.' \
+            | tee -a "$smoke_log"
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-t3-linux-x64-gnu-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/m5-t3-evidence
+          if-no-files-found: error
+          retention-days: 30
