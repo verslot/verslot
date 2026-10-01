@@ -40,7 +40,7 @@ impl Storage {
             Ok(_) => {}
         }
         let root = fs::canonicalize(self.root())?;
-        let _lock = acquire_lock(&root)?;
+        let lock = acquire_lock(&root)?;
         let previous = self.read_complete_current(&root)?;
         let destination = root.join("installs/node").join(target.version.to_string());
         real_directory(&root, destination.parent().unwrap()).map_err(|error| {
@@ -57,6 +57,7 @@ impl Storage {
         }
         validate_installation(&root, target)?;
         if previous == Some(target.version) {
+            lock.unlock()?;
             return Ok(false);
         }
 
