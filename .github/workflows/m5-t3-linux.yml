@@ -71,7 +71,20 @@ jobs:
         run: cargo clippy --all-targets --all-features --locked -- -D warnings
 
       - name: Run tests
-        run: cargo test --all --locked
+        run: |
+          set -o pipefail
+          set +e
+          cargo test --all --locked 2>&1 | tee "$RUNNER_TEMP/m5-t3-evidence/tests.txt"
+          status=${PIPESTATUS[0]}
+          set -e
+          if test "$status" -ne 0; then
+            message=$(tail -n 30 "$RUNNER_TEMP/m5-t3-evidence/tests.txt")
+            message=${message//'%'/'%25'}
+            message=${message//$'\r'/'%0D'}
+            message=${message//$'\n'/'%0A'}
+            echo "::error title=Linux tests failed::$message"
+            exit "$status"
+          fi
 
       - name: Build validation binary
         run: cargo build --locked
