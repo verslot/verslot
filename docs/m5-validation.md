@@ -4,7 +4,7 @@ Last updated: 2026-10-01
 
 ## Status
 
-M5 is **In progress (3 / 6 tasks)**. T1 Windows and T2 macOS delivery validation are complete. The T3 Linux validation workflow is prepared and awaits a native run and evidence review. T4 security review is complete with no release-blocking finding; T5 and T6 have not started.
+M5 is **In progress (4 / 6 tasks)**. T1 Windows, T2 macOS, T3 Linux, and T4 security review are complete. T5 installation/usage/limitations documentation is next; T6 has not started.
 
 No package version, tag, binary publication, or persistent PATH state changed during this validation update.
 
@@ -14,8 +14,9 @@ No package version, tag, binary publication, or persistent PATH state changed du
 | --- | --- |
 | Product candidate commit | `cf5760d930585cf31fd9de39d50e076cfd5b5270` (`v0.4.0`) |
 | macOS validation commit | `7dc4272b1009d11d421c53f865c1f48ba4a4fcb4`; differs from the product candidate only by M5 workflow and documentation commits |
+| Linux validation commit | `04c17a42b6f8099e0ef0ba13951abdd4511b201a`; includes the T3 workflow and the Linux lock-release repair described below |
 | Candidate CI | [run 36698517158](https://github.com/verslot/verslot/actions/runs/36698517158), push workflow, completed successfully on 2026-09-30 |
-| Documentation state | This record, `docs/v0.5.md`, and the roadmap are synchronized after T2; they do not change the executable |
+| Documentation state | This record, `docs/v0.5.md`, and the roadmap are synchronized after T3 |
 | Package version | `0.4.0` |
 | Publication status | No Verslot binaries published |
 
@@ -95,18 +96,29 @@ macOS x86_64, case-sensitive APFS, other macOS versions, non-APFS filesystems, p
 
 ## T3 Linux delivery validation
 
-**In progress.** The exact candidate's [ubuntu-latest job 109832162362](https://github.com/verslot/verslot/actions/runs/36698517158/job/109832162362) reports successful Check, Clippy, and Test steps. This is supporting evidence only; it does not include the official A/B workflow or the required GNU Linux environment/filesystem/permission record.
+**Complete.** [Run 36843186140](https://github.com/verslot/verslot/actions/runs/36843186140) validated commit `04c17a42b6f8099e0ef0ba13951abdd4511b201a` on a GitHub-hosted `ubuntu-24.04` runner. The workflow asserted x86_64, a non-root user, and GNU libc, and recorded the distribution, kernel, libc, filesystem, mount options, virtualization, Rust toolchain, and clean checkout in its retained evidence.
 
-The prepared manual workflow targets Ubuntu 24.04 x86_64 as a non-root user, asserts GNU libc, records distribution, kernel, filesystem, mount options and virtualization, runs all four required checks, and exercises executable permissions plus the official Node.js 22.0.0 / 24.0.0 A/B workflow. T3 remains incomplete until that workflow passes and its uploaded evidence is reviewed.
+| Evidence | Result |
+| --- | --- |
+| Required checks | `cargo fmt --check`, `cargo check --all-targets --locked`, `cargo clippy --all-targets --all-features --locked -- -D warnings`, and `cargo test --all --locked` passed |
+| Tests | 137 library + 19 CLI + 8 selection CLI tests, 164 total; 0 failed or ignored |
+| Build | `cargo build --locked` passed |
+| Official workflow | Node.js 22.0.0 and 24.0.0 install/list/use/current/direct-entry/controlled-PATH/no-op/protected-uninstall/inactive-uninstall workflow passed |
+| Official Linux x64 SHA-256 | `74bb0f3a80307c529421c3ed84517b8f543867709f41e53cd73df99e6442af4d` (22.0.0) and `b760ed6de40c35a25eb011b3cf5943d35d7a76f0c8c331d5a801e10925826cb3` (24.0.0) |
+| Artifact | `m5-t3-linux-x64-gnu-36843186140-1`, artifact ID `11152935391`, uploaded ZIP SHA-256 `01c3c8a70891bdbc67fce6ff3f6da945896dc6c3a36290d8b19e99b1ae4f85ca`, retained for 30 days |
+
+The first two native runs exposed that successful Unix no-op and switching paths could return before a following operation observed the file lock as released. Commits `4a25760` and `04c17a4` explicitly unlock before both successful returns; the existing `relative_selection_is_untouched_on_noop_and_supported_on_switch` regression then passed in the final run. A separate push-trigger repair supplied the manual input defaults during validation. The temporary push trigger was removed after acceptance; the workflow remains manually dispatchable.
+
+The final smoke confirmed executable permission, numeric list order, fixed-entry and controlled-PATH execution for both versions, inode preservation on no-op selection, documented competing-PATH precedence, unchanged receipt/executable hashes after switching, active-version uninstall protection, removal of only the inactive version, an empty operation directory, and no reserved switch siblings. Linux GNU arm64, non-GitHub-hosted distributions, other filesystems/mount policies, persistent shell-profile changes, and hostile same-user races remain unverified.
 
 ## T4 security review
 
-**Complete.** The review covered the current `6f42688` tree. That commit differs from the `v0.4.0` product candidate only through T2/T3 validation workflows and documentation; production Rust source and locked runtime dependencies are unchanged. No confirmed vulnerability or unresolved release-blocking finding was found. T3's missing Linux native evidence remains a delivery-validation gap, not an unreviewed security finding.
+**Complete.** The main review covered tree `6f42688`. T3 subsequently changed only Unix successful-return lock release in `src/storage/switching.rs`; a focused follow-up reviewed that diff and its existing sequential no-op/switch/query regression. It shortens lock ownership without weakening validation, rollback, or exclusive mutation, and introduces no dependency. No confirmed vulnerability or unresolved release-blocking finding was found.
 
 | Area | Reviewed implementation and regression evidence | Finding and disposition | Residual limitation |
 | --- | --- | --- | --- |
 | Native roots and boundaries | `src/storage.rs`, `src/installation.rs`, `src/mutation.rs`, `src/install.rs`, `src/uninstall.rs`, `src/inventory.rs`; storage boundary/link tests, linked mutation-path tests, cleanup boundary tests | No finding. Roots are resolved to a canonical boundary before mutation; descendants are inspected component by component with `symlink_metadata`; non-direct operation cleanup and linked/non-directory ancestors fail closed | A linked storage root is intentionally supported. Hostile same-user path replacement races are outside the documented threat model |
-| Archive extraction | `src/installation.rs`, `src/installation/zip.rs`, `src/installation/tar.rs`; unsafe-name, duplicate/conflict, byte/entry, ZIP64, CRC/truncation, tar metadata, special-entry, link escape/cycle and corruption tests | No finding. Extraction requires one expected top-level directory, rejects traversal/reserved receipt paths/unsupported types, bounds compressed download, expanded bytes, entries and metadata, and creates links only after resolving their in-archive targets | Correctly verified official payload code remains trusted executable content. Linux-native tar/permission delivery evidence remains T3 |
+| Archive extraction | `src/installation.rs`, `src/installation/zip.rs`, `src/installation/tar.rs`; unsafe-name, duplicate/conflict, byte/entry, ZIP64, CRC/truncation, tar metadata, special-entry, link escape/cycle and corruption tests | No finding. Extraction requires one expected top-level directory, rejects traversal/reserved receipt paths/unsupported types, bounds compressed download, expanded bytes, entries and metadata, and creates links only after resolving their in-archive targets | Correctly verified official payload code remains trusted executable content. Linux GNU arm64 and other host/filesystem combinations remain unverified |
 | Checksums and transport | `src/distribution.rs`, `src/download.rs`; exact/duplicate checksum, SHA-256 vector, mismatch/truncation, HTTPS/certificate, redirect, status, size and timeout tests | No finding. URLs are fixed official HTTPS paths derived from a parsed full version; certificate verification remains enabled; redirects and content decoding are disabled; response sizes and time are bounded; checksum selection is exact and unique; extraction starts only after SHA-256 matches | Compromised official infrastructure and local trust-store/proxy policy are outside scope; custom mirrors and proxies are unsupported |
 | Complete installations | `src/installation.rs`, `src/inventory.rs`, selection/uninstall callers; receipt, executable, incomplete inventory/current and malformed destination tests | No finding. Visibility requires a bounded exact receipt matching target/platform/digest, a real canonical direct directory and a nonempty regular executable; Unix also requires an execute bit | The receipt records verified installation provenance; it is not a continuing integrity monitor against later same-user payload modification |
 | Mutations and cleanup | `src/mutation.rs`, `src/install.rs`, `src/uninstall.rs`; process contention, exclusive allocation, rename, partial cleanup, link-preservation, selected-version and residue tests | No finding. Writers use one nonblocking exclusive lock; complete queries use a shared lock; operations stay on the storage filesystem; cleanup is restricted to direct owned operation paths and never recursively follows links; selected or invalid state fails closed | Power loss, hostile same-user races and automatic recovery are not promised. Reported detached or temporary leftovers can require manual recovery |
@@ -133,3 +145,4 @@ The prepared manual workflow targets Ubuntu 24.04 x86_64 as a non-root user, ass
 | 2026-10-01 | Complete T2 macOS delivery validation | PR [#8](https://github.com/verslot/verslot/pull/8) repaired filesystem/case evidence and updated Actions. [Run 36777691817](https://github.com/verslot/verslot/actions/runs/36777691817) passed on macOS 15.7.9 arm64 / APFS: all four checks, 163 tests, build, official Node.js 22.0.0 / 24.0.0 workflow, payload/residue assertions and evidence upload. T2 Complete; begin T3 Linux validation next |
 | 2026-10-01 | Start T3 Linux delivery validation | Added a manual Ubuntu 24.04 x86_64 GNU workflow that asserts a non-root glibc environment, records filesystem/mount and virtualization evidence, runs all four checks, and performs the official A/B workflow. Native execution and evidence review remain pending |
 | 2026-10-01 | Complete T4 security review | Reviewed all eight v0.5 security areas and their mapped regression tests. `cargo-audit 0.22.2` scanned 99 locked dependencies against RustSec database commit `9b3a3b7` (1,277 advisories) with no vulnerabilities or warnings. No release-blocking finding; T3 remains independently pending |
+| 2026-10-01 | Complete T3 Linux delivery validation | [Run 36843186140](https://github.com/verslot/verslot/actions/runs/36843186140) passed the Ubuntu 24.04 x86_64 GNU environment assertions, all four checks, 164 tests, build, official Node.js 22.0.0 / 24.0.0 workflow and evidence upload. Earlier runs exposed and repaired explicit Unix lock release on both successful return paths plus push-trigger input defaults. T3 Complete; begin T5 documentation next |

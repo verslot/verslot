@@ -1,11 +1,6 @@
 name: M5 T3 Linux validation
 
 on:
-  push:
-    branches: [dev]
-    paths:
-      - .github/workflows/m5-t3-linux.yml
-      - src/storage/switching.rs
   workflow_dispatch:
     inputs:
       node_a:
