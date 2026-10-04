@@ -1,10 +1,10 @@
 # M5 Cross-Platform Validation
 
-Last updated: 2026-10-01
+Last updated: 2026-10-04
 
 ## Status
 
-M5 is **In progress (4 / 6 tasks)**. T1 Windows, T2 macOS, T3 Linux, and T4 security review are complete. T5 installation/usage/limitations documentation is next; T6 has not started.
+M5 is **Complete, release scope confirmed (6 / 6 tasks)**. The repaired final source is covered by Windows local checks plus source-equivalent M4 smoke reuse, retained Linux T3 acceptance, and macOS run 37205835491 reviewed below. Package version remains `0.4.0`; no new tag or binary publication is implied.
 
 No package version, tag, binary publication, or persistent PATH state changed during this validation update.
 
@@ -12,11 +12,11 @@ No package version, tag, binary publication, or persistent PATH state changed du
 
 | Field | Value |
 | --- | --- |
-| Product candidate commit | `cf5760d930585cf31fd9de39d50e076cfd5b5270` (`v0.4.0`) |
+| Original product candidate commit | `cf5760d930585cf31fd9de39d50e076cfd5b5270` (`v0.4.0`) |
 | macOS validation commit | `7dc4272b1009d11d421c53f865c1f48ba4a4fcb4`; differs from the product candidate only by M5 workflow and documentation commits |
 | Linux validation commit | `04c17a42b6f8099e0ef0ba13951abdd4511b201a`; includes the T3 workflow and the Linux lock-release repair described below |
 | Candidate CI | [run 36698517158](https://github.com/verslot/verslot/actions/runs/36698517158), push workflow, completed successfully on 2026-09-30 |
-| Documentation state | This record, `docs/v0.5.md`, and the roadmap are synchronized after T3 |
+| Documentation state | This record, `docs/v0.5.md`, and the roadmap are synchronized after T6 |
 | Package version | `0.4.0` |
 | Publication status | No Verslot binaries published |
 
@@ -134,6 +134,189 @@ The final smoke confirmed executable permission, numeric list order, fixed-entry
 - Result: no vulnerabilities and no warnings reported. The previously published `rustls-webpki` CRL panic is fixed from `0.103.13`; the project locks `0.103.15`. The historical `ring` unmaintained notice is withdrawn.
 - Limitation: this is a point-in-time database result, not a guarantee about undisclosed vulnerabilities or future advisories.
 
+## T5 installation, usage, and limitations documentation
+
+**Complete.** [README](../README.md) now documents installation pinned to
+`04c17a42b6f8099e0ef0ba13951abdd4511b201a`, native build prerequisites,
+Cargo binary location, all five commands, full-version syntax, storage/fixed
+entry paths, and manual per-shell PATH configuration. It separates native
+validated platforms from mapped-but-unverified and unsupported targets.
+
+Filesystem/permission, macOS fixture, Windows antivirus/sharing, network/proxy,
+checksum/trust, PATH precedence, uninstall protection, publication-gap and
+manual recovery limitations are tied to retained evidence. The pinned source
+includes the T3 Unix lock-release repair reviewed in T4; older platform runs
+are not a new combined acceptance run for that source. T6 owns that assessment.
+
+Documentation only: no production code, dependency, version, tag, binary
+publication or persistent PATH change. Checks, tests, builds and official
+workflows **Not run** for T5; previous results remain historical evidence.
+
+## T6 final evidence matrix and release decision
+
+**Initial T6 decision: Awaiting validation; superseded by final acceptance below.** This decision is based
+on retained repository evidence and local Git source comparisons on 2026-10-04.
+No CI, checks, tests, builds, advisory scan or official workflow was run during
+T6; remote log/artifact availability was not reverified.
+
+### Final candidate and evidence matrix
+
+The final source candidate is `04c17a42b6f8099e0ef0ba13951abdd4511b201a`,
+package `0.4.0`. Comparing its production code, manifest, lockfile and tests
+with the original `v0.4.0` candidate shows only the Unix successful-return
+lock-release changes in `src/storage/switching.rs`: explicitly unlock before
+both no-op and successful-switch returns. HEAD `9c35b90` differs from this
+candidate only in documentation and the Linux workflow; current uncommitted
+T5/T6 changes are documentation only. Windows production behavior is unchanged,
+but the macOS workflow predates this Unix behavior change.
+
+| Gate | Retained evidence | Final-candidate assessment |
+| --- | --- | --- |
+| Formatting | Original candidate CI; T2 and T3 native fmt passed | Passed for final source in T3; T5/T6 documentation not checked |
+| Windows Check / Clippy / Test | Original candidate CI plus local 2026-10-04 checks; 160 tests | Passed locally for source identical to final candidate; see acceptance attempt below |
+| Windows official A/B workflow | T1 reuses M4 Windows x86_64 / NTFS evidence | Final-source equivalence and current native checks confirmed on 2026-10-04; smoke reused |
+| macOS Check / Clippy / Test and A/B workflow | Run 37205835491 on `9c35b90`; arm64 / APFS; successful job screenshot plus retained environment/smoke artifact | Final-source acceptance passed; exact test total not present in supplied evidence |
+| Linux Check / Clippy / Test and A/B workflow | Run 36843186140 on `04c17a4`; Ubuntu 24.04 x86_64 GNU; 164 tests | Passed for final source; receipt/payload/PATH/residue evidence retained in T3 |
+| Security review | T4 review of `6f42688` plus focused Unix repair review | No recorded unresolved release blocker; 99-dependency advisory scan dated 2026-10-01 |
+| Instructions and limitations | T5 README and this record | Complete; mapped/unverified targets and observed limitations remain explicit |
+| Final decision and synchronization | T6 record, README, roadmap and v0.5 task log | M5 Complete; minimum three-target scope confirmed; retain package 0.4.0; no new tag or publication |
+
+Initial failures, repairs, exact archive checksums, artifact identifiers and
+limitations remain in T1–T4 above. No cfg-excluded or absent test is counted as
+passing. The macOS non-UTF-8 on-disk fixture, mapped Windows arm64/macOS x86_64/
+Linux GNU arm64, and other filesystem/host combinations remain unverified.
+
+### Scope, version and publication decision
+
+- Candidate release scope: Node.js version management with the existing five
+  commands on Windows `x86_64-pc-windows-msvc`, macOS `aarch64-apple-darwin`,
+  and Linux `x86_64-unknown-linux-gnu`, subject to recorded environment limits.
+  This scope is provisional until the final candidate passes the gate.
+- Version decision: retain package version `0.4.0`; defer choosing a new
+  release version until acceptance closes. The v0.5 design name does not
+  select `0.5.0`; the old `v0.4.0` tag does not contain the Unix repair.
+- Publication decision: no release approved, new tag, binary publication,
+  installer, signing or provenance claim. Such actions remain separate.
+- M5 decision: **Awaiting validation**, because the same repaired candidate
+  lacks the complete required native evidence. No historical pass is revoked
+  and no missing run is represented as passed.
+
+### Conditions for completing M5
+
+1. Record Check, Clippy and Test evidence for the repaired candidate on all
+   three minimum native platforms, with shared fmt evidence. The design
+   requires a full matrix rerun after locking behavior changes; the existing
+   T3 run can supply the Linux result for this exact source.
+2. Run the official macOS arm64 A/B workflow on the repaired candidate and
+   retain native environment, exact outputs, checksums, PATH, payload and
+   residue evidence. Windows smoke reuse requires an explicit final-candidate
+   equivalence decision and current native checks; Linux evidence is retained.
+3. Review the completed matrix, confirm security evidence still applies,
+   select the release version explicitly, and synchronize M5 to Complete only
+   when every gate is met. If candidate source/dependencies change, apply the
+   design's affected-platform rerun and advisory-review requirements.
+
+## Acceptance attempt on 2026-10-04
+
+M5 remains **Awaiting validation**. Local Windows acceptance passed for HEAD
+`9c35b9047c20fda8ce9d2c6bb00afd057fd9077d`; a Git comparison against
+`04c17a42b6f8099e0ef0ba13951abdd4511b201a` found no differences in `src`,
+`tests`, `Cargo.toml` or `Cargo.lock`. The working tree contained only the four
+T5/T6 documentation edits. Rust was `1.98.1`, host
+`x86_64-pc-windows-msvc`, Cargo `1.98.1`, LLVM `22.1.8`.
+
+| Local command | Result |
+| --- | --- |
+| `cargo fmt --check` | Passed; no output |
+| `cargo check --all-targets --locked --offline` | Passed |
+| `cargo clippy --all-targets --all-features --locked --offline -- -D warnings` | Passed |
+| `cargo test --all --locked --offline` | Passed: 133 library + 19 CLI + 8 selection CLI tests, 160 total; 0 failed or ignored |
+
+Offline resolution used the locked cached dependencies without weakening TLS
+or changing dependency versions. Windows smoke reuse is confirmed for this
+final source: the only production change since the original candidate is in
+the Unix-only switching module; Windows source behavior is unchanged and now
+has current native checks. The retained M4 official 22.0.0 / 24.0.0 NTFS
+workflow remains the smoke evidence; no new official binaries were downloaded
+or executed. A current `Get-Volume` filesystem query returned access denied;
+no new filesystem evidence is claimed.
+
+The retained Linux T3 checks and official A/B run cover the same final source.
+The remaining gate is macOS arm64 native Check/Clippy/Test and official A/B
+workflow after the Unix lock-release repair. GitHub CLI authentication reports
+an invalid token for the configured account. Attempting
+`gh workflow run m5-t2-macos.yml --ref main -f node_a=22.0.0 -f node_b=24.0.0`
+returned HTTP 401 and created no run. Browser automation had no existing
+GitHub browser tab; opening the workflow page timed out, so no browser-based
+run was created or verified. No credentials were changed.
+
+Resume by restoring authorized GitHub access, dispatching the macOS workflow
+on a ref whose production source matches the final candidate, and retaining
+its commit, environment, checks, exact A/B outputs and artifact evidence.
+Reconcile that run with the Windows local and Linux retained evidence before
+marking M5 Complete. No new release version, tag or publication was created.
+
+### GitHub plugin follow-up on 2026-10-04
+
+The GitHub plugin successfully fetched remote commits independently of the
+invalid local CLI credential: `dev` is
+`9c35b9047c20fda8ce9d2c6bb00afd057fd9077d`, while `main` is
+`4a705a65ce0bf69c921c06140082a52015479a16` and predates the Unix repair.
+The earlier attempted `--ref main` dispatch would not have validated the
+repaired source even if authentication had succeeded. Use `dev` for the
+pending macOS workflow, and verify its resolved commit before accepting it.
+
+Available plugin Actions tools read jobs/logs/artifacts and rerun existing
+jobs; none dispatches a new workflow. Rerunning the old macOS job would retain
+its old commit and cannot close this gap. The plugin's commit-workflow query
+returned no entries for the final candidate/HEAD, but it filters to PR-triggered
+runs and is first-page-only; that result does not prove absence of manual or
+push runs. No new run was created through the plugin.
+
+Start the existing macOS workflow on branch `dev` with `node_a=22.0.0` and
+`node_b=24.0.0`, then provide the run URL or ID. The plugin can read the new
+run's jobs, logs and artifacts to complete evidence review without repairing
+local CLI authentication. M5 remains Awaiting validation.
+
+## Final acceptance on 2026-10-04
+
+**M5 Complete, release scope confirmed.** The user supplied the successful
+[macOS run 37205835491](https://github.com/verslot/verslot/actions/runs/37205835491)
+summary screenshot and its downloaded artifact. These close the macOS gate
+for the repaired source. This section supersedes the earlier pending decisions;
+those attempt records remain to preserve the failures and recovery history.
+
+| Evidence | Reviewed result |
+| --- | --- |
+| Commit | `9c35b9047c20fda8ce9d2c6bb00afd057fd9077d`, branch `dev`; production source/tests/manifest/lockfile identical to Linux candidate `04c17a4` |
+| Native environment | macOS 15.7.9 (24G830), arm64, Apple virtualized kernel; image `macos15` / `20260907.0337.1`; APFS root, temporary storage on Data volume; filename probe `case_sensitive=false` |
+| Toolchain | Rust/Cargo 1.98.1, host `aarch64-apple-darwin`, Clippy 0.1.98 |
+| Checks and build | Supplied run summary shows `validate-macos-arm64` Success. At this commit the job runs fmt, locked Check, locked Clippy with warnings denied, locked Test and build as mandatory sequential steps before smoke; success establishes their completion. Full check logs and exact test total were not supplied or independently fetched |
+| Official A/B workflow | 22.0.0 / 24.0.0 archive digests match retained official values; empty initial queries, duplicate install, numeric list, selection/current, fixed-entry/PATH execution, no-op, competing PATH, selected-uninstall rejection, inactive-uninstall success and payload preservation passed |
+| Final state | Smoke ends `PASS: B selected/executable; A absent; B bytes unchanged; tmp empty; no reserved siblings.` |
+| Supplied artifact | `m5-t2-macos-arm64-37205835491-1.zip`; locally computed SHA-256 `e71d326b1e4bf5bd768047e0010ac7b7df12a5de4325d7577e36c812f400d571` matches the visible screenshot prefix; full server digest and artifact ID not independently retrieved |
+| Retained evidence | [Environment](evidence/m5-macos-37205835491/environment.txt), [smoke](evidence/m5-macos-37205835491/smoke.txt), [user-supplied run summary](evidence/m5-macos-37205835491/run-summary.png) |
+
+The new macOS evidence, Windows local 160-test acceptance and confirmed
+Windows smoke equivalence, Linux final-source 164-test acceptance and official
+workflow, T4 security review including the Unix repair, and T5 documentation
+satisfy the minimum gate. The earlier macOS count of 163 belongs to its old
+run and is not asserted for this rerun. No absent or excluded fixture is counted
+as passed; previously recorded platform/filesystem/security limitations remain.
+The advisory scan remains the dated 2026-10-01 result, not a new scan.
+
+Confirmed scope is the five existing Node.js commands on Windows
+`x86_64-pc-windows-msvc`, macOS `aarch64-apple-darwin`, and Linux
+`x86_64-unknown-linux-gnu` under recorded environment limitations. Windows
+arm64, macOS x86_64 and Linux GNU arm64 remain mapped but unverified.
+
+Final version decision: retain package version `0.4.0` for this accepted source;
+no new release version is selected. The existing `v0.4.0` tag still predates the
+Unix repair and is not the accepted source identifier. Use the candidate SHA
+or the source-equivalent HEAD above. M5 acceptance confirms scope; it does not
+publish binaries, create a tag, approve signing/provenance, or authorize a new
+hosted release. Publication and any later version bump remain separate actions.
+
 ## Progress log
 
 | Date | Item | Result / next step |
@@ -146,3 +329,7 @@ The final smoke confirmed executable permission, numeric list order, fixed-entry
 | 2026-10-01 | Start T3 Linux delivery validation | Added a manual Ubuntu 24.04 x86_64 GNU workflow that asserts a non-root glibc environment, records filesystem/mount and virtualization evidence, runs all four checks, and performs the official A/B workflow. Native execution and evidence review remain pending |
 | 2026-10-01 | Complete T4 security review | Reviewed all eight v0.5 security areas and their mapped regression tests. `cargo-audit 0.22.2` scanned 99 locked dependencies against RustSec database commit `9b3a3b7` (1,277 advisories) with no vulnerabilities or warnings. No release-blocking finding; T3 remains independently pending |
 | 2026-10-01 | Complete T3 Linux delivery validation | [Run 36843186140](https://github.com/verslot/verslot/actions/runs/36843186140) passed the Ubuntu 24.04 x86_64 GNU environment assertions, all four checks, 164 tests, build, official Node.js 22.0.0 / 24.0.0 workflow and evidence upload. Earlier runs exposed and repaired explicit Unix lock release on both successful return paths plus push-trigger input defaults. T3 Complete; begin T5 documentation next |
+| 2026-10-04 | Complete M5 T5 documentation | README now covers pinned-source installation, build prerequisites, commands, platform evidence, download trust and observed limitations; [T5 record](m5-validation.md#t5-installation-usage-and-limitations-documentation). M5 In progress (5 / 6). Next: T6 final evidence matrix and release scope/version decision. Documentation only; checks Not run; no version, tag or publication change |
+| 2026-10-04 | Complete T6 final record and decision | Added final-candidate evidence matrix, source comparison, provisional three-target scope and version/publication decision. T6 documentation complete; M5 Awaiting validation (6 / 6 deliverables). Final-candidate Windows checks and macOS checks/A/B workflow remain missing; no checks or workflows run in T6 |
+| 2026-10-04 | Execute M5 acceptance | Windows fmt/Check/Clippy/Test passed with 160 tests on final-equivalent source; Windows official workflow reuse confirmed and Linux final-source evidence retained. macOS dispatch failed HTTP 401; browser fallback timed out. M5 remains Awaiting validation pending macOS native checks/A/B evidence |
+| 2026-10-04 | Close M5 acceptance | Reviewed user-supplied successful macOS run 37205835491 screenshot and environment/smoke artifact for final-equivalent 9c35b90; retained evidence in docs. M5 Complete (6 / 6), minimum three-target scope confirmed, package 0.4.0 retained; no new tag or publication. Rerun test total not supplied |

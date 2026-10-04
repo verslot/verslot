@@ -1,0 +1,79 @@
+commit=9c35b9047c20fda8ce9d2c6bb00afd057fd9077d
+runner_image=macos15
+runner_image_version=20260907.0337.1
+architecture=arm64
+ProductName:		macOS
+ProductVersion:		15.7.9
+BuildVersion:		24G830
+Darwin iad20-gt1021-90aed3bc-ca89-418c-8cb1-e76c2beb2a19-1E32EEBFA441.local 24.6.0 Darwin Kernel Version 24.6.0: Tue Jul 21 20:51:34 PDT 2026; root:xnu-11417.140.69.711.44~1/RELEASE_ARM64_VMAPPLE arm64
+Filesystem   512-blocks      Used Available Capacity  Mounted on
+/dev/disk2s5  670064640 540833144  90572344    86%    /System/Volumes/Data
+   Device Identifier:         disk2s1s1
+   Device Node:               /dev/disk2s1s1
+   Whole:                     No
+   Part of Whole:             disk2
+
+   Volume Name:               Macintosh HD
+   Mounted:                   Yes
+   Mount Point:               /
+
+   Partition Type:            41504653-0000-11AA-AA11-00306543ECAC
+   File System Personality:   APFS
+   Type (Bundle):             apfs
+   Name (User Visible):       APFS
+   Owners:                    Enabled
+
+   OS Can Be Installed:       No
+   Booter Disk:               disk2s2
+   Recovery Disk:             disk2s3
+   Media Type:                
+   Protocol:                  
+   SMART Status:              Not Supported
+   Volume UUID:               14744BDF-53E3-444C-8B42-EF21BB3DBC92
+   Disk / Partition UUID:     14744BDF-53E3-444C-8B42-EF21BB3DBC92
+
+   Disk Size:                 343.1 GB (343073095680 Bytes) (exactly 670064640 512-Byte-Units)
+   Device Block Size:         4096 Bytes
+
+   Volume Used Space:         11.3 GB (11267788800 Bytes) (exactly 22007400 512-Byte-Units)
+   Container Total Space:     343.1 GB (343073095680 Bytes) (exactly 670064640 512-Byte-Units)
+   Container Free Space:      46.4 GB (46373081088 Bytes) (exactly 90572424 512-Byte-Units)
+   Allocation Block Size:     4096 Bytes
+
+   Media OS Use Only:         No
+   Media Read-Only:           Yes
+   Volume Read-Only:          Yes (read-only mount flag set)
+
+   Device Location:           Internal
+   Removable Media:           Fixed
+
+   Solid State:               Yes
+
+   This disk is an APFS Volume Snapshot.  APFS Information:
+   APFS Snapshot Name:        com.apple.os.update-2C083E7D042E96779F886D9092C61E88A0E7AB9EE4C8ACE14FD9C26E43B17C55
+   APFS Snapshot UUID:        14744BDF-53E3-444C-8B42-EF21BB3DBC92
+   APFS Container:            disk2
+   APFS Physical Store:       disk0s2
+   Fusion Drive:              No
+   APFS Volume Group:         995BAA35-FC3B-4105-B6D9-D45D24A66DEB
+   EFI Driver In macOS:       2332140013702002
+   Encrypted:                 No
+   FileVault:                 No
+   Sealed:                    Yes
+   Locked:                    No
+
+   APFS Snapshots are defined upon this APFS Volume.  Snapshot list:
+   Snapshot UUID:             14744BDF-53E3-444C-8B42-EF21BB3DBC92
+   Name:                      com.apple.os.update-2C083E7D042E96779F886D9092C61E88A0E7AB9EE4C8ACE14FD9C26E43B17C55
+   XID:                       2403
+
+rustc 1.98.1 (48a229cea 2026-09-01)
+binary: rustc
+commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985
+commit-date: 2026-09-01
+host: aarch64-apple-darwin
+release: 1.98.1
+LLVM version: 22.1.8
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+clippy 0.1.98 (48a229ceae 2026-09-01)
+case_sensitive=false

@@ -1,6 +1,6 @@
 # Verslot Development Roadmap and Progress
 
-Last updated: 2026-10-01
+Last updated: 2026-10-04
 
 This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation; the [v0.4 design](v0.4.md) defines M4 switching and current-version queries; the [v0.5 design](v0.5.md) defines M5 cross-platform delivery and release-scope validation. Planned work does not indicate completed delivery or a committed release date.
 
@@ -11,12 +11,12 @@ This document tracks development phases, tasks, and delivery progress. The CLI f
 | Metric | Current Status |
 | --- | --- |
 | Package version | `0.4.0` (does not indicate published binaries) |
-| Current milestone | M5 In progress: 4 / 6 tasks complete. Windows T1, macOS T2, Linux T3, and T4 security review are complete |
-| Core features implemented | **5 / 5**: install, list, uninstall, use, and current have code and tests; local Windows M4 acceptance passed; full cross-platform delivery remains M5 |
-| Active development tasks | M5 T1–T4 complete; T5 documentation is next |
-| Next step | Begin T5 installation, usage, and evidence-based limitations documentation. [M5 evidence](m5-validation.md) |
+| Current milestone | M5 Complete: 6 / 6 tasks; final-source minimum three-platform scope confirmed |
+| Core features implemented | **5 / 5**: install, list, uninstall, use, and current have code and tests; minimum three-platform M5 acceptance complete; other mapped architectures remain unverified |
+| Active development tasks | M5 T1–T6 complete; package 0.4.0 retained; no published binaries |
+| Next step | M5 acceptance closed; any new version, tag or binary publication is a separate decision. [M5 evidence](m5-validation.md) |
 | Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; [M2 foundations](v0.2.md), [M4 switching and recovery](v0.4.md) |
-| Validation status | [M5 T1](m5-validation.md) reused verified M4 Windows evidence; [M5 T2](m5-validation.md#t2-macos-delivery-validation) passed 163 tests and the official A/B workflow on macOS arm64; [M5 T3](m5-validation.md#t3-linux-delivery-validation) passed 164 tests and the official A/B workflow on Ubuntu 24.04 x86_64 GNU. [M5 T4](m5-validation.md#t4-security-review) found no release blocker and scanned 99 locked dependencies with no RustSec vulnerability or warning. Other mapped architectures remain unverified |
+| Validation status | Final-source [macOS acceptance](m5-validation.md#final-acceptance-on-2026-10-04) passed; Windows local checks passed 160 tests; [M5 T1](m5-validation.md) reused verified M4 Windows evidence; [M5 T2](m5-validation.md#t2-macos-delivery-validation) passed 163 tests and the official A/B workflow on macOS arm64; [M5 T3](m5-validation.md#t3-linux-delivery-validation) passed 164 tests and the official A/B workflow on Ubuntu 24.04 x86_64 GNU. [M5 T4](m5-validation.md#t4-security-review) found no release blocker and scanned 99 locked dependencies with no RustSec vulnerability or warning. Other mapped architectures remain unverified |
 
 Implementation counts reflect features users can actually use; placeholder commands do not count as implemented. Phases differ in effort, so task counts are not used to estimate an overall project completion percentage.
 
@@ -55,7 +55,7 @@ Milestone statuses: Not started → In progress → Awaiting validation → Comp
 | M2 Target parsing and local state | Before M3 | Complete | 6 / 6 | Valid targets can be parsed, invalid targets are rejected, and local state read/write rules are defined |
 | M3 Node.js installation and queries | After M2 | Complete | 7 / 7 | Specified versions can be installed safely, query results match disk state, and installed versions can be uninstalled |
 | M4 Version switching | After M3 | Complete under local Windows acceptance | 5 / 5 capability code items; 5 / 5 tasks | Complete installed versions can be selected and queried; the fixed entry point and controlled PATH execute the selected version; failure recovery is validated |
-| M5 Cross-platform delivery | After M4 | In progress | 4 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
+| M5 Cross-platform delivery | After M4 | Complete | 6 / 6 | Core workflows pass validation on each platform, and usage instructions and limitations are documented |
 
 Checklist progress counts the checked items below. It reflects completed tasks, not effort or delivery percentages. M3 is planned in v0.3, M4 in v0.4, and M5 in [v0.5](v0.5.md); M5 has no preset package version or date. No planned version implies a release commitment.
 
@@ -103,14 +103,14 @@ Design: [v0.4](v0.4.md), with five implementation tasks distinct from this capab
 
 ### Phase 5: Cross-Platform Delivery
 
-Design: [v0.5](v0.5.md), with six delivery tasks corresponding to this checklist. The minimum gate requires native Windows x86_64, macOS arm64, and Linux x86_64 GNU checks and official two-version workflows, followed by a security review, evidence-based documentation, and an explicit release decision. T1 Windows, T2 macOS, T3 Linux, and T4 security review are complete. See [current evidence](m5-validation.md).
+Design: [v0.5](v0.5.md), with six delivery tasks corresponding to this checklist. The minimum gate requires native Windows x86_64, macOS arm64, and Linux x86_64 GNU checks and official two-version workflows, followed by a security review, evidence-based documentation, and an explicit release decision. T1–T6 are complete. Final-source macOS run 37205835491 closes the Unix locking repair acceptance gap; minimum three-platform release scope is confirmed. See [current evidence](m5-validation.md).
 
 - [x] Validate the install → list → switch → query → uninstall workflow on Windows.
 - [x] Validate the same workflow on macOS.
 - [x] Validate the same workflow on Linux.
 - [x] Complete a security review of paths, archive extraction, checksum verification, and untrusted remote data.
-- [ ] Update installation instructions, command examples, and known limitations.
-- [ ] Record validation results and confirm the release scope and version number.
+- [x] Update installation instructions, command examples, and known limitations.
+- [x] Record validation results and confirm the release scope and version number (T6 decision: confirmed minimum three-target scope, retain 0.4.0, no new release version/tag/publication).
 
 ## Development Workflow
 
@@ -173,6 +173,10 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-10-01 | Start M5 T3 Linux delivery validation | Added a manual Ubuntu 24.04 x86_64 GNU workflow with non-root/glibc assertions, environment and filesystem/mount evidence, all four required checks, executable-permission coverage and the official Node.js 22.0.0 / 24.0.0 workflow | M5 remains In progress (2 / 6). Run the workflow and review its evidence before completing T3. [Evidence](m5-validation.md#t3-linux-delivery-validation) |
 | 2026-10-01 | Complete M5 T4 security review | Reviewed native paths, archives, transport/checksums, completeness, mutations, switching, dependencies and smoke harness against mapped tests; `cargo-audit 0.22.2` scanned 99 locked dependencies using RustSec commit `9b3a3b7` and reported no vulnerabilities or warnings | M5 In progress (3 / 6), with no release-blocking security finding. T3 Linux native evidence remains pending; T5 follows T3. [Evidence](m5-validation.md#t4-security-review) |
 | 2026-10-01 | Complete M5 T3 Linux delivery validation | [Run 36843186140](https://github.com/verslot/verslot/actions/runs/36843186140) passed Ubuntu 24.04 x86_64 GNU environment assertions, all four checks, 164 tests, build, official Node.js 22.0.0 / 24.0.0 workflow, and evidence upload after explicit Unix successful-return lock release was repaired | M5 In progress (4 / 6). T5 installation, usage, and evidence-based limitations documentation is next. [Evidence](m5-validation.md#t3-linux-delivery-validation) |
+| 2026-10-04 | Complete M5 T5 documentation | README now covers pinned-source installation, build prerequisites, commands, platform evidence, download trust and observed limitations; [T5 record](m5-validation.md#t5-installation-usage-and-limitations-documentation) | M5 In progress (5 / 6). Next: T6 final evidence matrix and release scope/version decision. Documentation only; checks Not run; no version, tag or publication change |
+| 2026-10-04 | Complete M5 T6 final record and decision | Added final-candidate matrix, source comparison and provisional minimum three-target release scope; retain package 0.4.0 and defer new release version/publication. [T6 decision](m5-validation.md#t6-final-evidence-matrix-and-release-decision) | M5 Awaiting validation (6 / 6 deliverables); close final-candidate Windows checks and macOS checks/A/B gaps. Documentation only; checks/workflows Not run; no version, tag or publication change |
+| 2026-10-04 | Execute M5 acceptance | Final-equivalent Windows source passed fmt/Check/Clippy/Test, 160 tests; Windows smoke reuse confirmed; Linux final-source evidence retained. [Acceptance attempt](m5-validation.md#acceptance-attempt-on-2026-10-04) | M5 Awaiting validation: macOS workflow dispatch failed HTTP 401, browser fallback timed out; restore GitHub access and complete macOS checks/A/B evidence. No version/tag/publication change |
+| 2026-10-04 | Complete M5 acceptance | Reviewed macOS run 37205835491 screenshot and supplied artifact on final-equivalent 9c35b90; native checks/build and official A/B workflow passed, exact rerun test count unavailable. [Final decision](m5-validation.md#final-acceptance-on-2026-10-04) | M5 Complete (6 / 6); minimum three-target scope confirmed, package 0.4.0 retained; no new version/tag/publication |
 
 Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
 
