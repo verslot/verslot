@@ -34,7 +34,7 @@ Do not implement hypothetical future requirements.
 
 ## Required validation
 
-Before completing implementation:
+Pure documentation changes require no Cargo checks. Code changes and version releases must run all four checks before completion. See [CONTRIBUTING.md](CONTRIBUTING.md) for the ongoing maintenance and release procedure.
 
 cargo fmt --check
 cargo check --all-targets

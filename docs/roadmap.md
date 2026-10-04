@@ -2,21 +2,21 @@
 
 Last updated: 2026-10-04
 
-This document tracks development phases, tasks, and delivery progress. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation; the [v0.4 design](v0.4.md) defines M4 switching and current-version queries; the [v0.5 design](v0.5.md) defines M5 cross-platform delivery and release-scope validation. Planned work does not indicate completed delivery or a committed release date.
+This document preserves the frozen M1–M5 development history. Ongoing work is tracked only in [GitHub Issues](https://github.com/verslot/verslot/issues); [CONTRIBUTING](../CONTRIBUTING.md) is the sole maintenance and release procedure. The CLI foundation is defined by the [v0.1 specification](v0.1.md) and [README](../README.md); implemented target validation and local state are defined by the [v0.2 specification](v0.2.md). The [v0.3 design](v0.3.md) defines M3 installation, listing, and uninstallation; the [v0.4 design](v0.4.md) defines M4 switching and current-version queries; the [v0.5 design](v0.5.md) defines M5 cross-platform delivery and release-scope validation. Planned work does not indicate completed delivery or a committed release date.
 
 ## Progress Overview
 
-> **M2 and local M3 acceptance are complete**: M2 Windows checks and repaired three-platform CI passed. M3 install/list/uninstall passed local Windows checks, 120 tests and the official Node.js 22.0.0 smoke workflow; see [M3 evidence and platform limitations](m3-validation.md). M3 Unix and other architectures remain unverified.
+> **M5 acceptance is complete (6 / 6)**: All five Node.js commands passed the minimum native Windows x86_64, macOS arm64 and Linux x86_64 GNU acceptance gate. Package version is `0.5.0`; source release preparation follows M5 acceptance, with no precompiled binaries or crates.io publication. Other mapped architectures remain unverified. See [final acceptance and limitations](m5-validation.md#final-acceptance-on-2026-10-04).
 
 | Metric | Current Status |
 | --- | --- |
-| Package version | `0.4.0` (does not indicate published binaries) |
-| Current milestone | M5 Complete: 6 / 6 tasks; final-source minimum three-platform scope confirmed |
+| Package version | `0.5.0` (source release; no precompiled binaries) |
+| Current milestone | M1–M5 records frozen; entering Issue-driven maintenance after v0.5.0 source delivery |
 | Core features implemented | **5 / 5**: install, list, uninstall, use, and current have code and tests; minimum three-platform M5 acceptance complete; other mapped architectures remain unverified |
-| Active development tasks | M5 T1–T6 complete; package 0.4.0 retained; no published binaries |
-| Next step | M5 acceptance closed; any new version, tag or binary publication is a separate decision. [M5 evidence](m5-validation.md) |
+| Active development tasks | v0.5.0 source release verification and delivery; future work belongs in Issues |
+| Next step | Complete v0.5.0 source release, then actual use → Issue → scoped fix/improvement → release. M1 historical acceptance is unrecorded and does not block publication |
 | Design decisions | Full versions only; fixed current link with Unix symlinks / Windows junctions and manual PATH configuration; [M2 foundations](v0.2.md), [M4 switching and recovery](v0.4.md) |
-| Validation status | Final-source [macOS acceptance](m5-validation.md#final-acceptance-on-2026-10-04) passed; Windows local checks passed 160 tests; [M5 T1](m5-validation.md) reused verified M4 Windows evidence; [M5 T2](m5-validation.md#t2-macos-delivery-validation) passed 163 tests and the official A/B workflow on macOS arm64; [M5 T3](m5-validation.md#t3-linux-delivery-validation) passed 164 tests and the official A/B workflow on Ubuntu 24.04 x86_64 GNU. [M5 T4](m5-validation.md#t4-security-review) found no release blocker and scanned 99 locked dependencies with no RustSec vulnerability or warning. Other mapped architectures remain unverified |
+| Validation status | Final-source [macOS acceptance](m5-validation.md#final-acceptance-on-2026-10-04) passed (exact rerun test count unavailable); Windows local checks passed 160 tests; [M5 T1](m5-validation.md) reused verified M4 Windows evidence; Earlier [M5 T2](m5-validation.md#t2-macos-delivery-validation) passed 163 tests and the official A/B workflow on macOS arm64; [M5 T3](m5-validation.md#t3-linux-delivery-validation) passed 164 tests and the official A/B workflow on Ubuntu 24.04 x86_64 GNU. [M5 T4](m5-validation.md#t4-security-review) found no release blocker and scanned 99 locked dependencies with no RustSec vulnerability or warning. Other mapped architectures remain unverified |
 
 Implementation counts reflect features users can actually use; placeholder commands do not count as implemented. Phases differ in effort, so task counts are not used to estimate an overall project completion percentage.
 
@@ -28,20 +28,22 @@ Implementation counts reflect features users can actually use; placeholder comma
 | Target parsing | Implemented; M2 three-platform CI passed | All three target commands validate full versions before dispatch; invalid targets report shared diagnostics on stderr with exit code `2` | [Parser and unit tests](../src/target.rs), [CLI definitions](../src/cli.rs), [CLI tests](../tests/cli.rs) |
 | Storage roots and paths | Implemented; M2 three-platform CI passed with recorded coverage limits | Native root resolution and read-only path construction enforce canonical directory boundaries | [Storage](../src/storage.rs), [tests](../src/storage/tests.rs) |
 | Internal current-version state | Implemented; M2 three-platform CI passed with recorded coverage limits | Reads native current links; distinguishes no selection from invalid state; M4 adds completeness/locking before exposing it through `current` | [State reads](../src/storage.rs), [platform links](../src/storage/links.rs), [tests](../src/storage/tests.rs) |
-| Complete selected state and M4 coordination | M4 T1 code/tests complete; Windows checks/tests passed; see [evidence](m4-t1-t3-validation.md) | Adds a read-only complete-selection query with shared locking; all existing writers reject reserved switch residue under the exclusive lock; integrated into current/use CLI | [Selection checks](../src/storage.rs), [coordination](../src/mutation.rs), [state/concurrency tests](../src/storage/selection_tests.rs), [T1 record](v0.4.md#t1-implementation-record) |
+| Complete selected state and M4 coordination | M4 T1 code/tests complete; minimum three-platform M5 acceptance passed; see [evidence](m5-validation.md) | Adds a read-only complete-selection query with shared locking; all existing writers reject reserved switch residue under the exclusive lock; integrated into current/use CLI | [Selection checks](../src/storage.rs), [coordination](../src/mutation.rs), [state/concurrency tests](../src/storage/selection_tests.rs), [T1 record](v0.4.md#t1-implementation-record) |
 | Internal Unix selection | M5 macOS arm64 and Linux x86_64 GNU native workflows passed | Unix Storage::select prepares native symlinks, atomically replaces the current link, verifies and rolls back failures, explicitly releases successful locks, and removes only identified links; used by use CLI; Windows has a separate implementation | [Unix switching](../src/storage/switching.rs), [link identity](../src/storage/links.rs), [Unix tests](../src/storage/switching/tests.rs), [M5 evidence](m5-validation.md) |
 | Internal Windows selection | M4 T3 code/tests complete; Windows checks/tests passed; see [evidence](m4-t1-t3-validation.md) | Windows Storage::select prepares junctions, backs up/publishes/restores with a possible entry-point gap, checks identity and confirmed removal, and preserves unexpected entries; used by use CLI | [Windows switching](../src/storage/switching_windows.rs), [link identity](../src/storage/links.rs), [Windows tests](../src/storage/switching_windows/tests.rs), [T3/dependency record](v0.4.md#t3-implementation-and-dependency-record) |
-| Node.js distribution selection | T1 code and tests complete; Windows acceptance passed; other platforms unverified | Maps six build platforms to fixed official archive/checksum URLs; rejects unsupported platforms; integrated into install | [Distribution selection and tests](../src/distribution.rs), [dependency decision](v0.3.md#t1-dependency-decision) |
-| Verified distribution downloads | T2 code and tests complete; Windows acceptance passed; other platforms unverified | Bounded synchronous HTTPS, no redirects/decoding, exact checksum selection and streaming SHA-256; integrated into install | [Downloads](../src/download.rs), [offline tests](../src/download/tests.rs), [dependency record](v0.3.md#t2-implementation-and-dependency-record) |
-| Safe extraction and complete-installation checks | T3 code and tests complete; Windows acceptance passed; other platforms unverified | Native ZIP/tar decoding, containment/type/link policy, completion receipt and executable validation; integrated into install/list/uninstall | [Installation module](../src/installation.rs), [shared](../src/installation/tests.rs), [Unix](../src/installation/tests/unix.rs), [Windows](../src/installation/tests/windows.rs), [dependency record](v0.3.md#t3-implementation-and-dependency-record) |
-| `install` | T4 code and tests complete; Windows acceptance passed; other platforms unverified | Verified installation under an OS lock, atomic rename commit, operation-only cleanup; complete duplicates succeed without downloading; incomplete destinations preserved | [Install lifecycle](../src/install.rs), [mutation helpers](../src/mutation.rs), [offline tests](../src/install/tests.rs), [CLI tests](../tests/cli.rs) |
-| `uninstall` | T6 code and tests complete; Windows acceptance passed; other platforms unverified | Shared-lock/current-state protection, complete inactive installations detached before deletion; selected/invalid/missing/incomplete targets rejected; rename failure preserves original installation, cleanup failure reports detached leftovers | [Uninstall](../src/uninstall.rs), [offline tests](../src/uninstall/tests.rs), [CLI tests](../tests/cli.rs) |
-| `use` | M4 T4 code/tests complete; Windows acceptance passed | Selects complete installed versions; exact using/already using output; operational errors leave stdout empty; no automatic installation | [Command dispatch](../src/lib.rs), [CLI regressions](../tests/selection_cli.rs) |
-| `list` | T5 code and tests complete; Windows acceptance passed; other platforms unverified | Read-only complete installations sorted numerically; missing/empty storage succeeds without writes; canonical incomplete entries and I/O/boundary errors fail without partial stdout; does not inspect current state | [Inventory](../src/inventory.rs), [offline tests](../src/inventory/tests.rs), [CLI tests](../tests/cli.rs) |
-| `current` | M4 T4 code/tests complete; Windows acceptance passed | Read-only complete-selection query; prints selected target or empty output; invalid state, residue and busy storage fail | [Command dispatch](../src/lib.rs), [CLI regressions](../tests/selection_cli.rs) |
+| Node.js distribution selection | T1 code and tests complete; minimum three-platform M5 acceptance passed | Maps six build platforms to fixed official archive/checksum URLs; rejects unsupported platforms; integrated into install | [Distribution selection and tests](../src/distribution.rs), [dependency decision](v0.3.md#t1-dependency-decision) |
+| Verified distribution downloads | T2 code and tests complete; minimum three-platform M5 acceptance passed | Bounded synchronous HTTPS, no redirects/decoding, exact checksum selection and streaming SHA-256; integrated into install | [Downloads](../src/download.rs), [offline tests](../src/download/tests.rs), [dependency record](v0.3.md#t2-implementation-and-dependency-record) |
+| Safe extraction and complete-installation checks | T3 code and tests complete; minimum three-platform M5 acceptance passed | Native ZIP/tar decoding, containment/type/link policy, completion receipt and executable validation; integrated into install/list/uninstall | [Installation module](../src/installation.rs), [shared](../src/installation/tests.rs), [Unix](../src/installation/tests/unix.rs), [Windows](../src/installation/tests/windows.rs), [dependency record](v0.3.md#t3-implementation-and-dependency-record) |
+| `install` | T4 code and tests complete; minimum three-platform M5 acceptance passed | Verified installation under an OS lock, atomic rename commit, operation-only cleanup; complete duplicates succeed without downloading; incomplete destinations preserved | [Install lifecycle](../src/install.rs), [mutation helpers](../src/mutation.rs), [offline tests](../src/install/tests.rs), [CLI tests](../tests/cli.rs) |
+| `uninstall` | T6 code and tests complete; minimum three-platform M5 acceptance passed | Shared-lock/current-state protection, complete inactive installations detached before deletion; selected/invalid/missing/incomplete targets rejected; rename failure preserves original installation, cleanup failure reports detached leftovers | [Uninstall](../src/uninstall.rs), [offline tests](../src/uninstall/tests.rs), [CLI tests](../tests/cli.rs) |
+| `use` | M4 T4 code/tests complete; minimum three-platform M5 acceptance passed | Selects complete installed versions; exact using/already using output; operational errors leave stdout empty; no automatic installation | [Command dispatch](../src/lib.rs), [CLI regressions](../tests/selection_cli.rs) |
+| `list` | T5 code and tests complete; minimum three-platform M5 acceptance passed | Read-only complete installations sorted numerically; missing/empty storage succeeds without writes; canonical incomplete entries and I/O/boundary errors fail without partial stdout; does not inspect current state | [Inventory](../src/inventory.rs), [offline tests](../src/inventory/tests.rs), [CLI tests](../tests/cli.rs) |
+| `current` | M4 T4 code/tests complete; minimum three-platform M5 acceptance passed | Read-only complete-selection query; prints selected target or empty output; invalid state, residue and busy storage fail | [Command dispatch](../src/lib.rs), [CLI regressions](../tests/selection_cli.rs) |
 | M4 workflow coverage and acceptance preparation | M4 T5 tests/docs complete; Windows checks/tests/smoke passed | Adds fresh offline install/select/query/uninstall, synthetic native entry/PATH execution and cross-process switch contention; manual PATH guidance and real A/B smoke procedure prepared | [Install workflow](../src/install/tests.rs), [CLI execution](../tests/selection_cli.rs), [acceptance mapping](v0.4.md#acceptance-mapping), [validation results](m4-validation.md) |
 | M5 security review | T4 complete; no release-blocking finding | Reviewed path boundaries, archives, transport/checksums, completeness, mutations, switching, dependencies and smoke harness; 99 locked dependencies produced no RustSec vulnerability or warning | [Security review](m5-validation.md#t4-security-review), [M5 design criteria](v0.5.md#security-review) |
-| M3 workflow coverage and acceptance preparation | T7 tests and documentation complete; Windows acceptance passed; other platforms unverified | Isolated offline fresh-install lifecycle and seeded CLI workflow fixtures; actual test-name acceptance mapping and a separate official HTTPS smoke procedure | [Lifecycle tests](../src/install/tests.rs), [CLI tests](../tests/cli.rs), [acceptance mapping](v0.3.md#acceptance-mapping), [validation record](m3-validation.md) |
+| M3 workflow coverage and acceptance preparation | T7 tests and documentation complete; minimum three-platform M5 acceptance passed | Isolated offline fresh-install lifecycle and seeded CLI workflow fixtures; actual test-name acceptance mapping and a separate official HTTPS smoke procedure | [Lifecycle tests](../src/install/tests.rs), [CLI tests](../tests/cli.rs), [acceptance mapping](v0.3.md#acceptance-mapping), [validation record](m3-validation.md) |
+
+The minimum three-platform M5 scope is Windows `x86_64-pc-windows-msvc`, macOS `aarch64-apple-darwin`, and Linux `x86_64-unknown-linux-gnu`, under the [recorded environment and coverage limitations](m5-validation.md#final-acceptance-on-2026-10-04). Windows arm64, macOS x86_64 and Linux GNU arm64 remain mapped but unverified.
 
 “Implemented” only means that the code exists. Whether acceptance criteria have been met is recorded separately in the milestones and progress log.
 
@@ -68,6 +70,8 @@ Checklist progress counts the checked items below. It reflects completed tasks, 
 - [x] Add CLI integration test code.
 - [ ] Record the validation results required by the project.
 
+M1 remains Awaiting validation because its separate validation record has not been reconciled. Later milestone checks cover the current CLI, but do not establish acceptance of the historical M1 placeholder behavior; this frozen historical gap is not a current release blocker and will not be retroactively reconciled.
+
 ### Phase 2: Target Parsing and Local State
 
 - [x] Define tool names, version formats, and error-message rules.
@@ -81,7 +85,7 @@ Design evidence: [v0.2 T1](v0.2.md#t1-finalize-parsing-and-local-state-conventio
 
 ### Phase 3: Node.js Installation and Queries
 
-Design: [v0.3](v0.3.md), with seven implementation tasks distinct from this capability checklist. M3 queries mean installed-version listing; `current` and `use` remain M4. T1–T7 code, tests, workflow coverage and documentation are complete (7 / 7 tasks). M3 local Windows acceptance passed: four checks, 120 tests and the official Node.js 22.0.0 smoke workflow; other platforms remain unverified. The [acceptance mapping](v0.3.md#acceptance-mapping) references actual test names, and [m3-validation.md](m3-validation.md) records pending checks, smoke procedure and coverage limitations.
+Design: [v0.3](v0.3.md), with seven implementation tasks distinct from this capability checklist. M3 queries mean installed-version listing; `current` and `use` remain M4. T1–T7 code, tests, workflow coverage and documentation are complete (7 / 7 tasks). M3 local Windows acceptance passed: four checks, 120 tests and the official Node.js 22.0.0 smoke workflow. M5 subsequently validated the same core commands on macOS arm64 and Linux x86_64 GNU; other mapped architectures remain unverified. The [acceptance mapping](v0.3.md#acceptance-mapping) references actual test names, and [m3-validation.md](m3-validation.md) records historical checks, smoke procedure and coverage limitations; [M5 evidence](m5-validation.md) records current cross-platform acceptance.
 
 - [x] Select the official distribution archive based on the operating system and architecture.
 - [x] Download the distribution archive and verify its checksum.
@@ -93,13 +97,13 @@ Design: [v0.3](v0.3.md), with seven implementation tasks distinct from this capa
 
 ### Phase 4: Version Switching
 
-Design: [v0.4](v0.4.md), with five implementation tasks distinct from this capability checklist. M3 local acceptance is complete. M4 T1–T5 code/tests/docs are complete (5 / 5 tasks), completing all five capability code items; M4 is Complete under local Windows acceptance. Use/current CLI regressions, fresh offline lifecycle, cross-process switch contention and synthetic fixed-entry/PATH execution coverage exist. [Actual acceptance mapping](v0.4.md#acceptance-mapping), README PATH guidance and [validation results](m4-validation.md) are ready. All four checks, 160 tests and the official 22.0.0 / 24.0.0 switching/PATH/uninstall smoke passed on Windows x86_64 / NTFS; [acceptance results and initial repairs](m4-validation.md). Unix/other architectures remain unverified; M5 owns cross-platform delivery.
+Design: [v0.4](v0.4.md), with five implementation tasks distinct from this capability checklist. M3 local acceptance is complete. M4 T1–T5 code/tests/docs are complete (5 / 5 tasks), completing all five capability code items; M4 is Complete under local Windows acceptance. Use/current CLI regressions, fresh offline lifecycle, cross-process switch contention and synthetic fixed-entry/PATH execution coverage exist. [Actual acceptance mapping](v0.4.md#acceptance-mapping), README PATH guidance and [validation results](m4-validation.md) are ready. All four checks, 160 tests and the official 22.0.0 / 24.0.0 switching/PATH/uninstall smoke passed on Windows x86_64 / NTFS; [acceptance results and initial repairs](m4-validation.md). M5 subsequently completed macOS arm64 and Linux x86_64 GNU native acceptance, including the Unix lock-release repair; other mapped architectures remain unverified. See [final acceptance](m5-validation.md#final-acceptance-on-2026-10-04).
 
-- [x] Implement `use` to select an installed Node.js version; Windows CLI acceptance passed; other platforms unverified.
-- [x] Implement `current` to display the selected complete version; Windows CLI acceptance passed; other platforms unverified.
-- [x] Define behavior for targets that are not installed, no version being selected, and switching failures; CLI output/exit regressions passed on Windows.
-- [x] Handle native updates and Windows file locking in internal switching (Unix atomic replacement; Windows backup/publish gap); CLI integrated and Windows acceptance passed; Unix platform validation pending.
-- [x] Add internal tests for switching, state consistency, and preserving the previous state after failure; CLI/workflow tests, mapping and Windows acceptance complete; Unix/other architectures unverified.
+- [x] Implement `use` to select an installed Node.js version; minimum three-platform M5 acceptance passed.
+- [x] Implement `current` to display the selected complete version; minimum three-platform M5 acceptance passed.
+- [x] Define behavior for targets that are not installed, no version being selected, and switching failures; CLI output/exit regressions passed in the minimum three-platform M5 scope.
+- [x] Handle native updates and Windows file locking in internal switching (Unix atomic replacement; Windows backup/publish gap); CLI integrated; Windows x86_64, macOS arm64 and Linux x86_64 GNU acceptance passed.
+- [x] Add internal tests for switching, state consistency, and preserving the previous state after failure; CLI/workflow tests and mapping complete; minimum three-platform M5 acceptance passed; other mapped architectures unverified.
 
 ### Phase 5: Cross-Platform Delivery
 
@@ -112,26 +116,14 @@ Design: [v0.5](v0.5.md), with six delivery tasks corresponding to this checklist
 - [x] Update installation instructions, command examples, and known limitations.
 - [x] Record validation results and confirm the release scope and version number (T6 decision: confirmed minimum three-target scope, retain 0.4.0, no new release version/tag/publication).
 
-## Development Workflow
+## Maintenance transition
 
-1. Define the task scope, expected behavior, and acceptance criteria; record decisions for unresolved design questions first.
-2. Mark the relevant item as “In progress” and implement only the minimum changes required for the current task.
-3. Add tests for behavior changes and regression tests for bug fixes.
-4. After implementation, mark the item as “Awaiting validation”, run the checks required by the project, and record the actual results.
-5. Once acceptance criteria are met, mark the milestone as “Complete” and record validation evidence.
-
-Whenever a task changes status, update the progress overview, relevant feature status, checklist items, and milestone counts together, and append a progress log entry. Implementation items can be checked off once they are in place, but an entire milestone must pass acceptance before it is marked as “Complete”. Prefer links to the relevant code, commits, PRs, or CI results as evidence. Explicitly label checks that were not run as “Not run”.
-
-The project requires the following implementation validation commands. Listing them here documents the workflow requirements; it does not mean they have been executed.
-
-```text
-cargo fmt --check
-cargo check --all-targets
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all
-```
-
-When work is blocked, record the cause and the conditions for unblocking it. Work that is not implemented or has not been validated must not be recorded as delivered.
+M1–M5 milestone and progress records are frozen history, including their original validation limits.
+No independent M1 acceptance is retroactively claimed or required for v0.5.0.
+Future bugs and improvements belong in Issues; do not append ongoing progress logs
+or extend M6/M7. Follow [CONTRIBUTING](../CONTRIBUTING.md) for development, PRs,
+validation, versioning and releases. Precompiled binaries remain a future Issue
+without a promised release date.
 
 ## Progress Log
 
@@ -178,7 +170,11 @@ When work is blocked, record the cause and the conditions for unblocking it. Wor
 | 2026-10-04 | Execute M5 acceptance | Final-equivalent Windows source passed fmt/Check/Clippy/Test, 160 tests; Windows smoke reuse confirmed; Linux final-source evidence retained. [Acceptance attempt](m5-validation.md#acceptance-attempt-on-2026-10-04) | M5 Awaiting validation: macOS workflow dispatch failed HTTP 401, browser fallback timed out; restore GitHub access and complete macOS checks/A/B evidence. No version/tag/publication change |
 | 2026-10-04 | Complete M5 acceptance | Reviewed macOS run 37205835491 screenshot and supplied artifact on final-equivalent 9c35b90; native checks/build and official A/B workflow passed, exact rerun test count unavailable. [Final decision](m5-validation.md#final-acceptance-on-2026-10-04) | M5 Complete (6 / 6); minimum three-target scope confirmed, package 0.4.0 retained; no new version/tag/publication |
 
-Append an entry for each subsequent update, noting the actual changes, validation results, and next steps. Include commit or issue links when available.
+| 2026-10-04 | Reconcile roadmap with final M5 acceptance | Updated the overview, feature status and M3/M4 descriptions to reflect minimum three-platform acceptance; distinguished the earlier macOS 163-test run from the final rerun with unavailable exact count | M1 separate validation record remains pending; retain 0.4.0 and note that the existing tag predates the accepted Unix repair. Documentation only; checks Not run; no version/tag/publication change |
+
+| 2026-10-04 | Prepare v0.5.0 source release and freeze M1–M5 | Preserve the existing roadmap reconciliation; update package metadata, installation and maintenance documentation; retain historical acceptance conclusions | Ongoing work moves to Issues and CONTRIBUTING; publication requires final-commit CI and isolated source installation. M1 historical gap does not block release |
+
+The log ends with this transition. New implementation and validation records belong in Issues, PRs and Releases.
 
 ## Scope Constraints
 
