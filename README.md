@@ -8,26 +8,73 @@ Verslot is currently under development.
 
 ## Current implementation
 
-The current package version is `0.4.0`. This version implements shared target
-validation, storage path boundaries, and internal current-version state reads.
-It also contains v0.3 T1–T7: verified Node.js installation,
-safe extraction, OS locking, rename commit, failure cleanup, read-only
-complete-installation listing, protected uninstallation, and offline workflow
-tests. M3 local Windows acceptance passed (7 / 7 tasks): four required checks,
-120 tests and the official Node.js 22.0.0 smoke workflow. The repaired
-Windows/Linux/macOS CI matrix also passed before the earlier `0.3.0`
-metadata-only bump; official-distribution smoke evidence remains Windows
-x86_64 only. Version `0.4.0` adds M4 T1–T5: version switching, complete
-selected-version queries, recovery/locking tests and acceptance preparation.
-M4 is **Complete under local Windows acceptance**: four required checks,
-160 tests and the official Node.js 22.0.0 / 24.0.0 switching/PATH/uninstall
-smoke passed on Windows x86_64 / NTFS. Initial failures, repairs and final
-evidence are recorded in [M4 validation](docs/m4-validation.md). Unix switching
-and other architectures remain unverified; cross-platform delivery remains M5.
-See the [v0.4 design and acceptance mapping](docs/v0.4.md),
-[M4 validation results](docs/m4-validation.md), [v0.3 design](docs/v0.3.md),
-[v0.2 specification](docs/v0.2.md), and
-[roadmap](docs/roadmap.md) for scope and progress.
+The current package version is `0.4.0`; no Verslot binaries have been
+published. All five Node.js commands are implemented. M5 records native
+Windows x86_64, macOS arm64 and Linux x86_64 GNU checks and official Node.js
+22.0.0 / 24.0.0 workflows, plus a security review with no recorded release
+blocker. M5 is Complete for the minimum three-platform scope after final-source macOS acceptance on 2026-10-04. See [M5 evidence](docs/m5-validation.md),
+[v0.5 design](docs/v0.5.md), and [roadmap](docs/roadmap.md).
+
+## Install Verslot from source
+
+Prerequisites: Git, stable Rust with Cargo, and native build tools: MSVC C++
+build tools and a Windows SDK on Windows, Xcode Command Line Tools on macOS,
+or a C compiler/linker on Linux GNU. Cargo needs registry/dependency access.
+The native runs used Rust 1.98.1; an older minimum Rust version is unverified.
+
+Use a new checkout pinned to the Linux validation commit, which includes the
+Unix lock-release repair reviewed in T4. The `v0.4.0` tag predates that repair.
+These commands work in PowerShell and Bash:
+
+```text
+git clone https://github.com/verslot/verslot.git verslot
+git -C verslot checkout --detach 04c17a42b6f8099e0ef0ba13951abdd4511b201a
+cargo install --path verslot --locked
+verslot --version
+verslot --help
+```
+
+Cargo installs into its bin directory (normally `%USERPROFILE%\.cargo\bin`
+or `$HOME/.cargo/bin`). Put that directory on PATH or invoke `verslot.exe`
+or `verslot` by its full path. This is separate from the Node.js PATH entry
+below. The binary reports `verslot 0.4.0`; local builds are not published or
+signed release artifacts. Final acceptance covers this pinned source through source-equivalent native evidence. The [final decision](docs/m5-validation.md#final-acceptance-on-2026-10-04) retains package version `0.4.0` and confirms the minimum three-target scope; no new tag or binaries were published.
+
+## Platform evidence and known limitations
+
+| Build platform | Evidence status | Recorded environment |
+| --- | --- | --- |
+| Windows x86_64 MSVC | Validated through candidate CI and retained M4 workflow | Windows / NTFS; [T1](docs/m5-validation.md#t1-windows-delivery-validation) |
+| macOS arm64 | Validated | macOS 15.7.9 / case-insensitive APFS; [T2](docs/m5-validation.md#t2-macos-delivery-validation) |
+| Linux x86_64 GNU | Validated | GitHub-hosted Ubuntu 24.04 / non-root glibc; [T3](docs/m5-validation.md#t3-linux-delivery-validation) |
+| Windows arm64, macOS x86_64, Linux GNU arm64 | Mapped but unverified | Archive URL mapping only; no native acceptance |
+| Linux musl, 32-bit targets, other operating systems/architectures | Unsupported | Installation fails without fallback |
+
+Evidence covers the recorded environments and Node.js versions. Other
+filesystems, case-sensitive APFS, other macOS/Linux versions and mount policies
+remain unverified. Storage needs write permission and native junction/symlink
+support; Unix executables need execute permission. Windows antivirus, endpoint
+protection and file sharing can affect mutations. The macOS non-UTF-8 on-disk
+fixture is excluded; native-byte tests do not replace filesystem coverage.
+Windows candidate CI test totals were unavailable; retained M4 had 160 tests,
+macOS 163, and Linux 164. See the linked evidence for environment details.
+
+Installation accesses fixed official `https://nodejs.org/dist/` archive and
+`SHASUMS256.txt` URLs. TLS verification remains enabled; redirects and content
+decoding are disabled. The exact archive SHA-256 must match before extraction.
+Downloads are bounded to 1 MiB of checksums, a 512 MiB archive and a 15-minute
+overall deadline. Missing artifacts, network restrictions, timeouts and
+certificate failures return errors. Custom mirrors and proxy configuration
+are outside the supported contract; corporate network compatibility is
+unverified. Retained Windows Cargo resolution failures did not disable TLS.
+
+Checksums establish agreement with official distribution data, not independent
+publisher authenticity. Executing installed Node.js trusts that official code;
+Verslot does not execute it during its five commands. Receipts are not ongoing
+integrity monitoring after installation. The [T4 review and advisory scan](docs/m5-validation.md#t4-security-review)
+are point-in-time evidence, not a guarantee about future vulnerabilities.
+
+## Commands
 
 ```text
 verslot --version
@@ -153,7 +200,7 @@ cooperative locks do not protect against malicious same-user path races.
 The [isolated two-version M4 smoke procedure](docs/m4-validation.md#official-distribution-smoke-procedure)
 records direct-entry and controlled-PATH execution separately from routine
 offline synthetic tests. It passed on Windows x86_64 with 22.0.0 / 24.0.0;
-Unix and other architectures remain unverified.
+M5 also passed the same A/B workflow on macOS arm64 and Linux x86_64 GNU; other mapped architectures remain unverified. See [M5 evidence](docs/m5-validation.md).
 
 The official-distribution smoke workflow passed locally on Windows x86_64:
 

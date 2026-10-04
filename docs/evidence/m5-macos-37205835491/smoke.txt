@@ -1,0 +1,169 @@
+M5 T2 macOS arm64 smoke
+commit=9c35b9047c20fda8ce9d2c6bb00afd057fd9077d
+base=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1
+binary=/Users/runner/work/verslot/verslot/target/debug/verslot
+command: /Users/runner/work/verslot/verslot/target/debug/verslot list
+exit=0
+stdout:
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot current
+exit=0
+stdout:
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot install node@22.0.0
+exit=0
+stdout:
+installed node@22.0.0
+stderr:
+---
+official=https://nodejs.org/dist/v22.0.0/node-v22.0.0-darwin-arm64.tar.gz checksum=https://nodejs.org/dist/v22.0.0/SHASUMS256.txt sha256=ea96d349cfaa67aa87ceeaa3e5b52c9167f7ac302fd8d1ff162d0785e9dc0785 receiptHash=58f8c1d0aec5a661e714ee81579a4204eba08d470634fd889de7660c897636f7 executableHash=9507031f6769f2381eae353b3614bafa871c957dc6f2ae86a3af948acdf9b178
+command: /Users/runner/work/verslot/verslot/target/debug/verslot current
+exit=0
+stdout:
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot install node@24.0.0
+exit=0
+stdout:
+installed node@24.0.0
+stderr:
+---
+official=https://nodejs.org/dist/v24.0.0/node-v24.0.0-darwin-arm64.tar.gz checksum=https://nodejs.org/dist/v24.0.0/SHASUMS256.txt sha256=194e2f3dd3ec8c2adcaa713ed40f44c5ca38467880e160974ceac1659be60121 receiptHash=626ac9b2adf932a6da724b5c61efdb6a77adb8e092a1cccf65c51258f956e8ec executableHash=f28f6fdb2b24cdfc3785f4f8b46fa7b392b0ec5892b075b434049c7d05cfc956
+command: /Users/runner/work/verslot/verslot/target/debug/verslot current
+exit=0
+stdout:
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot install node@22.0.0
+exit=0
+stdout:
+already installed node@22.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot list
+exit=0
+stdout:
+node@22.0.0
+node@24.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot current
+exit=0
+stdout:
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot use node@22.0.0
+exit=0
+stdout:
+using node@22.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot current
+exit=0
+stdout:
+node@22.0.0
+stderr:
+---
+command: /Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin/node --version
+exit=0
+stdout:
+v22.0.0
+stderr:
+---
+resolvedNode=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin/node
+command: env PATH=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin:/usr/bin:/bin node --version
+exit=0
+stdout:
+v22.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot use node@24.0.0
+exit=0
+stdout:
+using node@24.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot current
+exit=0
+stdout:
+node@24.0.0
+stderr:
+---
+command: /Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin/node --version
+exit=0
+stdout:
+v24.0.0
+stderr:
+---
+resolvedNode=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin/node
+command: env PATH=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin:/usr/bin:/bin node --version
+exit=0
+stdout:
+v24.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot use node@24.0.0
+exit=0
+stdout:
+already using node@24.0.0
+stderr:
+---
+competingNode=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/installs/node/22.0.0/bin/node
+command: env PATH=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/installs/node/22.0.0/bin:/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin:/usr/bin:/bin node --version
+exit=0
+stdout:
+v22.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot current
+exit=0
+stdout:
+node@24.0.0
+stderr:
+---
+command: env PATH=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin:/usr/bin:/bin node --version
+exit=0
+stdout:
+v24.0.0
+stderr:
+---
+A and B receipt/executable hashes unchanged after switching and no-op.
+command: /Users/runner/work/verslot/verslot/target/debug/verslot uninstall node@24.0.0
+exit=1
+stdout:
+stderr:
+uninstall node@24.0.0: cannot uninstall current version: node@24.0.0
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot uninstall node@22.0.0
+exit=0
+stdout:
+uninstalled node@22.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot list
+exit=0
+stdout:
+node@24.0.0
+stderr:
+---
+command: /Users/runner/work/verslot/verslot/target/debug/verslot current
+exit=0
+stdout:
+node@24.0.0
+stderr:
+---
+command: /Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin/node --version
+exit=0
+stdout:
+v24.0.0
+stderr:
+---
+command: env PATH=/Users/runner/work/_temp/verslot-m5-t2-37205835491-1/home/.verslot/current/node/bin:/usr/bin:/bin node --version
+exit=0
+stdout:
+v24.0.0
+stderr:
+---
+PASS: B selected/executable; A absent; B bytes unchanged; tmp empty; no reserved siblings.
