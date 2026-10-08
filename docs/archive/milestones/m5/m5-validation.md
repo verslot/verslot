@@ -16,7 +16,7 @@ No package version, tag, binary publication, or persistent PATH state changed du
 | macOS validation commit | `7dc4272b1009d11d421c53f865c1f48ba4a4fcb4`; differs from the product candidate only by M5 workflow and documentation commits |
 | Linux validation commit | `04c17a42b6f8099e0ef0ba13951abdd4511b201a`; includes the T3 workflow and the Linux lock-release repair described below |
 | Candidate CI | [run 36698517158](https://github.com/verslot/verslot/actions/runs/36698517158), push workflow, completed successfully on 2026-09-30 |
-| Documentation state | This record, `docs/v0.5.md`, and the roadmap are synchronized after T6 |
+| Documentation state | This record, `docs/archive/milestones/m5/v0.5.md`, and the roadmap are synchronized after T6 |
 | Package version | `0.4.0` |
 | Publication status | No Verslot binaries published |
 
@@ -39,7 +39,7 @@ The first local `cargo check` attempt failed before compilation because Windows 
 
 ### M4-equivalence decision
 
-[M4 validation](m4-validation.md) records the native Windows x86_64 / NTFS official Node.js 22.0.0 / 24.0.0 A/B workflow, exact checksums, direct-entry and controlled-PATH execution, no-op selection, competing PATH behavior, protected active uninstall, inactive uninstall, payload preservation, and absence of reserved residue.
+[M4 validation](../m4/m4-validation.md) records the native Windows x86_64 / NTFS official Node.js 22.0.0 / 24.0.0 A/B workflow, exact checksums, direct-entry and controlled-PATH execution, no-op selection, competing PATH behavior, protected active uninstall, inactive uninstall, payload preservation, and absence of reserved residue.
 
 The M4 acceptance record includes SHA-256 values for every source and test file. Comparing those recorded values with the candidate established:
 
@@ -136,7 +136,7 @@ The final smoke confirmed executable permission, numeric list order, fixed-entry
 
 ## T5 installation, usage, and limitations documentation
 
-**Complete.** [README](../README.md) now documents installation pinned to
+**Complete.** [README](../../../../README.md) now documents installation pinned to
 `04c17a42b6f8099e0ef0ba13951abdd4511b201a`, native build prerequisites,
 Cargo binary location, all five commands, full-version syntax, storage/fixed
 entry paths, and manual per-shell PATH configuration. It separates native

@@ -99,7 +99,7 @@ their original executable; selection affects subsequent launches.
 
 M5 native acceptance covers Windows x86_64 MSVC, macOS arm64 and Linux x86_64
 GNU with official Node.js 22.0.0 / 24.0.0 workflows. See the historical
-[M5 evidence and final decision](docs/m5-validation.md#final-acceptance-on-2026-10-04).
+[M5 evidence and final decision](docs/archive/milestones/m5/m5-validation.md#final-acceptance-on-2026-10-04).
 These workflows are retained evidence, not new v0.5.0 release runs.
 
 | Platform | Status |
@@ -122,7 +122,7 @@ These workflows are retained evidence, not new v0.5.0 release runs.
   unverified. Missing artifacts and network/certificate failures return errors.
 - Checksums establish agreement with official distribution data, not independent
   publisher authenticity. Executing Node.js trusts that code. Receipts do not
-  monitor integrity after installation. The [M5 security review](docs/m5-validation.md#t4-security-review)
+  monitor integrity after installation. The [M5 security review](docs/archive/milestones/m5/m5-validation.md#t4-security-review)
   is point-in-time evidence.
 - Mutations use a nonblocking exclusive lock; `current` uses a shared lock.
   Busy storage asks you to retry. Incomplete installations and invalid selection
@@ -141,8 +141,10 @@ Report bugs and scoped improvements through [GitHub Issues](https://github.com/v
 [CONTRIBUTING](CONTRIBUTING.md) is the sole ongoing maintenance and release
 procedure. [CHANGELOG](CHANGELOG.md) records user-visible changes.
 
-The [roadmap](docs/roadmap.md) and M1–M5 design/acceptance records are frozen
+See the [documentation index](docs/README.md) for reading guidance and archived records.
+
+The [roadmap](docs/archive/milestones/roadmap.md) and M1–M5 design/acceptance records are frozen
 history. M1's independent historical acceptance remains unrecorded and does
-not block this release. See [M2](docs/m2-validation-windows.md),
-[M3](docs/m3-validation.md), [M4](docs/m4-validation.md) and
-[M5](docs/m5-validation.md) for detailed evidence and contracts.
+not block this release. See [M2](docs/archive/milestones/m2/m2-validation-windows.md),
+[M3](docs/archive/milestones/m3/m3-validation.md), [M4](docs/archive/milestones/m4/m4-validation.md) and
+[M5](docs/archive/milestones/m5/m5-validation.md) for detailed evidence and contracts.

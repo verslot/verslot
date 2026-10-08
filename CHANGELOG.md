@@ -14,7 +14,7 @@ No precompiled binaries or crates.io publication.
   This M5 repair is included in v0.5.0; the v0.4.0 tag predates it.
 - Complete M5 native acceptance for Windows x86_64 MSVC, macOS arm64 and Linux
   x86_64 GNU, including official Node.js 22.0.0 / 24.0.0 workflows and a security
-  review. Retained [M5 evidence](docs/m5-validation.md) is historical validation,
+  review. Retained [M5 evidence](docs/archive/milestones/m5/m5-validation.md) is historical validation,
   not a rerun performed for this release.
 - Pin source installation to v0.5.0, organize usage and limitations in README,
   and move ongoing maintenance to Issues and CONTRIBUTING.

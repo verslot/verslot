@@ -27,11 +27,11 @@ cargo test --all
 | --- | --- |
 | Acceptance date and source revision | 2026-09-27; working tree based on `2fcf04e6794fe243f26525fead5aa18410934a81`, including T5–T7 and acceptance repairs; not a clean committed revision |
 | OS, architecture, and Rust version | Windows; x86_64-pc-windows-msvc; rustc 1.98.1 (48a229cea 2026-09-01) |
-| `cargo fmt --check` | Passed after formatting repairs; [log](m3-validation-logs/fmt.txt) is empty on success |
-| `cargo check --all-targets` | Passed; [log](m3-validation-logs/check.txt) |
-| `cargo clippy --all-targets --all-features -- -D warnings` | Passed; [log](m3-validation-logs/clippy.txt) |
-| `cargo test --all` | Passed: 100 library + 20 CLI tests, 0 failed/ignored; main/doc targets have 0 tests; [log](m3-validation-logs/test.txt) |
-| Official-distribution smoke workflow | Passed on Windows x86_64 with Node.js 22.0.0; [log](m3-validation-logs/smoke.txt) |
+| `cargo fmt --check` | Passed after formatting repairs; [log](evidence/fmt.txt) is empty on success |
+| `cargo check --all-targets` | Passed; [log](evidence/check.txt) |
+| `cargo clippy --all-targets --all-features -- -D warnings` | Passed; [log](evidence/clippy.txt) |
+| `cargo test --all` | Passed: 100 library + 20 CLI tests, 0 failed/ignored; main/doc targets have 0 tests; [log](evidence/test.txt) |
+| Official-distribution smoke workflow | Passed on Windows x86_64 with Node.js 22.0.0; [log](evidence/smoke.txt) |
 | Acceptance decision | Local M3 acceptance passed; M3 Complete; other platforms explicitly unverified |
 
 The [v0.3 acceptance mapping](v0.3.md#acceptance-mapping) links actual test
@@ -41,12 +41,12 @@ in this run; cfg-excluded Unix fixtures are not skipped tests or passing results
 ## Initial failures and repairs
 
 The initial fmt check failed on M3 formatting differences; `cargo fmt` repaired
-them. The initial [check log](m3-validation-logs/check-initial.txt) shows two
+them. The initial [check log](evidence/check-initial.txt) shows two
 SHA-256 fixture formatting errors with sha2 0.11; fixture digests now format
-each byte explicitly. The initial [Clippy log](m3-validation-logs/clippy-initial.txt)
+each byte explicitly. The initial [Clippy log](evidence/clippy-initial.txt)
 flagged permission restoration in a Windows fixture.
 
-The initial [test run](m3-validation-logs/test-initial.txt) had 91 library passes
+The initial [test run](evidence/test-initial.txt) had 91 library passes
 and 9 failures; CLI tests had not run because the library target failed:
 
 - Accepted sockets inherited nonblocking mode on Windows. Both local HTTP
@@ -69,10 +69,10 @@ All four checks were rerun on the repaired source; the final tests passed.
 The first smoke run installed successfully, but its extra PowerShell checksum
 fetch failed during sandbox TLS initialization. Fetching the same official
 SHASUMS256.txt outside the sandbox succeeded without disabling TLS validation;
-the [saved official checksum file](m3-validation-logs/SHASUMS256.txt) was used
+the [saved official checksum file](evidence/SHASUMS256.txt) was used
 for receipt comparison in a fresh complete rerun. Production install itself
 uses Rust TLS and succeeded inside the sandbox. The first smoke fixture and
-[partial log](m3-validation-logs/smoke-initial.txt) remain isolated under target
+[partial log](evidence/smoke-initial.txt) remain isolated under target
 for evidence; no user installation or selection was modified.
 
 ## Offline workflow scope
@@ -95,11 +95,11 @@ official-distribution smoke workflow or support for untested architectures.
   duplicate install, and uninstall run together. A corrupt archive leaves an
   empty list; successful cleanup preserves unrelated orphan operations.
 - `offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory` in
-  [tests/cli.rs](../tests/cli.rs) seeds a complete fixture and asserts exact
+  [tests/cli.rs](../../../../tests/cli.rs) seeds a complete fixture and asserts exact
   stdout/stderr and exit success for list, duplicate install, uninstall, and an
   empty final list. It checks duplicate content preservation and no current
   state creation. It does not exercise a fresh production CLI download.
-- [Download tests](../src/download/tests.rs) independently exercise transport,
+- [Download tests](../../../../src/download/tests.rs) independently exercise transport,
   strict checksums, streaming verification, timeout/size bounds, and HTTP errors
   with local HTTP or injected readers. No production mirror or URL override is
   added. Routine fixtures never execute Node.js or contact nodejs.org.

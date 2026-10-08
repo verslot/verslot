@@ -6,8 +6,8 @@ T1–T5 code, test code, acceptance mapping and documentation exist. M4 is
 **Complete under local Windows acceptance**. Package version remains `0.3.0`;
 no release or version bump is part of acceptance. The accepted implementation is an
 uncommitted working tree based on `ca320a898bedc64c5ece9416be11c0b580565841`.
-It includes T1–T5 and the acceptance repairs below; [source SHA-256 hashes](m4-validation-logs/source-sha256.txt)
-identify the tested Cargo/source/test files, and [environment metadata](m4-validation-logs/environment.json)
+It includes T1–T5 and the acceptance repairs below; [source SHA-256 hashes](evidence/source-sha256.txt)
+identify the tested Cargo/source/test files, and [environment metadata](evidence/environment.json)
 records the platform and built executable hash.
 
 The user requested no checks during development, then explicitly requested M4
@@ -31,13 +31,13 @@ cargo test --all
 
 | Evidence | Current result |
 | --- | --- |
-| Acceptance date / exact source revision and local changes | 2026-09-28; working tree based on `ca320a898bedc64c5ece9416be11c0b580565841`, T1–T5 plus acceptance repairs; [source manifest](m4-validation-logs/source-sha256.txt) |
-| OS, filesystem, architecture and Rust version at acceptance | Windows NT 10.0.26200.0; NTFS; x86_64-pc-windows-msvc; rustc 1.98.1 (48a229cea 2026-09-01); [environment](m4-validation-logs/environment.json) |
-| `cargo fmt --check` | Passed, exit 0 after formatting repairs; [log](m4-validation-logs/fmt.txt) empty on success |
-| `cargo check --all-targets` | Passed, exit 0 after test-helper lifetime repair; [log](m4-validation-logs/check.txt) |
-| `cargo clippy --all-targets --all-features -- -D warnings` | Passed, exit 0 after needless-borrow repair; [log](m4-validation-logs/clippy.txt) |
-| `cargo test --all` | Passed, exit 0: 133 library + 19 CLI + 8 selection CLI = 160 tests, 0 failed/ignored; main/doc targets contain 0 tests; [log](m4-validation-logs/test.txt) |
-| Official-distribution A/B smoke | Passed on Windows x86_64 with 22.0.0 and 24.0.0; [raw output](m4-validation-logs/smoke.txt) |
+| Acceptance date / exact source revision and local changes | 2026-09-28; working tree based on `ca320a898bedc64c5ece9416be11c0b580565841`, T1–T5 plus acceptance repairs; [source manifest](evidence/source-sha256.txt) |
+| OS, filesystem, architecture and Rust version at acceptance | Windows NT 10.0.26200.0; NTFS; x86_64-pc-windows-msvc; rustc 1.98.1 (48a229cea 2026-09-01); [environment](evidence/environment.json) |
+| `cargo fmt --check` | Passed, exit 0 after formatting repairs; [log](evidence/fmt.txt) empty on success |
+| `cargo check --all-targets` | Passed, exit 0 after test-helper lifetime repair; [log](evidence/check.txt) |
+| `cargo clippy --all-targets --all-features -- -D warnings` | Passed, exit 0 after needless-borrow repair; [log](evidence/clippy.txt) |
+| `cargo test --all` | Passed, exit 0: 133 library + 19 CLI + 8 selection CLI = 160 tests, 0 failed/ignored; main/doc targets contain 0 tests; [log](evidence/test.txt) |
+| Official-distribution A/B smoke | Passed on Windows x86_64 with 22.0.0 and 24.0.0; [raw output](evidence/smoke.txt) |
 | Acceptance decision | Local Windows M4 acceptance passed; M4 Complete; cross-platform delivery remains M5 |
 
 The [acceptance mapping](v0.4.md#acceptance-mapping) names actual tests. Record
@@ -45,28 +45,28 @@ cfg-excluded platform tests separately from failures, ignored tests and passes.
 
 ## Initial failures and repairs
 
-1. Initial [fmt](m4-validation-logs/fmt-initial.txt) rejected formatting in
+1. Initial [fmt](evidence/fmt-initial.txt) rejected formatting in
    src/install/tests.rs and tests/selection_cli.rs. Cargo fmt repaired these
    assertions/argument lists; the subsequent fmt check passed.
-2. Initial [all-target check](m4-validation-logs/check-initial.txt) rejected
+2. Initial [all-target check](evidence/check-initial.txt) rejected
    Fixture::assert_current passing a borrowed expected string to assert_cmd,
    which requires an owned or static output predicate. It now passes
    stdout.to_owned(); the all-target check passed afterward.
-3. Initial [Clippy](m4-validation-logs/clippy-initial.txt) rejected an unnecessary
+3. Initial [Clippy](evidence/clippy-initial.txt) rejected an unnecessary
    borrow of a temporary Windows junction handle. The information call now
    consumes that temporary directly. Clippy passed; the full tests compiled
    and exercised the repaired code. No production switching algorithm changed.
-4. The initial [test attempt](m4-validation-logs/test-initial.txt) could not open
+4. The initial [test attempt](evidence/test-initial.txt) could not open
    target/debug/.cargo-artifact-lock due to sandbox access denial and ran no
    tests. The requested tests were rerun outside the sandbox and all 160 passed.
-5. The initial [smoke](m4-validation-logs/smoke-initial.txt) successfully installed
+5. The initial [smoke](evidence/smoke-initial.txt) successfully installed
    A, then PowerShell Invoke-WebRequest failed TLS authentication while fetching
    the independent official checksum file in the sandbox. The partial fixture
    was retained. The full smoke was rerun outside the sandbox with a fresh base,
    default TLS validation and no verification bypass, and passed. Production
    Rust HTTPS installation succeeded on both attempts.
 
-The [smoke harness](m4-validation-logs/smoke.ps1) records raw exits/stdout/stderr
+The [smoke harness](evidence/smoke.ps1) records raw exits/stdout/stderr
 and checks exact CLI output. Official Windows Node version lines use CRLF,
 recorded verbatim; the harness normalizes only CRLF to LF for line comparison.
 The owned success/partial fixtures remain under target for evidence. The
@@ -82,7 +82,7 @@ nor their normal Verslot root was changed, and no active uninstall was added.
   uninstall rejection and inactive uninstall run together. It checks bundled
   payloads and absence of operation/switch residue. It does not download.
 - `fixed_entry_and_controlled_path_execute_selected_payload_after_switch` in
-  [selection CLI tests](../tests/selection_cli.rs) copies the native Rust test
+  [selection CLI tests](../../../../tests/selection_cli.rs) copies the native Rust test
   binary into both complete installations as node/node.exe. The child test
   `synthetic_node_reports_its_receipt` reads its own adjacent receipt and prints
   a version marker. First A and then B are launched by the fixed absolute entry
@@ -162,14 +162,14 @@ reason to bypass checksum/TLS verification.
 | Windows | `<base>\verslot` | `<root>\current\node\node.exe` | `<root>\current\node` | `<root>\installs\node\22.0.0` |
 | macOS / Linux | `<base>/.verslot` | `<root>/current/node/bin/node` | `<root>/current/node/bin` | `<root>/installs/node/22.0.0/bin` |
 
-Use the [README shell examples](../README.md#select-nodejs-and-configure-path-manually)
+Use the [README shell examples](../../../../README.md#select-nodejs-and-configure-path-manually)
 only inside that child, with its overridden native root. Do not edit the user's
 persistent PATH, shell profiles or existing Node.js installations.
 
 | Smoke evidence | Current result |
 | --- | --- |
 | Fresh isolated base / exact A and B versions | `D:\code\verslot\target\m4-smoke-0c7a734c06644092b98a0aca3a12fa15`; 22.0.0 / 24.0.0; success fixture retained |
-| Official URLs, SHA-256 and receipt comparisons | Passed; official win-x64 archives and SHASUMS256.txt matched receipts; exact URLs/digests in [smoke log](m4-validation-logs/smoke.txt); [A checksums](m4-validation-logs/SHASUMS256-22.0.0.txt), [B checksums](m4-validation-logs/SHASUMS256-24.0.0.txt) |
+| Official URLs, SHA-256 and receipt comparisons | Passed; official win-x64 archives and SHASUMS256.txt matched receipts; exact URLs/digests in [smoke log](evidence/smoke.txt); [A checksums](evidence/SHASUMS256-22.0.0.txt), [B checksums](evidence/SHASUMS256-24.0.0.txt) |
 | Install/list and no selection after installs | Passed; exact installed messages, A/B numeric list, empty current and no storage creation by initial queries |
 | First select / current / fixed-entry execution | Passed; using/current identify A, fixed node.exe returns `v22.0.0` |
 | PATH resolution and execution for A and B | Passed; Get-Command/where.exe identify fixed node.exe first, node --version returns `v22.0.0` then `v24.0.0` |
