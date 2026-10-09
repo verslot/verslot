@@ -118,3 +118,15 @@ Examples:
 - test(switching): add selection workflow coverage
 - docs: record M4 Windows acceptance
 - build(deps): add winapi-util dependency
+
+## Agent skills
+
+### Issue tracker
+
+Track issues and specs in GitHub Issues for verslot/verslot.
+See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Use a single-context layout: root `GLOSSARY.md` and `docs/adr/`.
+See `docs/agents/domain.md`.
