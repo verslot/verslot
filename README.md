@@ -62,6 +62,15 @@ build metadata are rejected. `list` and `current` take no positional arguments.
 exit 1 with empty stdout and diagnostics on stderr; invalid CLI usage exits 2.
 The five commands do not execute installed Node.js.
 
+New installations report checksum retrieval, archive download, SHA-256
+verification and extraction/installation on stderr. Interactive terminals show
+an ASCII spinner; redirected or unsupported terminals receive plain stage lines.
+The spinner indicates activity, not downloaded bytes or a completion percentage.
+Stage feedback stops before the final result or error, and complete duplicate
+installations remain silent on stderr. Progress output is best-effort and does
+not change the installation result. Live byte counts and percentages are not yet
+implemented.
+
 ## Configure Node.js PATH
 
 Prepend the fixed directory once. Verslot does not edit PATH or shell profiles.

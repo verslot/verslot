@@ -5,6 +5,7 @@ mod install;
 pub mod installation;
 mod inventory;
 mod mutation;
+mod progress;
 pub mod storage;
 pub mod target;
 mod uninstall;

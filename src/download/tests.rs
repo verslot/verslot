@@ -3,6 +3,7 @@ use std::io::{self, Cursor, Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -10,6 +11,120 @@ use super::*;
 
 const ABC_DIGEST: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
 const FILENAME: &str = "node-v22.0.0-win-x64.zip";
+
+// Compose the actual downloader with installation tests without production URL overrides.
+pub(crate) fn download_fixture(
+    version: Version,
+    bytes: &[u8],
+    archive: &Path,
+    progress: &mut Progress<'_>,
+) -> Result<String, String> {
+    let mut distribution = NodeDistribution::for_current_build(version).unwrap();
+    let digest: String = Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let checksums = format!("{digest} {}\n", distribution.archive_filename);
+    let (url, task) = serve(vec![response(checksums.as_bytes()), response(bytes)]);
+    distribution.archive_url = format!("{url}/{}", distribution.archive_filename);
+    distribution.checksum_url = format!("{url}/SHASUMS256.txt");
+    let result =
+        download_distribution_with_progress(&local_agent(), &distribution, archive, progress);
+    task.join().unwrap();
+    result
+}
+
+#[test]
+fn download_failure_does_not_report_later_stages() {
+    for (responses, expected_error, expected_output) in [
+        (
+            vec![response(b"invalid")],
+            "missing entry",
+            "Fetching checksums...\n",
+        ),
+        (
+            vec![
+                response(format!("{ABC_DIGEST} {FILENAME}\n").as_bytes()),
+                b"HTTP/1.1 500 Error\r\nContent-Length: 0\r\n\r\n".to_vec(),
+            ],
+            "received 500",
+            "Fetching checksums...\nDownloading archive...\n",
+        ),
+        (
+            vec![
+                response(format!("{ABC_DIGEST} {FILENAME}\n").as_bytes()),
+                response(b"bad"),
+            ],
+            "SHA-256 mismatch",
+            "Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\n",
+        ),
+    ] {
+        let (url, task) = serve(responses);
+        let directory = OperationDirectory::new();
+        let mut output = Vec::new();
+        let result = download_distribution_with_progress(
+            &local_agent(),
+            &local_distribution(&url),
+            &directory.archive_path(),
+            &mut Progress::plain(&mut output),
+        );
+        task.join().unwrap();
+        let error = result.unwrap_err();
+        assert!(error.contains(expected_error), "{error}");
+        assert_eq!(output, expected_output.as_bytes());
+    }
+}
+
+#[test]
+fn download_reports_stages_in_order_without_changing_the_digest() {
+    let checksums = format!("{ABC_DIGEST} {FILENAME}\n");
+    let output = Arc::new(Mutex::new(Vec::new()));
+    let observed = Arc::clone(&output);
+    let (url, task) = serve_observed(
+        vec![response(checksums.as_bytes()), response(b"abc")],
+        move |request| {
+            let expected = if request == 0 {
+                "Fetching checksums...\n"
+            } else {
+                "Fetching checksums...\nDownloading archive...\n"
+            };
+            assert_eq!(
+                *observed.lock().unwrap(),
+                expected.as_bytes(),
+                "stage must be visible before the response"
+            );
+        },
+    );
+    let directory = OperationDirectory::new();
+    let mut progress = crate::progress::Progress::plain(SharedOutput(Arc::clone(&output)));
+    let digest = download_distribution_with_progress(
+        &local_agent(),
+        &local_distribution(&url),
+        &directory.archive_path(),
+        &mut progress,
+    )
+    .unwrap();
+    drop(progress);
+    task.join().unwrap();
+    assert_eq!(digest, ABC_DIGEST);
+    assert_eq!(
+        *output.lock().unwrap(),
+        b"Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\n"
+    );
+}
+
+struct SharedOutput(Arc<Mutex<Vec<u8>>>);
+
+impl Write for SharedOutput {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 fn deadline() -> Instant {
     Instant::now() + Duration::from_secs(5)
@@ -155,11 +270,18 @@ fn expired_deadline_prevents_reads_and_writes() {
 
 // Serves generated fixtures on loopback only, never nodejs.org. Bounds every accept/read.
 fn serve(responses: Vec<Vec<u8>>) -> (String, JoinHandle<()>) {
+    serve_observed(responses, |_| {})
+}
+
+fn serve_observed(
+    responses: Vec<Vec<u8>>,
+    observe: impl Fn(usize) + Send + 'static,
+) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     listener.set_nonblocking(true).unwrap();
     let task = thread::spawn(move || {
-        for response in responses {
+        for (index, response) in responses.into_iter().enumerate() {
             let until = deadline();
             let mut socket = loop {
                 match listener.accept() {
@@ -191,6 +313,7 @@ fn serve(responses: Vec<Vec<u8>>) -> (String, JoinHandle<()>) {
                     .to_ascii_lowercase()
                     .contains("accept-encoding: identity")
             );
+            observe(index);
             // The client may close early when rejecting a response or byte limit.
             let _ = socket.write_all(&response);
         }

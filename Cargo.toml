@@ -9,6 +9,7 @@ repository = "https://github.com/verslot/verslot"
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+indicatif = { version = "0.18", default-features = false }
 sha2 = { version = "0.11", default-features = false }
 ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
 

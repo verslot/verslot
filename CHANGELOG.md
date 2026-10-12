@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Show installation stages on stderr with an ASCII terminal spinner and plain
+  stage lines for redirected output (#15). Preserve final stdout results,
+  errors and duplicate-installation behavior. Live byte counts and percentages
+  remain future work (#16, #17).
+
 ## v0.5.0 — 2026-10-04
 
 First source release intended for actual use after M1–M5 focused development.

@@ -11,6 +11,7 @@ use ureq::unversioned::transport::{
 use ureq::{Agent, Body, Error, Timeout};
 
 use crate::distribution::NodeDistribution;
+use crate::progress::Progress;
 use crate::target::Version;
 
 const CHECKSUM_LIMIT: u64 = 1024 * 1024;
@@ -23,9 +24,17 @@ const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 /// The caller must validate mutation boundaries and clean up this file on failure (T4).
 /// Returns the verified lowercase digest only after the entire response has been read.
 pub fn download_verified_archive(version: Version, archive_path: &Path) -> Result<String, String> {
+    download_verified_archive_with_progress(version, archive_path, &mut Progress::Silent)
+}
+
+pub(crate) fn download_verified_archive_with_progress(
+    version: Version,
+    archive_path: &Path,
+    progress: &mut Progress<'_>,
+) -> Result<String, String> {
     let distribution = NodeDistribution::for_current_build(version)?;
     let agent = download_agent();
-    download_distribution(&agent, &distribution, archive_path)
+    download_distribution_with_progress(&agent, &distribution, archive_path, progress)
 }
 
 fn download_agent() -> Agent {
@@ -41,12 +50,23 @@ fn download_agent() -> Agent {
     Agent::with_parts(config, ReadTimeoutConnector, DefaultResolver::default())
 }
 
+#[cfg(test)]
 fn download_distribution(
     agent: &Agent,
     distribution: &NodeDistribution,
     archive_path: &Path,
 ) -> Result<String, String> {
+    download_distribution_with_progress(agent, distribution, archive_path, &mut Progress::Silent)
+}
+
+fn download_distribution_with_progress(
+    agent: &Agent,
+    distribution: &NodeDistribution,
+    archive_path: &Path,
+    progress: &mut Progress<'_>,
+) -> Result<String, String> {
     let deadline = Instant::now() + DOWNLOAD_TIMEOUT;
+    progress.stage("Fetching checksums...");
     let mut checksums = fetch_response(agent, &distribution.checksum_url, deadline)?;
     let mut checksum_bytes = Vec::new();
     copy_bounded(
@@ -60,6 +80,7 @@ fn download_distribution(
         .map_err(|error| format!("read checksums: invalid UTF-8: {error}"))?;
     let expected = parse_checksum(checksum_text, &distribution.archive_filename)?;
 
+    progress.stage("Downloading archive...");
     let mut response = fetch_response(agent, &distribution.archive_url, deadline)?;
     let mut archive = File::create_new(archive_path)
         .map_err(|error| format!("create archive {}: {error}", archive_path.display()))?;
@@ -70,6 +91,7 @@ fn download_distribution(
         deadline,
     )
     .map_err(|error| format!("download archive {}: {error}", distribution.archive_url))?;
+    progress.stage("Verifying SHA-256...");
     if digest != expected {
         return Err(format!(
             "verify archive {}: SHA-256 mismatch (expected {expected}, received {digest})",
@@ -228,4 +250,4 @@ impl Transport for ReadTimeoutTransport {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

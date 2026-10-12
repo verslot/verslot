@@ -6,6 +6,104 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 struct Fixture(PathBuf);
 
+#[test]
+fn progress_install_extracts_real_archive_and_preserves_final_result() {
+    let fixture = Fixture::new();
+    let target = fixture.target();
+    let bytes = archive_fixture(&target);
+    let mut output = Vec::new();
+    let result = install_with_progress(
+        &fixture.0,
+        &target,
+        &mut crate::progress::Progress::plain(&mut output),
+        |version, archive, progress| {
+            crate::download::tests::download_fixture(version, &bytes, archive, progress)
+        },
+        remove_operation,
+    );
+    assert_eq!(result.unwrap(), "installed node@22.0.0");
+    validate_installation(&fixture.0, &target).unwrap();
+    assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\nExtracting and installing...\n");
+}
+
+#[test]
+fn progress_install_duplicate_skips_all_stages() {
+    let fixture = Fixture::new();
+    fixture.install().unwrap();
+    let mut output = Vec::new();
+    let result = install_with_progress(
+        &fixture.0,
+        &fixture.target(),
+        &mut Progress::plain(&mut output),
+        |_, _, _| panic!("duplicate must not download"),
+        |_, _| panic!("duplicate must not clean up"),
+    );
+    assert_eq!(result.unwrap(), "already installed node@22.0.0");
+    assert!(output.is_empty());
+}
+
+#[test]
+fn progress_install_finishes_reporting_even_when_cleanup_fails() {
+    let fixture = Fixture::new();
+    let target = fixture.target();
+    let bytes = archive_fixture(&target);
+    let mut output = Vec::new();
+    let mut progress = Progress::plain(&mut output);
+    let error = install_with_progress(
+        &fixture.0,
+        &target,
+        &mut progress,
+        |version, archive, progress| {
+            crate::download::tests::download_fixture(version, &bytes, archive, progress)
+        },
+        |_, _| Err(io::Error::other("injected cleanup failure")),
+    )
+    .unwrap_err();
+    progress.stage("must not appear after return");
+    drop(progress);
+    assert!(error.contains("installation succeeded but cleanup failed"));
+    validate_installation(&fixture.0, &target).unwrap();
+    assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\nExtracting and installing...\n");
+}
+
+#[test]
+fn progress_install_preserves_download_and_extraction_failures() {
+    for download_failure in [true, false] {
+        let fixture = Fixture::new();
+        let mut output = Vec::new();
+        let mut progress = Progress::plain(&mut output);
+        let error = install_with_progress(
+            &fixture.0,
+            &fixture.target(),
+            &mut progress,
+            |version, archive, progress| {
+                if download_failure {
+                    Err("injected download failure".to_owned())
+                } else {
+                    crate::download::tests::download_fixture(
+                        version,
+                        b"invalid archive",
+                        archive,
+                        progress,
+                    )
+                }
+            },
+            remove_operation,
+        )
+        .unwrap_err();
+        progress.stage("must not appear after failure");
+        drop(progress);
+        if download_failure {
+            assert_eq!(error, "injected download failure");
+            assert!(output.is_empty());
+        } else {
+            assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\nExtracting and installing...\n");
+        }
+        assert!(!fixture.destination().exists());
+        assert_eq!(fs::read_dir(fixture.0.join("tmp")).unwrap().count(), 0);
+    }
+}
+
 impl Fixture {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
