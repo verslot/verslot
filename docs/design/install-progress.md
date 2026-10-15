@@ -3,7 +3,8 @@
 Design for [Issue #13](https://github.com/verslot/verslot/issues/13).
 Implementation specification: [Issue #14](https://github.com/verslot/verslot/issues/14).
 Status: accepted on 2026-10-13; stage feedback (#15) and live byte progress (#16)
-are implemented. Total-aware progress (#17) is not implemented.
+are implemented. Total-aware progress (#17) is implemented locally; complete
+macOS/Linux native terminal and redirected acceptance remains pending.
 GitHub Issues remain the only backlog. The implementation sections below record
 the scope and results actually exercised, not full cross-platform acceptance.
 
@@ -94,7 +95,9 @@ async runtime. Stop that ticker on every exit path.
 4. Smaller alternative: plain lines need no dependency, but do not meet the
    animation request. A spinner-only library would still require separate
    determinate progress rendering. Use `default-features = false` with fixed
-   ASCII templates; no optional integrations are required for core animation.
+   single-cell dot frames and ASCII bars; no optional integrations are required
+   for core animation. The dot frames supersede the original ASCII rotation at
+   the user's request during #17 implementation.
    The library still brings required transitive dependencies, including console,
    unit-prefix and portable-atomic; review the resolved lockfile when implementing.
    See the [upstream manifest](https://github.com/console-rs/indicatif/blob/0.18.6/Cargo.toml).
@@ -247,6 +250,72 @@ Before implementation is considered complete, run the four required checks from
 redirected output on Windows, macOS and Linux. Non-terminal CI alone cannot
 validate terminal behavior. Record exact commands, platform, commit and actual
 results; label unexecuted cases explicitly.
+
+### Total-aware implementation (#17)
+
+Only one positive digit-only Content-Length within the archive byte limit is
+eligible for display. Transfer-Encoding, Content-Range, duplicate lengths,
+duplicate content encodings and any non-identity Content-Encoding disable the
+total. HeaderMap tests cover malformed/ambiguous metadata that the HTTP parser
+can reject before the normal reporting boundary. Real local HTTP tests cover
+fixed-size, close-delimited, chunked and encoded response presentation. Existing
+transport/framing failures remain errors rather than successful fallback.
+
+Plain output includes bytes/total and integer percentages rounded down, using
+wide arithmetic to avoid overflow. The terminal adds a bar and the requested
+leading dot spinner. If observed bytes exceed the display total, subsequent
+output uses bytes only and the terminal removes the bar. Progress reaching 100%
+does not bypass EOF, digest comparison, extraction, commit or cleanup. Stage
+changes remove total/percentage formatting. No dependency changes were needed.
+
+The new known-length HTTP regression failed against #16's byte-only output and
+passed after this change. The existing synchronized before-EOF regression now
+covers both chunked and fixed-length transfers (two of three bytes shows 66%).
+Controlled-clock tests cover throttling and inconsistent totals; installation
+tests verify that even a 100% transfer can still fail extraction or cleanup.
+
+Two default-ignored native acceptance entry points are available in the compiled
+library test executable after `cargo test --lib --no-run`:
+
+```text
+<library-test-executable> stage_output_smoke --ignored --nocapture
+<library-test-executable> installation_progress_smoke --ignored --nocapture
+```
+
+Run each directly in a native terminal and then with stderr redirected to a
+file. On Windows use PowerShell's `& <path>`; on macOS/Linux execute the path
+directly. Supported terminals must render the dot glyphs. The reporter smoke
+pauses with unchanged bytes, shows 50%/100%, then demonstrates byte-only fallback.
+The installation smoke uses isolated temporary storage and real local HTTP,
+hashing, extraction, commit and cleanup for known/unknown totals, successful
+installation, duplicate installation and invalid-archive failure. It does not
+change the user's installation root or expose production URL overrides.
+
+Windows interactive and redirected runs on 2026-10-15 passed. Dot frames, the
+bar, percentages and fallback were observed; redirected runs contained no ESC
+or cursor-control carriage returns. The offline lifecycle run passed for both
+response modes. These are native offline checks, not a fresh download from the
+Node.js server, nor evidence of macOS/Linux execution.
+
+On the same Windows checkout, `cargo fmt --check`, `cargo check --all-targets`,
+`cargo clippy --all-targets --all-features -- -D warnings` and `cargo test --all`
+passed: 152 library tests, 19 CLI tests and 8 selection CLI tests (179 passed).
+The two default-ignored acceptance tests above were executed separately.
+Standards review found no issues; specification review found no implementation
+defects and identified the pending native macOS/Linux acceptance below.
+
+| Native acceptance | Windows | macOS | Linux |
+| --- | --- | --- | --- |
+| Reporter: stalled activity, known/unknown totals, fallback, stage changes | Passed | Not run | Not run |
+| Reporter redirected: plain output, totals, fallback, no terminal controls | Passed | Not run | Not run |
+| Offline install lifecycle: success, failure, duplicate, known/unknown totals | Passed | Not run | Not run |
+| Offline install lifecycle redirected | Passed | Not run | Not run |
+
+This leaves the complete cross-platform acceptance criterion in #17 open. The
+existing CI matrix runs code checks and automated tests on Windows/macOS/Linux
+when a PR targets main, but it does not establish interactive rendering. Run the
+same native acceptance entry points on macOS/Linux and record commit, commands
+and observations before closing #17 or declaring all of #13/#14 accepted.
 
 ## Confirmed decisions
 

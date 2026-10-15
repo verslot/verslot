@@ -84,6 +84,7 @@ fn download_distribution_with_progress(
     let mut response = fetch_response(agent, &distribution.archive_url, deadline)?;
     let mut archive = File::create_new(archive_path)
         .map_err(|error| format!("create archive {}: {error}", archive_path.display()))?;
+    progress.set_download_total(archive_display_total(response.headers()));
     let digest = copy_bounded_with_progress(
         &mut response.body_mut().as_reader(),
         &mut archive,
@@ -100,6 +101,31 @@ fn download_distribution_with_progress(
         ));
     }
     Ok(digest)
+}
+
+// Only display a length that describes the same untransformed archive bytes we copy.
+fn archive_display_total(headers: &ureq::http::HeaderMap) -> Option<u64> {
+    if headers.contains_key("transfer-encoding") || headers.contains_key("content-range") {
+        return None;
+    }
+    let mut encodings = headers.get_all("content-encoding").iter();
+    if let Some(encoding) = encodings.next()
+        && (!encoding.as_bytes().eq_ignore_ascii_case(b"identity") || encodings.next().is_some())
+    {
+        return None;
+    }
+    let mut lengths = headers.get_all("content-length").iter();
+    let length = lengths.next()?.to_str().ok()?;
+    if lengths.next().is_some()
+        || length.is_empty()
+        || !length.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    length
+        .parse::<u64>()
+        .ok()
+        .filter(|length| (1..=ARCHIVE_LIMIT).contains(length))
 }
 
 fn fetch_response(

@@ -8,8 +8,11 @@
 - Show live archive byte counts before the download completes (#16), including
   responses without a known total. Throttle redirected intermediate byte updates
   to once per second, retain immediate snapshots, and preserve installation
-  outcomes when progress output fails. Total sizes and percentages remain future
-  work (#17).
+  outcomes when progress output fails.
+- Add total-aware download progress with a bar, bytes/total and percentage when
+  the response supplies a usable total (#17). Fall back to byte-only output for
+  unknown, invalid or inconsistent totals. Use a leading dot spinner, replacing
+  the initial ASCII rotation, and keep redirected output plain text.
 
 ## v0.5.0 — 2026-10-04
 

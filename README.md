@@ -64,11 +64,13 @@ The five commands do not execute installed Node.js.
 
 New installations report checksum retrieval, archive download, SHA-256
 verification and extraction/installation on stderr. Interactive terminals show
-an ASCII spinner; redirected or unsupported terminals receive plain stage lines.
+a dot spinner (`⠋ ⠙ ⠹`); redirected or unsupported terminals receive plain stage lines.
 During archive transfer, the spinner also shows cumulative bytes successfully
 written. Redirected byte updates are limited to once per second, with immediate
 initial and final snapshots. The spinner keeps animating while reads wait without
-advancing the byte count. No total size or percentage is displayed yet.
+advancing the byte count. A usable response total adds a progress bar, bytes/total
+and percentage. Unknown, invalid or inconsistent totals show only downloaded
+bytes. Redirected output shows the same amounts and percentages as plain text.
 Stage feedback stops before the final result or error, and complete duplicate
 installations remain silent on stderr. Progress output is best-effort and does
 not change the installation result. A final byte snapshot describes the transfer

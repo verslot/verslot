@@ -6,6 +6,63 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 struct Fixture(PathBuf);
 
+// Run directly from the test executable in a native terminal, then redirect stderr.
+#[test]
+#[ignore = "manual native terminal/redirected lifecycle acceptance"]
+fn installation_progress_smoke() {
+    for chunked in [false, true] {
+        let fixture = Fixture::new();
+        let target = fixture.target();
+        let bytes = archive_fixture(&target);
+        let result = install_with_progress(
+            &fixture.0,
+            &target,
+            &mut Progress::stderr(),
+            |version, archive, progress| {
+                crate::download::tests::download_fixture(
+                    version, &bytes, archive, progress, chunked,
+                )
+            },
+            remove_operation,
+        )
+        .unwrap();
+        assert_eq!(result, "installed node@22.0.0");
+        println!("{result}");
+        validate_installation(&fixture.0, &target).unwrap();
+        let duplicate = install_with_progress(
+            &fixture.0,
+            &target,
+            &mut Progress::stderr(),
+            |_, _, _| panic!("duplicate must not download"),
+            remove_operation,
+        )
+        .unwrap();
+        assert_eq!(duplicate, "already installed node@22.0.0");
+        println!("{duplicate}");
+
+        let failed = Fixture::new();
+        let error = install_with_progress(
+            &failed.0,
+            &target,
+            &mut Progress::stderr(),
+            |version, archive, progress| {
+                crate::download::tests::download_fixture(
+                    version,
+                    b"invalid archive",
+                    archive,
+                    progress,
+                    chunked,
+                )
+            },
+            remove_operation,
+        )
+        .unwrap_err();
+        assert!(!failed.destination().exists());
+        assert_eq!(fs::read_dir(failed.0.join("tmp")).unwrap().count(), 0);
+        eprintln!("expected invalid archive failure: {error}");
+    }
+}
+
 #[test]
 fn progress_install_extracts_real_archive_and_preserves_final_result() {
     let fixture = Fixture::new();
@@ -17,7 +74,7 @@ fn progress_install_extracts_real_archive_and_preserves_final_result() {
         &target,
         &mut crate::progress::Progress::plain(&mut output),
         |version, archive, progress| {
-            crate::download::tests::download_fixture(version, &bytes, archive, progress)
+            crate::download::tests::download_fixture(version, &bytes, archive, progress, false)
         },
         remove_operation,
     );
@@ -25,18 +82,21 @@ fn progress_install_extracts_real_archive_and_preserves_final_result() {
     validate_installation(&fixture.0, &target).unwrap();
     let output = String::from_utf8(output).unwrap();
     assert!(
-        output.starts_with("Fetching checksums...\nDownloading archive...\nDownloaded 0 bytes\n"),
-        "{output}"
-    );
-    assert!(
-        output.contains(&format!(
-            "Downloaded {} bytes\nVerifying SHA-256...\nExtracting and installing...\n",
+        output.starts_with(&format!(
+            "Fetching checksums...\nDownloading archive...\nDownloaded 0/{} bytes (0%)\n",
             bytes.len()
         )),
         "{output}"
     );
     assert!(
-        !output.contains('%') && !output.contains('\x1b') && !output.contains('\r'),
+        output.contains(&format!(
+            "Downloaded {0}/{0} bytes (100%)\nVerifying SHA-256...\nExtracting and installing...\n",
+            bytes.len()
+        )),
+        "{output}"
+    );
+    assert!(
+        !output.contains('\x1b') && !output.contains('\r'),
         "{output}"
     );
 }
@@ -69,7 +129,7 @@ fn progress_install_finishes_reporting_even_when_cleanup_fails() {
         &target,
         &mut progress,
         |version, archive, progress| {
-            crate::download::tests::download_fixture(version, &bytes, archive, progress)
+            crate::download::tests::download_fixture(version, &bytes, archive, progress, false)
         },
         |_, _| Err(io::Error::other("injected cleanup failure")),
     )
@@ -84,7 +144,7 @@ fn progress_install_finishes_reporting_even_when_cleanup_fails() {
         "{output}"
     );
     assert!(
-        output.contains(&format!("Downloaded {} bytes\n", bytes.len())),
+        output.contains(&format!("Downloaded {0}/{0} bytes (100%)\n", bytes.len())),
         "{output}"
     );
 }
@@ -108,6 +168,7 @@ fn progress_install_preserves_download_and_extraction_failures() {
                         b"invalid archive",
                         archive,
                         progress,
+                        false,
                     )
                 }
             },
@@ -120,7 +181,7 @@ fn progress_install_preserves_download_and_extraction_failures() {
             assert_eq!(error, "injected download failure");
             assert!(output.is_empty());
         } else {
-            assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nDownloaded 0 bytes\nDownloaded 15 bytes\nDownloaded 15 bytes\nVerifying SHA-256...\nExtracting and installing...\n");
+            assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nDownloaded 0/15 bytes (0%)\nDownloaded 15/15 bytes (100%)\nDownloaded 15/15 bytes (100%)\nVerifying SHA-256...\nExtracting and installing...\n");
         }
         assert!(!fixture.destination().exists());
         assert_eq!(fs::read_dir(fixture.0.join("tmp")).unwrap().count(), 0);
@@ -152,7 +213,7 @@ fn failed_byte_progress_sink_does_not_change_installation_result() {
         &target,
         &mut Progress::plain(&mut output),
         |version, archive, progress| {
-            crate::download::tests::download_fixture(version, &bytes, archive, progress)
+            crate::download::tests::download_fixture(version, &bytes, archive, progress, false)
         },
         remove_operation,
     );

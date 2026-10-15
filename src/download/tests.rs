@@ -13,39 +13,153 @@ const ABC_DIGEST: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff
 const FILENAME: &str = "node-v22.0.0-win-x64.zip";
 
 #[test]
-fn download_progress_is_visible_before_eof() {
-    let (progress_sent, progress_seen) = mpsc::channel();
+fn known_length_download_reports_total_and_percentage() {
     let checksums = format!("{ABC_DIGEST} {FILENAME}\n");
-    let (url, task) = serve_streamed_archive(response(checksums.as_bytes()), progress_seen);
+    let (url, task) = serve(vec![response(checksums.as_bytes()), response(b"abc")]);
     let directory = OperationDirectory::new();
-    let output = Arc::new(Mutex::new(Vec::new()));
+    let mut output = Vec::new();
     let result = download_distribution_with_progress(
         &local_agent(),
         &local_distribution(&url),
         &directory.archive_path(),
-        &mut Progress::plain(ProgressSignal {
-            output: Arc::clone(&output),
-            progress_sent: Some(progress_sent),
-        }),
+        &mut Progress::plain(&mut output),
     );
-    let observed_before_eof = task.join().unwrap();
-    assert!(
-        observed_before_eof,
-        "server never observed rendered byte progress before EOF"
-    );
+    task.join().unwrap();
     assert_eq!(result.unwrap(), ABC_DIGEST);
-    let output = String::from_utf8(output.lock().unwrap().clone()).unwrap();
-    assert!(output.contains("Downloaded 2 bytes\n"), "{output}");
-    assert!(output.contains("Downloaded 3 bytes\n"), "{output}");
+    let output = String::from_utf8(output).unwrap();
+    assert!(output.contains("Downloaded 0/3 bytes (0%)\n"), "{output}");
     assert!(
-        !output.contains('%') && !output.contains('\x1b') && !output.contains('\r'),
+        output.contains("Downloaded 3/3 bytes (100%)\nVerifying SHA-256...\n"),
         "{output}"
     );
+    assert!(
+        !output.contains('\x1b') && !output.contains('\r'),
+        "{output}"
+    );
+}
+
+#[test]
+fn unusable_response_lengths_are_not_display_totals() {
+    use ureq::http::{HeaderMap, HeaderValue};
+    for (values, expected) in [
+        (vec![], None),
+        (vec![("content-length", "3")], Some(3)),
+        (
+            vec![("content-length", "3"), ("content-encoding", "identity")],
+            Some(3),
+        ),
+        (vec![("content-length", "0")], None),
+        (vec![("content-length", "-1")], None),
+        (vec![("content-length", "+3")], None),
+        (vec![("content-length", "3, 3")], None),
+        (vec![("content-length", "invalid")], None),
+        (vec![("content-length", "536870913")], None),
+        (vec![("content-length", "18446744073709551616")], None),
+        (vec![("content-length", "3"), ("content-length", "3")], None),
+        (vec![("content-length", "3"), ("content-length", "4")], None),
+        (
+            vec![("content-length", "3"), ("transfer-encoding", "chunked")],
+            None,
+        ),
+        (
+            vec![("content-length", "3"), ("content-range", "bytes 0-2/10")],
+            None,
+        ),
+        (
+            vec![("content-length", "3"), ("content-encoding", "gzip")],
+            None,
+        ),
+        (
+            vec![
+                ("content-length", "3"),
+                ("content-encoding", "identity"),
+                ("content-encoding", "identity"),
+            ],
+            None,
+        ),
+    ] {
+        let mut headers = HeaderMap::new();
+        for (name, value) in &values {
+            headers.append(*name, HeaderValue::from_str(value).unwrap());
+        }
+        assert_eq!(archive_display_total(&headers), expected, "{values:?}");
+    }
+}
+
+#[test]
+fn unknown_or_encoded_http_responses_keep_byte_only_output() {
+    for archive in [
+        b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nabc".to_vec(),
+        b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n3\r\nabc\r\n0\r\n\r\n".to_vec(),
+        b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\nContent-Encoding: gzip\r\nConnection: close\r\n\r\nabc".to_vec(),
+    ] {
+        let checksums = format!("{ABC_DIGEST} {FILENAME}\n");
+        let (url, task) = serve(vec![response(checksums.as_bytes()), archive]);
+        let directory = OperationDirectory::new();
+        let mut output = Vec::new();
+        let result = download_distribution_with_progress(
+            &local_agent(), &local_distribution(&url), &directory.archive_path(),
+            &mut Progress::plain(&mut output),
+        );
+        task.join().unwrap();
+        assert_eq!(result.unwrap(), ABC_DIGEST);
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.contains("Downloaded 3 bytes\nVerifying SHA-256..."), "{output}");
+        assert!(!output.contains('%'), "{output}");
+    }
+}
+
+#[test]
+fn download_progress_is_visible_before_eof() {
+    for known_total in [false, true] {
+        let (progress_sent, progress_seen) = mpsc::channel();
+        let checksums = format!("{ABC_DIGEST} {FILENAME}\n");
+        let (url, task) =
+            serve_streamed_archive(response(checksums.as_bytes()), progress_seen, known_total);
+        let directory = OperationDirectory::new();
+        let output = Arc::new(Mutex::new(Vec::new()));
+        let result = download_distribution_with_progress(
+            &local_agent(),
+            &local_distribution(&url),
+            &directory.archive_path(),
+            &mut Progress::plain(ProgressSignal {
+                output: Arc::clone(&output),
+                progress_sent: Some(progress_sent),
+                expected: if known_total {
+                    b"Downloaded 2/3 bytes (66%)\n"
+                } else {
+                    b"Downloaded 2 bytes\n"
+                },
+            }),
+        );
+        let observed_before_eof = task.join().unwrap();
+        assert!(
+            observed_before_eof,
+            "server never observed rendered byte progress before EOF"
+        );
+        assert_eq!(result.unwrap(), ABC_DIGEST);
+        let output = String::from_utf8(output.lock().unwrap().clone()).unwrap();
+        if known_total {
+            assert!(output.contains("Downloaded 2/3 bytes (66%)\n"), "{output}");
+            assert!(output.contains("Downloaded 3/3 bytes (100%)\n"), "{output}");
+        } else {
+            assert!(output.contains("Downloaded 2 bytes\n"), "{output}");
+            assert!(
+                output.contains("Downloaded 3 bytes\n") && !output.contains('%'),
+                "{output}"
+            );
+        }
+        assert!(
+            !output.contains('\x1b') && !output.contains('\r'),
+            "{output}"
+        );
+    }
 }
 
 struct ProgressSignal {
     output: Arc<Mutex<Vec<u8>>>,
     progress_sent: Option<mpsc::Sender<()>>,
+    expected: &'static [u8],
 }
 
 impl Write for ProgressSignal {
@@ -59,8 +173,8 @@ impl Write for ProgressSignal {
             .output
             .lock()
             .unwrap()
-            .windows(b"Downloaded 2 bytes\n".len())
-            .any(|bytes| bytes == b"Downloaded 2 bytes\n")
+            .windows(self.expected.len())
+            .any(|bytes| bytes == self.expected)
             && let Some(sent) = self.progress_sent.take()
         {
             let _ = sent.send(());
@@ -73,6 +187,7 @@ impl Write for ProgressSignal {
 fn serve_streamed_archive(
     checksums: Vec<u8>,
     progress_seen: mpsc::Receiver<()>,
+    known_total: bool,
 ) -> (String, JoinHandle<bool>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
@@ -108,10 +223,24 @@ fn serve_streamed_archive(
             if index == 0 {
                 socket.write_all(&checksums).unwrap();
             } else {
-                socket.write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n2\r\nab\r\n").unwrap();
+                if known_total {
+                    socket
+                        .write_all(
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nab",
+                        )
+                        .unwrap();
+                } else {
+                    socket.write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n2\r\nab\r\n").unwrap();
+                }
                 observed = progress_seen.recv_timeout(Duration::from_secs(2)).is_ok();
                 // Release even on failure so both client and fixture can terminate.
-                socket.write_all(b"1\r\nc\r\n0\r\n\r\n").unwrap();
+                socket
+                    .write_all(if known_total {
+                        b"c"
+                    } else {
+                        b"1\r\nc\r\n0\r\n\r\n"
+                    })
+                    .unwrap();
             }
         }
         observed
@@ -125,6 +254,7 @@ pub(crate) fn download_fixture(
     bytes: &[u8],
     archive: &Path,
     progress: &mut Progress<'_>,
+    chunked: bool,
 ) -> Result<String, String> {
     let mut distribution = NodeDistribution::for_current_build(version).unwrap();
     let digest: String = Sha256::digest(bytes)
@@ -132,7 +262,19 @@ pub(crate) fn download_fixture(
         .map(|byte| format!("{byte:02x}"))
         .collect();
     let checksums = format!("{digest} {}\n", distribution.archive_filename);
-    let (url, task) = serve(vec![response(checksums.as_bytes()), response(bytes)]);
+    let archive_response = if chunked {
+        let mut response = format!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:x}\r\n",
+            bytes.len()
+        )
+        .into_bytes();
+        response.extend_from_slice(bytes);
+        response.extend_from_slice(b"\r\n0\r\n\r\n");
+        response
+    } else {
+        response(bytes)
+    };
+    let (url, task) = serve(vec![response(checksums.as_bytes()), archive_response]);
     distribution.archive_url = format!("{url}/{}", distribution.archive_filename);
     distribution.checksum_url = format!("{url}/SHASUMS256.txt");
     let result =
@@ -163,7 +305,7 @@ fn download_failure_does_not_report_later_stages() {
                 response(b"bad"),
             ],
             "SHA-256 mismatch",
-            "Fetching checksums...\nDownloading archive...\nDownloaded 0 bytes\nDownloaded 3 bytes\nDownloaded 3 bytes\nVerifying SHA-256...\n",
+            "Fetching checksums...\nDownloading archive...\nDownloaded 0/3 bytes (0%)\nDownloaded 3/3 bytes (100%)\nDownloaded 3/3 bytes (100%)\nVerifying SHA-256...\n",
         ),
     ] {
         let (url, task) = serve(responses);
@@ -216,7 +358,7 @@ fn download_reports_stages_in_order_without_changing_the_digest() {
     assert_eq!(digest, ABC_DIGEST);
     assert_eq!(
         *output.lock().unwrap(),
-        b"Fetching checksums...\nDownloading archive...\nDownloaded 0 bytes\nDownloaded 3 bytes\nDownloaded 3 bytes\nVerifying SHA-256...\n"
+        b"Fetching checksums...\nDownloading archive...\nDownloaded 0/3 bytes (0%)\nDownloaded 3/3 bytes (100%)\nDownloaded 3/3 bytes (100%)\nVerifying SHA-256...\n"
     );
 }
 
