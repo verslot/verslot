@@ -4,8 +4,12 @@
 
 - Show installation stages on stderr with an ASCII terminal spinner and plain
   stage lines for redirected output (#15). Preserve final stdout results,
-  errors and duplicate-installation behavior. Live byte counts and percentages
-  remain future work (#16, #17).
+  errors and duplicate-installation behavior.
+- Show live archive byte counts before the download completes (#16), including
+  responses without a known total. Throttle redirected intermediate byte updates
+  to once per second, retain immediate snapshots, and preserve installation
+  outcomes when progress output fails. Total sizes and percentages remain future
+  work (#17).
 
 ## v0.5.0 — 2026-10-04
 

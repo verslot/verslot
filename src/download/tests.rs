@@ -3,7 +3,7 @@ use std::io::{self, Cursor, Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -11,6 +11,113 @@ use super::*;
 
 const ABC_DIGEST: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
 const FILENAME: &str = "node-v22.0.0-win-x64.zip";
+
+#[test]
+fn download_progress_is_visible_before_eof() {
+    let (progress_sent, progress_seen) = mpsc::channel();
+    let checksums = format!("{ABC_DIGEST} {FILENAME}\n");
+    let (url, task) = serve_streamed_archive(response(checksums.as_bytes()), progress_seen);
+    let directory = OperationDirectory::new();
+    let output = Arc::new(Mutex::new(Vec::new()));
+    let result = download_distribution_with_progress(
+        &local_agent(),
+        &local_distribution(&url),
+        &directory.archive_path(),
+        &mut Progress::plain(ProgressSignal {
+            output: Arc::clone(&output),
+            progress_sent: Some(progress_sent),
+        }),
+    );
+    let observed_before_eof = task.join().unwrap();
+    assert!(
+        observed_before_eof,
+        "server never observed rendered byte progress before EOF"
+    );
+    assert_eq!(result.unwrap(), ABC_DIGEST);
+    let output = String::from_utf8(output.lock().unwrap().clone()).unwrap();
+    assert!(output.contains("Downloaded 2 bytes\n"), "{output}");
+    assert!(output.contains("Downloaded 3 bytes\n"), "{output}");
+    assert!(
+        !output.contains('%') && !output.contains('\x1b') && !output.contains('\r'),
+        "{output}"
+    );
+}
+
+struct ProgressSignal {
+    output: Arc<Mutex<Vec<u8>>>,
+    progress_sent: Option<mpsc::Sender<()>>,
+}
+
+impl Write for ProgressSignal {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.output.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self
+            .output
+            .lock()
+            .unwrap()
+            .windows(b"Downloaded 2 bytes\n".len())
+            .any(|bytes| bytes == b"Downloaded 2 bytes\n")
+            && let Some(sent) = self.progress_sent.take()
+        {
+            let _ = sent.send(());
+        }
+        Ok(())
+    }
+}
+
+// Withhold the final chunk until rendered progress arrives; timeouts only bound failures.
+fn serve_streamed_archive(
+    checksums: Vec<u8>,
+    progress_seen: mpsc::Receiver<()>,
+) -> (String, JoinHandle<bool>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let task = thread::spawn(move || {
+        let mut observed = false;
+        for index in 0..2 {
+            let until = deadline();
+            let mut socket = loop {
+                match listener.accept() {
+                    Ok((socket, _)) => break socket,
+                    Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                        assert!(Instant::now() < until);
+                        thread::yield_now();
+                    }
+                    Err(error) => panic!("fixture accept: {error}"),
+                }
+            };
+            socket.set_nonblocking(false).unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            socket
+                .set_write_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut request = Vec::new();
+            let mut byte = [0];
+            while !request.ends_with(b"\r\n\r\n") {
+                assert_eq!(socket.read(&mut byte).unwrap(), 1);
+                request.push(byte[0]);
+                assert!(request.len() < 8192);
+            }
+            if index == 0 {
+                socket.write_all(&checksums).unwrap();
+            } else {
+                socket.write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n2\r\nab\r\n").unwrap();
+                observed = progress_seen.recv_timeout(Duration::from_secs(2)).is_ok();
+                // Release even on failure so both client and fixture can terminate.
+                socket.write_all(b"1\r\nc\r\n0\r\n\r\n").unwrap();
+            }
+        }
+        observed
+    });
+    (url, task)
+}
 
 // Compose the actual downloader with installation tests without production URL overrides.
 pub(crate) fn download_fixture(
@@ -56,7 +163,7 @@ fn download_failure_does_not_report_later_stages() {
                 response(b"bad"),
             ],
             "SHA-256 mismatch",
-            "Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\n",
+            "Fetching checksums...\nDownloading archive...\nDownloaded 0 bytes\nDownloaded 3 bytes\nDownloaded 3 bytes\nVerifying SHA-256...\n",
         ),
     ] {
         let (url, task) = serve(responses);
@@ -109,7 +216,7 @@ fn download_reports_stages_in_order_without_changing_the_digest() {
     assert_eq!(digest, ABC_DIGEST);
     assert_eq!(
         *output.lock().unwrap(),
-        b"Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\n"
+        b"Fetching checksums...\nDownloading archive...\nDownloaded 0 bytes\nDownloaded 3 bytes\nDownloaded 3 bytes\nVerifying SHA-256...\n"
     );
 }
 
@@ -258,6 +365,94 @@ fn write_and_flush_failures_do_not_return_a_verified_digest() {
             .contains(expected)
         );
     }
+}
+
+#[test]
+fn failed_archive_copy_never_reports_unwritten_bytes_or_a_final_snapshot() {
+    for (fail_flush, expected_error, expected_output) in [
+        (false, "write download", "Downloaded 0 bytes\n"),
+        (
+            true,
+            "flush download",
+            "Downloaded 0 bytes\nDownloaded 3 bytes\n",
+        ),
+    ] {
+        let mut output = Vec::new();
+        let error = copy_bounded_with_progress(
+            &mut Cursor::new(b"abc"),
+            &mut FailingWriter { fail_flush },
+            3,
+            deadline(),
+            &mut Progress::plain(&mut output),
+        )
+        .unwrap_err();
+        assert!(error.contains(expected_error), "{error}");
+        assert_eq!(output, expected_output.as_bytes());
+    }
+}
+
+#[test]
+fn read_limit_and_deadline_errors_stop_byte_reporting() {
+    let mut output = Vec::new();
+    let error = copy_bounded_with_progress(
+        &mut Cursor::new(b"ab").chain(FailingReader(io::ErrorKind::TimedOut)),
+        &mut Vec::new(),
+        3,
+        deadline(),
+        &mut Progress::plain(&mut output),
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("read response") && error.contains("injected read failure"),
+        "{error}"
+    );
+    assert_eq!(output, b"Downloaded 0 bytes\nDownloaded 2 bytes\n");
+
+    for until in [deadline(), Instant::now()] {
+        let mut output = Vec::new();
+        let mut archive = Vec::new();
+        let error = copy_bounded_with_progress(
+            &mut Cursor::new(b"abcd"),
+            &mut archive,
+            3,
+            until,
+            &mut Progress::plain(&mut output),
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("limit") || error.contains("deadline"),
+            "{error}"
+        );
+        assert!(archive.is_empty());
+        assert_eq!(output, b"Downloaded 0 bytes\n");
+    }
+}
+
+#[test]
+fn truncated_archive_stops_before_final_bytes_or_verification() {
+    let checksums = format!("{ABC_DIGEST} {FILENAME}\n");
+    let (url, task) = serve(vec![
+        response(checksums.as_bytes()),
+        b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nabc".to_vec(),
+    ]);
+    let directory = OperationDirectory::new();
+    let mut output = Vec::new();
+    let error = download_distribution_with_progress(
+        &local_agent(),
+        &local_distribution(&url),
+        &directory.archive_path(),
+        &mut Progress::plain(&mut output),
+    )
+    .unwrap_err();
+    task.join().unwrap();
+    assert!(error.contains("read response"), "{error}");
+    let output = String::from_utf8(output).unwrap();
+    assert!(!output.contains("Verifying"), "{output}");
+    assert!(
+        output.matches("Downloaded 3 bytes\n").count() <= 1,
+        "{output}"
+    );
+    assert!(!output.contains("Downloaded 4 bytes"), "{output}");
 }
 
 #[test]

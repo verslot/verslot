@@ -84,11 +84,12 @@ fn download_distribution_with_progress(
     let mut response = fetch_response(agent, &distribution.archive_url, deadline)?;
     let mut archive = File::create_new(archive_path)
         .map_err(|error| format!("create archive {}: {error}", archive_path.display()))?;
-    let digest = copy_bounded(
+    let digest = copy_bounded_with_progress(
         &mut response.body_mut().as_reader(),
         &mut archive,
         ARCHIVE_LIMIT,
         deadline,
+        progress,
     )
     .map_err(|error| format!("download archive {}: {error}", distribution.archive_url))?;
     progress.stage("Verifying SHA-256...");
@@ -166,9 +167,20 @@ fn copy_bounded(
     limit: u64,
     deadline: Instant,
 ) -> Result<String, String> {
+    copy_bounded_with_progress(reader, writer, limit, deadline, &mut Progress::Silent)
+}
+
+fn copy_bounded_with_progress(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    limit: u64,
+    deadline: Instant,
+    progress: &mut Progress<'_>,
+) -> Result<String, String> {
     let mut buffer = [0; 64 * 1024];
     let mut total = 0_u64;
     let mut digest = Sha256::new();
+    progress.downloaded(0, true);
     loop {
         remaining_time(deadline)?;
         let count = match reader.read(&mut buffer) {
@@ -188,6 +200,7 @@ fn copy_bounded(
             .write_all(&buffer[..count])
             .map_err(|error| format!("write download: {error}"))?;
         digest.update(&buffer[..count]);
+        progress.downloaded(total, false);
     }
     writer
         .flush()
@@ -199,6 +212,7 @@ fn copy_bounded(
         hexadecimal.push(char::from(hex_digits[(byte >> 4) as usize]));
         hexadecimal.push(char::from(hex_digits[(byte & 0x0f) as usize]));
     }
+    progress.downloaded(total, true);
     Ok(hexadecimal)
 }
 

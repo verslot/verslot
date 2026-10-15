@@ -2,10 +2,10 @@
 
 Design for [Issue #13](https://github.com/verslot/verslot/issues/13).
 Implementation specification: [Issue #14](https://github.com/verslot/verslot/issues/14).
-Status: accepted on 2026-10-13; stage feedback (#15) is implemented locally.
-Live byte progress (#16) and total-aware progress (#17) are not implemented.
-GitHub Issues remain the only backlog. This document is not implementation or
-validation evidence.
+Status: accepted on 2026-10-13; stage feedback (#15) and live byte progress (#16)
+are implemented. Total-aware progress (#17) is not implemented.
+GitHub Issues remain the only backlog. The implementation sections below record
+the scope and results actually exercised, not full cross-platform acceptance.
 
 ## Agreed scope
 
@@ -173,20 +173,54 @@ and was run separately. Clippy initially caught test-module placement; moving
 the module after implementation resolved it. Redirected smoke output contained
 the four stage lines without ESC or cursor-control carriage returns.
 
-First create a deterministic offline regression named
-`download_progress_is_visible_before_eof`. A local HTTP fixture sends one chunk
-and waits on a bounded synchronization signal before sending the remainder.
-Assert a progress event and a rendered byte update before releasing that
-remainder. Use a controlled reporting clock instead of timing-dependent sleeps.
-This must exercise the real streaming copy path, not replay a finished download.
-Proposed focused command, valid only once that test exists:
+### Live byte implementation (#16)
+
+The archive copy reports cumulative bytes after successful chunk writes. The
+checksum-list copy and public download wrapper remain silent. The CLI displays
+raw bytes with the existing spinner; this slice ignores response totals entirely.
+Plain output emits an initial zero snapshot, an immediate first data update,
+subsequent changed values at most once per second, and a final snapshot only
+after the copy and flush succeed. The initial snapshot does not delay the first
+data update. The final byte snapshot is not a checksum or installation success
+message; digest comparison and the existing installation lifecycle still follow.
+
+`download_progress_is_visible_before_eof` uses a local chunked HTTP fixture. The
+server sends two bytes, waits for a bounded signal triggered by flushing the
+rendered `Downloaded 2 bytes` line, then sends the remainder and EOF. The fixture
+also terminates on a failed assertion without hanging the client. Its bounds
+limit failure time; the success path uses synchronization rather than sleeps.
+The test failed against the #15 implementation with "server never observed
+rendered byte progress before EOF" and passed after the streaming change.
+Focused command:
 
 ```text
 cargo test download_progress_is_visible_before_eof -- --nocapture
 ```
 
-Record an actual failing result before implementation and a passing result
-afterward. A rendering unit test alone does not prove streaming behavior.
+Reporter throttling tests use explicit monotonic timestamps to exercise the
+one-second boundary, unchanged counts and unthrottled stage/final messages.
+Offline coverage also checks write/flush/read errors, timeouts, byte limits,
+truncation, digest mismatch, duplicate installation and real extraction with a
+failed byte-output sink. The existing installation seam still composes the real
+local HTTP downloader, extraction, commit and cleanup.
+
+Windows reporter smoke on 2026-10-15 used the library test executable's ignored
+`stage_output_smoke` with `--ignored --nocapture` and `TERM=xterm-256color` for the
+terminal case. ASCII frames continued while the displayed count stayed at 1024
+or 2048 during deliberate pauses; stage changes and clearing were observed.
+Redirected output included 0, 1024 and 2048 byte snapshots without ESC, carriage
+returns or percentages. This reporter smoke is not a fresh live Node.js install;
+full Windows/macOS/Linux acceptance remains in #17. No dependencies were added
+or upgraded for #16.
+
+Validation on Windows (2026-10-15): `cargo fmt --check`,
+`cargo check --all-targets`, `cargo clippy --all-targets --all-features -- -D warnings`
+and `cargo test --all` passed. The suite reported 147 library tests, 19 CLI tests
+and 8 selection CLI tests passed; the ignored reporter smoke was run separately
+in terminal and redirected modes. Loopback tests ran outside the sandbox because
+the sandbox blocked local HTTP connections. The initial check emitted an
+incremental-cache hard-link warning and used file copies; it did not affect the
+check outcome.
 
 | Case | Required assertion |
 | --- | --- |

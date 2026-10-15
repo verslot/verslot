@@ -23,7 +23,22 @@ fn progress_install_extracts_real_archive_and_preserves_final_result() {
     );
     assert_eq!(result.unwrap(), "installed node@22.0.0");
     validate_installation(&fixture.0, &target).unwrap();
-    assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\nExtracting and installing...\n");
+    let output = String::from_utf8(output).unwrap();
+    assert!(
+        output.starts_with("Fetching checksums...\nDownloading archive...\nDownloaded 0 bytes\n"),
+        "{output}"
+    );
+    assert!(
+        output.contains(&format!(
+            "Downloaded {} bytes\nVerifying SHA-256...\nExtracting and installing...\n",
+            bytes.len()
+        )),
+        "{output}"
+    );
+    assert!(
+        !output.contains('%') && !output.contains('\x1b') && !output.contains('\r'),
+        "{output}"
+    );
 }
 
 #[test]
@@ -63,7 +78,15 @@ fn progress_install_finishes_reporting_even_when_cleanup_fails() {
     drop(progress);
     assert!(error.contains("installation succeeded but cleanup failed"));
     validate_installation(&fixture.0, &target).unwrap();
-    assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\nExtracting and installing...\n");
+    let output = String::from_utf8(output).unwrap();
+    assert!(
+        output.ends_with("Verifying SHA-256...\nExtracting and installing...\n"),
+        "{output}"
+    );
+    assert!(
+        output.contains(&format!("Downloaded {} bytes\n", bytes.len())),
+        "{output}"
+    );
 }
 
 #[test]
@@ -97,11 +120,45 @@ fn progress_install_preserves_download_and_extraction_failures() {
             assert_eq!(error, "injected download failure");
             assert!(output.is_empty());
         } else {
-            assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nVerifying SHA-256...\nExtracting and installing...\n");
+            assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nDownloaded 0 bytes\nDownloaded 15 bytes\nDownloaded 15 bytes\nVerifying SHA-256...\nExtracting and installing...\n");
         }
         assert!(!fixture.destination().exists());
         assert_eq!(fs::read_dir(fixture.0.join("tmp")).unwrap().count(), 0);
     }
+}
+
+#[test]
+fn failed_byte_progress_sink_does_not_change_installation_result() {
+    struct FailsOnBytes(bool);
+    impl Write for FailsOnBytes {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            assert!(!self.0, "output used after progress failure");
+            if bytes.starts_with(b"Downloaded") {
+                self.0 = true;
+                return Err(io::Error::other("injected byte progress failure"));
+            }
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    let fixture = Fixture::new();
+    let target = fixture.target();
+    let bytes = archive_fixture(&target);
+    let mut output = FailsOnBytes(false);
+    let result = install_with_progress(
+        &fixture.0,
+        &target,
+        &mut Progress::plain(&mut output),
+        |version, archive, progress| {
+            crate::download::tests::download_fixture(version, &bytes, archive, progress)
+        },
+        remove_operation,
+    );
+    assert_eq!(result.unwrap(), "installed node@22.0.0");
+    assert!(output.0);
+    validate_installation(&fixture.0, &target).unwrap();
 }
 
 impl Fixture {
