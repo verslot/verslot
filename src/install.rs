@@ -3,31 +3,52 @@ use std::io;
 use std::path::Path;
 
 use crate::distribution::NodeDistribution;
-use crate::download::download_verified_archive;
+use crate::download::download_verified_archive_with_progress;
 use crate::installation::{
     extract_verified_archive, real_directory, validate_directory, validate_installation,
 };
 use crate::mutation::{acquire_lock, allocate_operation, create_directory, remove_operation};
+use crate::progress::Progress;
 use crate::storage::Storage;
-use crate::target::Target;
+use crate::target::{Target, Version};
 
 pub(crate) fn install(target: &Target) -> Result<String, String> {
     NodeDistribution::for_current_build(target.version)
         .map_err(|error| format!("install {target}: {error}"))?;
     let storage = Storage::from_env().map_err(|error| format!("install {target}: {error}"))?;
-    install_at(
+    install_with_progress(
         storage.root(),
+        target,
+        &mut Progress::stderr(),
+        download_verified_archive_with_progress,
+        remove_operation,
+    )
+    .map_err(|error| format!("install {target}: {error}"))
+}
+
+// Keeps real extraction and mutation in the offline download/cleanup test seam.
+fn install_with_progress(
+    root: &Path,
+    target: &Target,
+    progress: &mut Progress<'_>,
+    download: impl FnOnce(Version, &Path, &mut Progress<'_>) -> Result<String, String>,
+    cleanup: impl FnOnce(&Path, &Path) -> io::Result<()>,
+) -> Result<String, String> {
+    let result = install_at(
+        root,
         target,
         |root, operation, staging| {
             real_directory(root, operation).map_err(|error| error.to_string())?;
             let archive = operation.join("archive");
-            let digest = download_verified_archive(target.version, &archive)?;
+            let digest = download(target.version, &archive, progress)?;
+            progress.stage("Extracting and installing...");
             extract_verified_archive(root, &archive, staging, target.version, &digest)
                 .map_err(|error| error.to_string())
         },
-        remove_operation,
-    )
-    .map_err(|error| format!("install {target}: {error}"))
+        cleanup,
+    );
+    progress.finish();
+    result
 }
 
 // Private closures provide offline failure fixtures without exposing production URL overrides.

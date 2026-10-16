@@ -7,6 +7,8 @@
 - [CONTRIBUTING](../CONTRIBUTING.md): the sole ongoing maintenance and release procedure.
 - [GitHub Issues](https://github.com/verslot/verslot/issues): the only backlog for new work.
 - [CHANGELOG](../CHANGELOG.md): user-visible changes by release.
+- [Installation progress design](design/install-progress.md): accepted behavior,
+  implementation outline and acceptance approach for Issue #13.
 
 Read the current guidance first, then the design sections relevant to the task.
 Historical task lists are not the current backlog, and historical validation

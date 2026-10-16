@@ -11,6 +11,7 @@ use ureq::unversioned::transport::{
 use ureq::{Agent, Body, Error, Timeout};
 
 use crate::distribution::NodeDistribution;
+use crate::progress::Progress;
 use crate::target::Version;
 
 const CHECKSUM_LIMIT: u64 = 1024 * 1024;
@@ -23,9 +24,17 @@ const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 /// The caller must validate mutation boundaries and clean up this file on failure (T4).
 /// Returns the verified lowercase digest only after the entire response has been read.
 pub fn download_verified_archive(version: Version, archive_path: &Path) -> Result<String, String> {
+    download_verified_archive_with_progress(version, archive_path, &mut Progress::Silent)
+}
+
+pub(crate) fn download_verified_archive_with_progress(
+    version: Version,
+    archive_path: &Path,
+    progress: &mut Progress<'_>,
+) -> Result<String, String> {
     let distribution = NodeDistribution::for_current_build(version)?;
     let agent = download_agent();
-    download_distribution(&agent, &distribution, archive_path)
+    download_distribution_with_progress(&agent, &distribution, archive_path, progress)
 }
 
 fn download_agent() -> Agent {
@@ -41,12 +50,23 @@ fn download_agent() -> Agent {
     Agent::with_parts(config, ReadTimeoutConnector, DefaultResolver::default())
 }
 
+#[cfg(test)]
 fn download_distribution(
     agent: &Agent,
     distribution: &NodeDistribution,
     archive_path: &Path,
 ) -> Result<String, String> {
+    download_distribution_with_progress(agent, distribution, archive_path, &mut Progress::Silent)
+}
+
+fn download_distribution_with_progress(
+    agent: &Agent,
+    distribution: &NodeDistribution,
+    archive_path: &Path,
+    progress: &mut Progress<'_>,
+) -> Result<String, String> {
     let deadline = Instant::now() + DOWNLOAD_TIMEOUT;
+    progress.stage("Fetching checksums...");
     let mut checksums = fetch_response(agent, &distribution.checksum_url, deadline)?;
     let mut checksum_bytes = Vec::new();
     copy_bounded(
@@ -60,16 +80,20 @@ fn download_distribution(
         .map_err(|error| format!("read checksums: invalid UTF-8: {error}"))?;
     let expected = parse_checksum(checksum_text, &distribution.archive_filename)?;
 
+    progress.stage("Downloading archive...");
     let mut response = fetch_response(agent, &distribution.archive_url, deadline)?;
     let mut archive = File::create_new(archive_path)
         .map_err(|error| format!("create archive {}: {error}", archive_path.display()))?;
-    let digest = copy_bounded(
+    progress.set_download_total(archive_display_total(response.headers()));
+    let digest = copy_bounded_with_progress(
         &mut response.body_mut().as_reader(),
         &mut archive,
         ARCHIVE_LIMIT,
         deadline,
+        progress,
     )
     .map_err(|error| format!("download archive {}: {error}", distribution.archive_url))?;
+    progress.stage("Verifying SHA-256...");
     if digest != expected {
         return Err(format!(
             "verify archive {}: SHA-256 mismatch (expected {expected}, received {digest})",
@@ -77,6 +101,31 @@ fn download_distribution(
         ));
     }
     Ok(digest)
+}
+
+// Only display a length that describes the same untransformed archive bytes we copy.
+fn archive_display_total(headers: &ureq::http::HeaderMap) -> Option<u64> {
+    if headers.contains_key("transfer-encoding") || headers.contains_key("content-range") {
+        return None;
+    }
+    let mut encodings = headers.get_all("content-encoding").iter();
+    if let Some(encoding) = encodings.next()
+        && (!encoding.as_bytes().eq_ignore_ascii_case(b"identity") || encodings.next().is_some())
+    {
+        return None;
+    }
+    let mut lengths = headers.get_all("content-length").iter();
+    let length = lengths.next()?.to_str().ok()?;
+    if lengths.next().is_some()
+        || length.is_empty()
+        || !length.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    length
+        .parse::<u64>()
+        .ok()
+        .filter(|length| (1..=ARCHIVE_LIMIT).contains(length))
 }
 
 fn fetch_response(
@@ -144,9 +193,20 @@ fn copy_bounded(
     limit: u64,
     deadline: Instant,
 ) -> Result<String, String> {
+    copy_bounded_with_progress(reader, writer, limit, deadline, &mut Progress::Silent)
+}
+
+fn copy_bounded_with_progress(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    limit: u64,
+    deadline: Instant,
+    progress: &mut Progress<'_>,
+) -> Result<String, String> {
     let mut buffer = [0; 64 * 1024];
     let mut total = 0_u64;
     let mut digest = Sha256::new();
+    progress.downloaded(0, true);
     loop {
         remaining_time(deadline)?;
         let count = match reader.read(&mut buffer) {
@@ -166,6 +226,7 @@ fn copy_bounded(
             .write_all(&buffer[..count])
             .map_err(|error| format!("write download: {error}"))?;
         digest.update(&buffer[..count]);
+        progress.downloaded(total, false);
     }
     writer
         .flush()
@@ -177,6 +238,7 @@ fn copy_bounded(
         hexadecimal.push(char::from(hex_digits[(byte >> 4) as usize]));
         hexadecimal.push(char::from(hex_digits[(byte & 0x0f) as usize]));
     }
+    progress.downloaded(total, true);
     Ok(hexadecimal)
 }
 
@@ -228,4 +290,4 @@ impl Transport for ReadTimeoutTransport {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
