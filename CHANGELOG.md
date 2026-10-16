@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show a leading spinner during uninstall on stderr, with plain text for
+  redirected output, and clear it on success or failure.
 - Show installation stages on stderr with an ASCII terminal spinner and plain
   stage lines for redirected output (#15). Preserve final stdout results,
   errors and duplicate-installation behavior.

@@ -411,7 +411,7 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .assert()
         .success()
         .stdout("uninstalled node@22.0.0\n")
-        .stderr("");
+        .stderr("Uninstalling...\n");
     verslot_command()
         .env("HOME", &directory)
         .env("LOCALAPPDATA", &directory)
@@ -663,7 +663,11 @@ fn offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory() {
             .assert()
             .success()
             .stdout(stdout)
-            .stderr("");
+            .stderr(if arguments[0] == "uninstall" {
+                "Uninstalling...\n"
+            } else {
+                ""
+            });
         if arguments[0] == "install" {
             assert_eq!(
                 fs::read_to_string(installation.join(".verslot-install")).unwrap(),

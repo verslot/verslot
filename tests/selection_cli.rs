@@ -168,7 +168,7 @@ fn selection_cli_switches_and_preserves_m3_behavior() {
         .assert()
         .success()
         .stdout("uninstalled node@22.0.0\n")
-        .stderr("");
+        .stderr("Uninstalling...\n");
     fixture.assert_current("node@24.0.0\n");
     assert!(!fixture.root.join("current/.node-next").exists());
     assert!(!fixture.root.join("current/.node-previous").exists());
