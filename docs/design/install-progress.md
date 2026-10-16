@@ -3,8 +3,9 @@
 Design for [Issue #13](https://github.com/verslot/verslot/issues/13).
 Implementation specification: [Issue #14](https://github.com/verslot/verslot/issues/14).
 Status: accepted on 2026-10-13; stage feedback (#15) and live byte progress (#16)
-are implemented. Total-aware progress (#17) is implemented locally; complete
-macOS/Linux native terminal and redirected acceptance remains pending.
+are implemented. Total-aware progress (#17) is implemented. Native macOS/Linux
+terminal acceptance uses the PTY CI jobs described below; current run evidence
+is recorded in [PR #18](https://github.com/verslot/verslot/pull/18).
 GitHub Issues remain the only backlog. The implementation sections below record
 the scope and results actually exercised, not full cross-platform acceptance.
 
@@ -304,18 +305,46 @@ The two default-ignored acceptance tests above were executed separately.
 Standards review found no issues; specification review found no implementation
 defects and identified the pending native macOS/Linux acceptance below.
 
-| Native acceptance | Windows | macOS | Linux |
+| Manual native acceptance recorded on 2026-10-15 | Windows | macOS | Linux |
 | --- | --- | --- | --- |
 | Reporter: stalled activity, known/unknown totals, fallback, stage changes | Passed | Not run | Not run |
 | Reporter redirected: plain output, totals, fallback, no terminal controls | Passed | Not run | Not run |
 | Offline install lifecycle: success, failure, duplicate, known/unknown totals | Passed | Not run | Not run |
 | Offline install lifecycle redirected | Passed | Not run | Not run |
 
-This leaves the complete cross-platform acceptance criterion in #17 open. The
-existing CI matrix runs code checks and automated tests on Windows/macOS/Linux
-when a PR targets main, but it does not establish interactive rendering. Run the
-same native acceptance entry points on macOS/Linux and record commit, commands
-and observations before closing #17 or declaring all of #13/#14 accepted.
+### Native PTY CI acceptance
+
+On 2026-10-16 the user approved native macOS/Linux runner PTY acceptance in place
+of providing separate machines for manual terminal checks. The CI workflow now
+runs `.github/scripts/check_terminal_progress.py` on both systems. It compiles
+the library test executable from Cargo's JSON artifact record and runs both
+acceptance entry points with stderr attached to a 120-column PTY, keeping stdout
+separate, and then with both streams redirected to files.
+
+Assertions cover advancing dot frames while bytes stay unchanged, half/full bar
+states, percentages, inconsistent-total fallback, stage messages on stderr,
+clearing before the final marker and no animation afterward. Redirected stderr
+must contain no ESC, carriage returns or dot frames. The lifecycle entry point
+must pass its success/failure/duplicate assertions for known and unknown totals.
+Subprocesses are time-bounded; this job does not access nodejs.org or install in
+the user's storage root. The script uses only Python's standard library.
+
+Artifacts named `terminal-acceptance-ubuntu-latest` and
+`terminal-acceptance-macos-latest` retain raw stdout/stderr, build logs and a
+JSON summary containing platform, tested checkout SHA, PR head SHA, exact
+commands, exit codes and assertion results. They are uploaded on failure too.
+When reproducing on macOS/Linux, run:
+
+```text
+python3 .github/scripts/check_terminal_progress.py
+```
+
+Only successful jobs for the current PR head count toward this acceptance; see
+PR #18 for their run links and results. These jobs exercise native PTY output
+behavior, not terminal-font glyph appearance or pixel rendering. The ordinary
+Windows/macOS/Linux test matrix still does not establish terminal behavior on
+its own. The table above remains the historical manual-check record and must
+not be read as the current automated acceptance result.
 
 ## Confirmed decisions
 
