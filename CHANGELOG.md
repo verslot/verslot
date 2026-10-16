@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Use a cyan block bar for terminal download progress and cyan stage spinners.
 - Show a leading spinner during uninstall on stderr, with plain text for
   redirected output, and clear it on success or failure.
 - Show installation stages on stderr with an ASCII terminal spinner and plain

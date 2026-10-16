@@ -96,7 +96,8 @@ async runtime. Stop that ticker on every exit path.
 4. Smaller alternative: plain lines need no dependency, but do not meet the
    animation request. A spinner-only library would still require separate
    determinate progress rendering. Use `default-features = false` with fixed
-   single-cell dot frames and ASCII bars; no optional integrations are required
+   single-cell dot frames and cyan block bars (`█` filled, `░` remaining);
+   the stage spinners also use cyan. No optional integrations are required
    for core animation. The dot frames supersede the original ASCII rotation at
    the user's request during #17 implementation.
    The library still brings required transitive dependencies, including console,

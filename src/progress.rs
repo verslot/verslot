@@ -17,6 +17,12 @@ pub(crate) enum Progress<'a> {
 }
 
 impl<'a> Progress<'a> {
+    fn spinner_style() -> ProgressStyle {
+        ProgressStyle::with_template("{spinner:.cyan} {msg}")
+            .unwrap_or_else(|_| ProgressStyle::default_spinner())
+            .tick_strings(DOT_TICKS)
+    }
+
     pub(crate) fn stderr() -> Self {
         Self::Stderr
     }
@@ -25,7 +31,7 @@ impl<'a> Progress<'a> {
         if io::stderr().is_terminal() {
             let bar = ProgressBar::with_draw_target(None, ProgressDrawTarget::stderr_with_hz(10));
             if !bar.is_hidden() {
-                bar.set_style(ProgressStyle::default_spinner().tick_strings(DOT_TICKS));
+                bar.set_style(Self::spinner_style());
                 return Self::Terminal(bar);
             }
         }
@@ -56,7 +62,7 @@ impl<'a> Progress<'a> {
                 *total = None;
             }
             Self::Terminal(bar) => {
-                bar.set_style(ProgressStyle::default_spinner().tick_strings(DOT_TICKS));
+                bar.set_style(Self::spinner_style());
                 bar.set_message(message);
                 bar.unset_length();
                 bar.force_draw();
@@ -72,12 +78,14 @@ impl<'a> Progress<'a> {
             Self::Terminal(bar) => {
                 if let Some(total) = total {
                     bar.set_length(total);
-                    if let Ok(style) = ProgressStyle::with_template("{spinner} [{bar:24}] {msg}") {
-                        bar.set_style(style.tick_strings(DOT_TICKS).progress_chars("=>-"));
+                    if let Ok(style) =
+                        ProgressStyle::with_template("Downloading  {bar:24.cyan}  {msg}")
+                    {
+                        bar.set_style(style.progress_chars("██░"));
                     }
                 } else {
                     bar.unset_length();
-                    bar.set_style(ProgressStyle::default_spinner().tick_strings(DOT_TICKS));
+                    bar.set_style(Self::spinner_style());
                 }
             }
             Self::Silent | Self::Stderr => {}
@@ -115,10 +123,14 @@ impl<'a> Progress<'a> {
             Self::Terminal(bar) => {
                 let total = bar.length().filter(|total| bytes <= *total);
                 if total != bar.length() {
-                    bar.set_style(ProgressStyle::default_spinner().tick_strings(DOT_TICKS));
+                    bar.set_style(Self::spinner_style());
                 }
-                let amount = Self::byte_amount(bytes, total);
-                bar.set_message(format!("Downloading archive... {amount}"));
+                if let Some(total) = total {
+                    let percentage = u128::from(bytes) * 100 / u128::from(total);
+                    bar.set_message(format!("{percentage}%  {bytes}/{total} bytes"));
+                } else {
+                    bar.set_message(format!("Downloading archive... {bytes} bytes"));
+                }
                 if total.is_none() {
                     bar.unset_length();
                 }
@@ -255,6 +267,22 @@ mod tests {
         progress.finish();
         drop(progress);
         assert_eq!(output, b"Downloading archive...\nDownloaded 0/4 bytes (0%)\nDownloaded 2/4 bytes (50%)\nDownloaded 4/4 bytes (100%)\nDownloaded 5 bytes\nDownloaded 6 bytes\nVerifying SHA-256...\n");
+    }
+
+    #[test]
+    fn terminal_download_shows_percentage_and_bytes_and_recovers_from_exceeded_total() {
+        let bar = ProgressBar::hidden();
+        let mut progress = Progress::Terminal(bar.clone());
+        progress.set_download_total(Some(1000));
+        progress.downloaded(999, true);
+        assert_eq!(bar.message(), "99%  999/1000 bytes");
+        assert_eq!(bar.position(), 999);
+        assert_eq!(bar.length(), Some(1000));
+
+        progress.downloaded(1001, true);
+        assert_eq!(bar.message(), "Downloading archive... 1001 bytes");
+        assert_eq!(bar.length(), None);
+        progress.finish();
     }
 
     #[test]
