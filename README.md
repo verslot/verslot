@@ -52,7 +52,7 @@ A selected version cannot be uninstalled.
 | `verslot install node@<version>` | Download the official archive, verify SHA-256, and install; complete duplicates are a no-op |
 | `verslot uninstall node@<version>` | Remove a complete inactive installation |
 | `verslot use node@<version>` | Select an installed version; selecting it again is a no-op |
-| `verslot list` | Print complete installations, sorted numerically; empty storage prints nothing |
+| `verslot list` | Print complete installations, sorted numerically; show a Tool/Version table in terminals |
 | `verslot current` | Print the selected complete version, or nothing if none is selected |
 
 Only `node@major.minor.patch` is accepted, with three ASCII decimal components
@@ -65,10 +65,11 @@ The five commands do not execute installed Node.js.
 Successful operations print one sentence: `Installed node@22.0.0`,
 `Selected node@22.0.0`, or `Uninstalled node@22.0.0`. Repeated operations print
 `Already installed ...` or `Already selected ...`. In interactive terminals,
-`list` marks the selected version with `(current)` and empty queries print
-`No installed versions` or `No version selected`. Redirected queries retain
-plain version lines and empty output for empty results. Listing remains available
-when selection state cannot be read; in that case it omits the current marker.
+`list` shows an aligned `Tool`/`Version` table with purple italic headers, cyan
+tool names, green for the selected version and gray for other versions. Empty
+queries print `No installed versions` or `No version selected`. Redirected queries
+retain plain version lines and empty output for empty results. Listing remains
+available when selection state cannot be read; in that case no version is highlighted.
 
 Installation progress uses one updating stderr line for fetching checksums,
 downloading, verifying and installing. Interactive terminals use a cyan dot
@@ -83,8 +84,10 @@ final snapshots. Progress reporting is best-effort and does not affect results.
 Operational diagnostics start with `error:`, followed by an indented cause when
 needed. Missing selection targets and attempts to uninstall the selected version
 include a short recovery suggestion. Cleanup failures retain actual operation
-state and paths. Success verbs are green and error labels red on terminals;
-redirected output, nonempty `NO_COLOR`, or `TERM=dumb` disable color.
+state and paths. Success results use the terminal's default text color. Error
+labels are red on terminals; redirected output, nonempty `NO_COLOR`, or
+`TERM=dumb` disable color. Terminal lists keep their two-column layout when
+color is disabled.
 
 ## Configure Node.js PATH
 

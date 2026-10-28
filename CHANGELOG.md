@@ -3,10 +3,13 @@
 ## Unreleased
 
 - Capitalize CLI results and use `Selected` for version selection. Add terminal
-  current-version markers and empty-query messages while keeping redirected
+  empty-query messages while keeping redirected
   query output plain. Format operational errors with recovery suggestions,
-  color success/error labels on supported terminals, and honor `NO_COLOR` and
-  `TERM=dumb` for results, errors and progress. Shorten progress stage labels.
+  keep success results in the default text color, color error labels on supported
+  terminals, and honor `NO_COLOR` and `TERM=dumb` for errors and progress.
+  Shorten progress stage labels.
+- Show terminal `list` output as an aligned `Tool`/`Version` table with colored
+  headers, tool names and selected versions. Keep redirected version lines plain.
 - Use a cyan block bar for terminal download progress and cyan stage spinners.
 - Show a leading spinner during uninstall on stderr, with plain text for
   redirected output, and clear it on success or failure.

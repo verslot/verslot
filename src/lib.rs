@@ -54,10 +54,7 @@ pub fn run() -> Result<(), String> {
             } else {
                 None
             };
-            print!(
-                "{}",
-                output::format_list(&installations, selected, terminal)
-            );
+            output::print_list(&installations, selected, terminal);
             Ok(())
         }
         Command::Current => {

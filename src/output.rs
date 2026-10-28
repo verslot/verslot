@@ -9,22 +9,13 @@ pub(crate) fn color_enabled(terminal: bool) -> bool {
 }
 
 pub(crate) fn print_result(message: &str) {
-    let color = color_enabled(io::stdout().is_terminal());
-    #[cfg(windows)]
-    let color = color && enable_windows_ansi(winapi_util::console::Console::stdout());
-    println!("{}", format_result(message, color));
+    println!("{}", format_result(message));
 }
 
-fn format_result(message: &str, color: bool) -> String {
+fn format_result(message: &str) -> String {
     let mut message = message.to_owned();
     if let Some(first) = message.get_mut(..1) {
         first.make_ascii_uppercase();
-    }
-    if color
-        && !message.starts_with("Already ")
-        && let Some((verb, rest)) = message.split_once(' ')
-    {
-        return format!("\x1b[32m{verb}\x1b[0m {rest}");
     }
     message
 }
@@ -36,25 +27,53 @@ fn enable_windows_ansi(console: io::Result<winapi_util::console::Console>) -> bo
         .is_ok()
 }
 
-pub(crate) fn format_list(
+pub(crate) fn print_list(installations: &[Target], selected: Option<Version>, terminal: bool) {
+    let color = color_enabled(terminal);
+    #[cfg(windows)]
+    let color = color && enable_windows_ansi(winapi_util::console::Console::stdout());
+    print!("{}", format_list(installations, selected, terminal, color));
+}
+
+fn format_list(
     installations: &[Target],
     selected: Option<Version>,
     terminal: bool,
+    color: bool,
 ) -> String {
-    if installations.is_empty() && terminal {
+    if !terminal {
+        return installations
+            .iter()
+            .map(|target| format!("{target}\n"))
+            .collect();
+    }
+    if installations.is_empty() {
         return "No installed versions\n".to_owned();
     }
-    installations
+    let tool_width = installations
         .iter()
-        .map(|target| {
-            let marker = if terminal && selected == Some(target.version) {
-                "  (current)"
-            } else {
-                ""
-            };
-            format!("{target}{marker}\n")
-        })
-        .collect()
+        .map(|target| target.tool.to_string().len())
+        .max()
+        .unwrap_or(0)
+        .max("Tool".len());
+    let header = format!("{:<tool_width$}  Version", "Tool");
+    let mut output = if color {
+        format!("\x1b[3;35m{header}\x1b[0m\n")
+    } else {
+        format!("{header}\n")
+    };
+    for target in installations {
+        let tool = target.tool.to_string();
+        let version = target.version;
+        if color {
+            let version_color = if selected == Some(version) { 32 } else { 90 };
+            output.push_str(&format!(
+                "\x1b[36m{tool:<tool_width$}\x1b[0m  \x1b[{version_color}m{version}\x1b[0m\n"
+            ));
+        } else {
+            output.push_str(&format!("{tool:<tool_width$}  {version}\n"));
+        }
+    }
+    output
 }
 
 pub(crate) fn format_current(selected: Option<Version>, terminal: bool) -> String {
@@ -115,23 +134,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn results_capitalize_and_color_only_success_verbs() {
-        for verb in ["installed", "selected", "uninstalled"] {
-            let message = format!("{verb} node@22.0.0");
-            let plain = format_result(&message, false);
-            let (verb, rest) = plain.split_once(' ').unwrap();
-            assert!(verb.starts_with(char::is_uppercase), "{plain}");
-            assert_eq!(
-                format_result(&message, true),
-                format!("\x1b[32m{verb}\x1b[0m {rest}")
-            );
-        }
-        for message in [
-            "already installed node@22.0.0",
-            "already selected node@22.0.0",
+    fn results_capitalize_without_color() {
+        for (message, expected) in [
+            ("installed node@22.0.0", "Installed node@22.0.0"),
+            ("selected node@22.0.0", "Selected node@22.0.0"),
+            ("uninstalled node@22.0.0", "Uninstalled node@22.0.0"),
+            (
+                "already installed node@22.0.0",
+                "Already installed node@22.0.0",
+            ),
+            (
+                "already selected node@22.0.0",
+                "Already selected node@22.0.0",
+            ),
         ] {
-            assert_eq!(format_result(message, true), format_result(message, false));
-            assert!(format_result(message, true).starts_with("Already "));
+            assert_eq!(format_result(message), expected);
         }
     }
 
@@ -155,18 +172,71 @@ mod tests {
     }
 
     #[test]
-    fn queries_decorate_only_terminal_output() {
+    fn list_shows_only_tool_and_version_columns() {
+        let installations = [
+            "node@18.18.0".parse::<Target>().unwrap(),
+            "node@24.20.0".parse::<Target>().unwrap(),
+        ];
+        assert_eq!(
+            format_list(&installations, Some(installations[1].version), true, false),
+            "Tool  Version\nnode  18.18.0\nnode  24.20.0\n"
+        );
+    }
+
+    #[test]
+    fn list_colors_headers_tools_and_selected_version() {
+        let installations = [
+            "node@18.18.0".parse::<Target>().unwrap(),
+            "node@24.20.0".parse::<Target>().unwrap(),
+        ];
+        assert_eq!(
+            format_list(&installations, Some(installations[1].version), true, true),
+            concat!(
+                "\x1b[3;35mTool  Version\x1b[0m\n",
+                "\x1b[36mnode\x1b[0m  \x1b[90m18.18.0\x1b[0m\n",
+                "\x1b[36mnode\x1b[0m  \x1b[32m24.20.0\x1b[0m\n",
+            )
+        );
+    }
+
+    #[test]
+    fn list_without_selection_keeps_versions_dim() {
         let target: Target = "node@22.0.0".parse().unwrap();
         assert_eq!(
-            format_list(&[target], Some(target.version), true),
-            "node@22.0.0  (current)\n"
+            format_list(&[target], None, true, true),
+            concat!(
+                "\x1b[3;35mTool  Version\x1b[0m\n",
+                "\x1b[36mnode\x1b[0m  \x1b[90m22.0.0\x1b[0m\n",
+            )
         );
+    }
+
+    #[test]
+    fn redirected_list_keeps_plain_targets_without_headers_or_colors() {
+        let installations = [
+            "node@18.18.0".parse::<Target>().unwrap(),
+            "node@24.20.0".parse::<Target>().unwrap(),
+        ];
         assert_eq!(
-            format_list(&[target], Some(target.version), false),
-            "node@22.0.0\n"
+            format_list(&installations, Some(installations[1].version), false, true),
+            "node@18.18.0\nnode@24.20.0\n"
         );
-        assert_eq!(format_list(&[], None, true), "No installed versions\n");
-        assert_eq!(format_list(&[], None, false), "");
+    }
+
+    #[test]
+    fn empty_list_preserves_terminal_and_redirected_messages() {
+        for color in [false, true] {
+            assert_eq!(
+                format_list(&[], None, true, color),
+                "No installed versions\n"
+            );
+            assert_eq!(format_list(&[], None, false, color), "");
+        }
+    }
+
+    #[test]
+    fn current_decorates_only_empty_terminal_output() {
+        let target: Target = "node@22.0.0".parse().unwrap();
         assert_eq!(format_current(None, true), "No version selected\n");
         assert_eq!(format_current(None, false), "");
         assert_eq!(format_current(Some(target.version), true), "node@22.0.0\n");
