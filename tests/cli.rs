@@ -49,7 +49,7 @@ fn install_reports_storage_errors_without_network_access() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("install node@22.0.0:"))
+        .stderr(predicate::str::contains("install node@22.0.0"))
         .stderr(predicate::str::contains("is missing"));
 }
 
@@ -62,7 +62,7 @@ fn uninstall_reports_storage_errors() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("uninstall node@22.0.0:"))
+        .stderr(predicate::str::contains("uninstall node@22.0.0"))
         .stderr(predicate::str::contains("is missing"));
 }
 
@@ -75,7 +75,7 @@ fn use_reports_storage_errors() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("use node@22.0.0:"))
+        .stderr(predicate::str::contains("select node@22.0.0"))
         .stderr(predicate::str::contains("is missing"));
 }
 
@@ -88,7 +88,7 @@ fn list_reports_storage_errors() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("list:"))
+        .stderr(predicate::str::contains("list"))
         .stderr(predicate::str::contains("is missing"));
 }
 
@@ -101,7 +101,7 @@ fn current_reports_storage_errors() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("current:"))
+        .stderr(predicate::str::contains("current"))
         .stderr(predicate::str::contains("is missing"));
 }
 
@@ -149,7 +149,7 @@ fn valid_use_targets_reach_storage_resolution() {
             .assert()
             .code(1)
             .stdout("")
-            .stderr(predicate::str::contains(format!("use {target}:")))
+            .stderr(predicate::str::contains(format!("select {target}")))
             .stderr(predicate::str::contains("is missing"));
     }
 }
@@ -387,7 +387,7 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .code(1)
         .stdout("")
         .stderr(predicate::str::contains(
-            "cannot uninstall current version: node@24.0.0",
+            "node@24.0.0 is currently selected",
         ));
     let lock = fs::OpenOptions::new()
         .read(true)
@@ -410,8 +410,8 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .args(["uninstall", "node@22.0.0"])
         .assert()
         .success()
-        .stdout("uninstalled node@22.0.0\n")
-        .stderr("Uninstalling...\n");
+        .stdout("Uninstalled node@22.0.0\n")
+        .stderr("Uninstalling\n");
     verslot_command()
         .env("HOME", &directory)
         .env("LOCALAPPDATA", &directory)
@@ -524,7 +524,7 @@ fn install_and_list_preserve_invalid_entries_and_current_state() {
         .env("LOCALAPPDATA", &directory)
         .assert()
         .success()
-        .stdout("already installed node@22.0.0\n")
+        .stdout("Already installed node@22.0.0\n")
         .stderr("");
     assert_eq!(fs::read(&current).unwrap(), b"invalid current state");
     assert!(!root.join("tmp").exists());
@@ -647,12 +647,12 @@ fn offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory() {
         (vec!["list"], "node@22.0.0\n"),
         (
             vec!["install", "node@22.0.0"],
-            "already installed node@22.0.0\n",
+            "Already installed node@22.0.0\n",
         ),
         (vec!["list"], "node@22.0.0\n"),
         (
             vec!["uninstall", "node@22.0.0"],
-            "uninstalled node@22.0.0\n",
+            "Uninstalled node@22.0.0\n",
         ),
         (vec!["list"], ""),
     ] {
@@ -664,7 +664,7 @@ fn offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory() {
             .success()
             .stdout(stdout)
             .stderr(if arguments[0] == "uninstall" {
-                "Uninstalling...\n"
+                "Uninstalling\n"
             } else {
                 ""
             });

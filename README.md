@@ -62,23 +62,29 @@ build metadata are rejected. `list` and `current` take no positional arguments.
 exit 1 with empty stdout and diagnostics on stderr; invalid CLI usage exits 2.
 The five commands do not execute installed Node.js.
 
-New installations report checksum retrieval, archive download, SHA-256
-verification and extraction/installation on stderr. Interactive terminals show
-a cyan dot spinner (`⠋ ⠙ ⠹`); redirected or unsupported terminals receive plain stage lines.
-During archive transfer, the spinner also shows cumulative bytes successfully
-written. Redirected byte updates are limited to once per second, with immediate
-initial and final snapshots. The spinner keeps animating while reads wait without
-advancing the byte count. A usable response total switches to a cyan block bar
-(`█` filled, `░` remaining), percentage and bytes/total. Unknown, invalid or
-inconsistent totals show only downloaded bytes. Redirected output shows the same
-amounts and percentages as plain text.
-Stage feedback stops before the final result or error, and complete duplicate
-installations remain silent on stderr. Progress output is best-effort and does
-not change the installation result. A final byte snapshot describes the transfer
-only; SHA-256 verification and installation must still succeed.
+Successful operations print one sentence: `Installed node@22.0.0`,
+`Selected node@22.0.0`, or `Uninstalled node@22.0.0`. Repeated operations print
+`Already installed ...` or `Already selected ...`. In interactive terminals,
+`list` marks the selected version with `(current)` and empty queries print
+`No installed versions` or `No version selected`. Redirected queries retain
+plain version lines and empty output for empty results. Listing remains available
+when selection state cannot be read; in that case it omits the current marker.
 
-Uninstalling shows a cyan dot spinner on stderr, or a plain `Uninstalling...`
-line when redirected. The spinner clears before the final result or error.
+Installation progress uses one updating stderr line for fetching checksums,
+downloading, verifying and installing. Interactive terminals use a cyan dot
+spinner (`⠋ ⠙ ⠹`). Downloads with a known total show the original 24-character
+block bar (`█` filled, `░` remaining), percentage and bytes/total. Unknown or
+inconsistent totals use the spinner and downloaded bytes. The spinner keeps
+animating while reads wait. Uninstalling uses the same dot spinner.
+Progress clears before the final result or error. Redirected output uses plain
+stage lines and byte snapshots, throttled to once per second except initial and
+final snapshots. Progress reporting is best-effort and does not affect results.
+
+Operational diagnostics start with `error:`, followed by an indented cause when
+needed. Missing selection targets and attempts to uninstall the selected version
+include a short recovery suggestion. Cleanup failures retain actual operation
+state and paths. Success verbs are green and error labels red on terminals;
+redirected output, nonempty `NO_COLOR`, or `TERM=dumb` disable color.
 
 ## Configure Node.js PATH
 

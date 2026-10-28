@@ -82,7 +82,7 @@ impl Fixture {
             .args(["use", &format!("node@{version}")])
             .assert()
             .success()
-            .stdout(format!("using node@{version}\n"))
+            .stdout(format!("Selected node@{version}\n"))
             .stderr("");
     }
 
@@ -120,7 +120,9 @@ fn missing_selection_is_read_only_and_use_does_not_install() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr("use node@22.0.0: not installed: node@22.0.0\n");
+        .stderr(
+            "error: node@22.0.0 is not installed\n\nRun `verslot install node@22.0.0` first.\n",
+        );
     assert!(!fixture.root.exists());
     fixture.seed("22.0.0");
     fixture.assert_current("");
@@ -141,7 +143,7 @@ fn selection_cli_switches_and_preserves_m3_behavior() {
         .args(["install", "node@24.0.0"])
         .assert()
         .success()
-        .stdout("already installed node@24.0.0\n")
+        .stdout("Already installed node@24.0.0\n")
         .stderr("");
     fixture.assert_current("node@22.0.0\n");
     fixture.select("24.0.0");
@@ -160,15 +162,15 @@ fn selection_cli_switches_and_preserves_m3_behavior() {
         .code(1)
         .stdout("")
         .stderr(predicate::str::contains(
-            "cannot uninstall current version: node@24.0.0",
+            "node@24.0.0 is currently selected",
         ));
     fixture
         .command()
         .args(["uninstall", "node@22.0.0"])
         .assert()
         .success()
-        .stdout("uninstalled node@22.0.0\n")
-        .stderr("Uninstalling...\n");
+        .stdout("Uninstalled node@22.0.0\n")
+        .stderr("Uninstalling\n");
     fixture.assert_current("node@24.0.0\n");
     assert!(!fixture.root.join("current/.node-next").exists());
     assert!(!fixture.root.join("current/.node-previous").exists());
@@ -206,7 +208,7 @@ fn selecting_same_version_does_not_replace_current_link() {
         .args(["use", "node@22.0.0"])
         .assert()
         .success()
-        .stdout("already using node@22.0.0\n")
+        .stdout("Already selected node@22.0.0\n")
         .stderr("");
     #[cfg(unix)]
     {
@@ -238,7 +240,9 @@ fn missing_or_incomplete_target_preserves_selection_and_invalid_current_takes_pr
         .assert()
         .code(1)
         .stdout("")
-        .stderr("use node@24.0.0: not installed: node@24.0.0\n");
+        .stderr(
+            "error: node@24.0.0 is not installed\n\nRun `verslot install node@24.0.0` first.\n",
+        );
     fixture.seed("24.0.0");
     let receipt = fixture.root.join("installs/node/24.0.0/.verslot-install");
     fs::write(&receipt, b"invalid receipt").unwrap();

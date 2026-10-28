@@ -1,6 +1,6 @@
 fn main() {
     if let Err(error) = verslot::run() {
-        eprintln!("{error}");
+        verslot::print_error(&error);
         std::process::exit(1);
     }
 }

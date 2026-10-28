@@ -125,7 +125,7 @@ fn uninstall_progress_finishes_after_success_or_cleanup_failure() {
         assert!(!directory.exists());
         assert!(matches!(progress, Progress::Silent));
         drop(progress);
-        assert_eq!(output, b"Uninstalling...\n");
+        assert_eq!(output, b"Uninstalling\n");
     }
 }
 
@@ -143,7 +143,7 @@ fn uninstall_progress_finishes_when_version_is_not_installed() {
     assert_eq!(result.unwrap_err(), "not installed: node@22.0.0");
     assert!(matches!(progress, Progress::Silent));
     drop(progress);
-    assert_eq!(output, b"Uninstalling...\n");
+    assert_eq!(output, b"Uninstalling\n");
 }
 
 #[test]

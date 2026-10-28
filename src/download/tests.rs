@@ -29,7 +29,7 @@ fn known_length_download_reports_total_and_percentage() {
     let output = String::from_utf8(output).unwrap();
     assert!(output.contains("Downloaded 0/3 bytes (0%)\n"), "{output}");
     assert!(
-        output.contains("Downloaded 3/3 bytes (100%)\nVerifying SHA-256...\n"),
+        output.contains("Downloaded 3/3 bytes (100%)\nVerifying\n"),
         "{output}"
     );
     assert!(
@@ -104,7 +104,7 @@ fn unknown_or_encoded_http_responses_keep_byte_only_output() {
         task.join().unwrap();
         assert_eq!(result.unwrap(), ABC_DIGEST);
         let output = String::from_utf8(output).unwrap();
-        assert!(output.contains("Downloaded 3 bytes\nVerifying SHA-256..."), "{output}");
+        assert!(output.contains("Downloaded 3 bytes\nVerifying"), "{output}");
         assert!(!output.contains('%'), "{output}");
     }
 }
@@ -289,7 +289,7 @@ fn download_failure_does_not_report_later_stages() {
         (
             vec![response(b"invalid")],
             "missing entry",
-            "Fetching checksums...\n",
+            "Fetching checksums\n",
         ),
         (
             vec![
@@ -297,7 +297,7 @@ fn download_failure_does_not_report_later_stages() {
                 b"HTTP/1.1 500 Error\r\nContent-Length: 0\r\n\r\n".to_vec(),
             ],
             "received 500",
-            "Fetching checksums...\nDownloading archive...\n",
+            "Fetching checksums\nDownloading\n",
         ),
         (
             vec![
@@ -305,7 +305,7 @@ fn download_failure_does_not_report_later_stages() {
                 response(b"bad"),
             ],
             "SHA-256 mismatch",
-            "Fetching checksums...\nDownloading archive...\nDownloaded 0/3 bytes (0%)\nDownloaded 3/3 bytes (100%)\nDownloaded 3/3 bytes (100%)\nVerifying SHA-256...\n",
+            "Fetching checksums\nDownloading\nDownloaded 0/3 bytes (0%)\nDownloaded 3/3 bytes (100%)\nDownloaded 3/3 bytes (100%)\nVerifying\n",
         ),
     ] {
         let (url, task) = serve(responses);
@@ -333,9 +333,9 @@ fn download_reports_stages_in_order_without_changing_the_digest() {
         vec![response(checksums.as_bytes()), response(b"abc")],
         move |request| {
             let expected = if request == 0 {
-                "Fetching checksums...\n"
+                "Fetching checksums\n"
             } else {
-                "Fetching checksums...\nDownloading archive...\n"
+                "Fetching checksums\nDownloading\n"
             };
             assert_eq!(
                 *observed.lock().unwrap(),
@@ -358,7 +358,7 @@ fn download_reports_stages_in_order_without_changing_the_digest() {
     assert_eq!(digest, ABC_DIGEST);
     assert_eq!(
         *output.lock().unwrap(),
-        b"Fetching checksums...\nDownloading archive...\nDownloaded 0/3 bytes (0%)\nDownloaded 3/3 bytes (100%)\nDownloaded 3/3 bytes (100%)\nVerifying SHA-256...\n"
+        b"Fetching checksums\nDownloading\nDownloaded 0/3 bytes (0%)\nDownloaded 3/3 bytes (100%)\nDownloaded 3/3 bytes (100%)\nVerifying\n"
     );
 }
 

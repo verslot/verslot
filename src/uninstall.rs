@@ -20,7 +20,7 @@ fn uninstall_with_progress(
     progress: &mut Progress<'_>,
     cleanup: impl FnOnce(&Path, &Path) -> io::Result<()>,
 ) -> Result<String, String> {
-    progress.stage("Uninstalling...");
+    progress.stage("Uninstalling");
     let result = uninstall_at(storage, target, cleanup);
     progress.finish();
     result

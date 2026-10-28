@@ -83,14 +83,14 @@ fn progress_install_extracts_real_archive_and_preserves_final_result() {
     let output = String::from_utf8(output).unwrap();
     assert!(
         output.starts_with(&format!(
-            "Fetching checksums...\nDownloading archive...\nDownloaded 0/{} bytes (0%)\n",
+            "Fetching checksums\nDownloading\nDownloaded 0/{} bytes (0%)\n",
             bytes.len()
         )),
         "{output}"
     );
     assert!(
         output.contains(&format!(
-            "Downloaded {0}/{0} bytes (100%)\nVerifying SHA-256...\nExtracting and installing...\n",
+            "Downloaded {0}/{0} bytes (100%)\nVerifying\nInstalling\n",
             bytes.len()
         )),
         "{output}"
@@ -139,10 +139,7 @@ fn progress_install_finishes_reporting_even_when_cleanup_fails() {
     assert!(error.contains("installation succeeded but cleanup failed"));
     validate_installation(&fixture.0, &target).unwrap();
     let output = String::from_utf8(output).unwrap();
-    assert!(
-        output.ends_with("Verifying SHA-256...\nExtracting and installing...\n"),
-        "{output}"
-    );
+    assert!(output.ends_with("Verifying\nInstalling\n"), "{output}");
     assert!(
         output.contains(&format!("Downloaded {0}/{0} bytes (100%)\n", bytes.len())),
         "{output}"
@@ -181,7 +178,7 @@ fn progress_install_preserves_download_and_extraction_failures() {
             assert_eq!(error, "injected download failure");
             assert!(output.is_empty());
         } else {
-            assert_eq!(output, b"Fetching checksums...\nDownloading archive...\nDownloaded 0/15 bytes (0%)\nDownloaded 15/15 bytes (100%)\nDownloaded 15/15 bytes (100%)\nVerifying SHA-256...\nExtracting and installing...\n");
+            assert_eq!(output, b"Fetching checksums\nDownloading\nDownloaded 0/15 bytes (0%)\nDownloaded 15/15 bytes (100%)\nDownloaded 15/15 bytes (100%)\nVerifying\nInstalling\n");
         }
         assert!(!fixture.destination().exists());
         assert_eq!(fs::read_dir(fixture.0.join("tmp")).unwrap().count(), 0);

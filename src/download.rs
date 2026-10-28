@@ -66,7 +66,7 @@ fn download_distribution_with_progress(
     progress: &mut Progress<'_>,
 ) -> Result<String, String> {
     let deadline = Instant::now() + DOWNLOAD_TIMEOUT;
-    progress.stage("Fetching checksums...");
+    progress.stage("Fetching checksums");
     let mut checksums = fetch_response(agent, &distribution.checksum_url, deadline)?;
     let mut checksum_bytes = Vec::new();
     copy_bounded(
@@ -80,7 +80,7 @@ fn download_distribution_with_progress(
         .map_err(|error| format!("read checksums: invalid UTF-8: {error}"))?;
     let expected = parse_checksum(checksum_text, &distribution.archive_filename)?;
 
-    progress.stage("Downloading archive...");
+    progress.stage("Downloading");
     let mut response = fetch_response(agent, &distribution.archive_url, deadline)?;
     let mut archive = File::create_new(archive_path)
         .map_err(|error| format!("create archive {}: {error}", archive_path.display()))?;
@@ -93,7 +93,7 @@ fn download_distribution_with_progress(
         progress,
     )
     .map_err(|error| format!("download archive {}: {error}", distribution.archive_url))?;
-    progress.stage("Verifying SHA-256...");
+    progress.stage("Verifying");
     if digest != expected {
         return Err(format!(
             "verify archive {}: SHA-256 mismatch (expected {expected}, received {digest})",
