@@ -109,7 +109,7 @@ def check_output(test, mode, stdout, stderr):
             raise AssertionError("Animation did not stop before final output")
         if mode == "pty":
             plain = re.sub(r"\x1b\[[0-9;]*m", "", before)
-            frames = re.findall(rf"([{DOTS}]) Downloading 1024 bytes", plain)
+            frames = re.findall(rf"([{DOTS}])  Downloading 1024 bytes", plain)
             if len(set(frames)) < 2:
                 raise AssertionError("Spinner did not advance while bytes stayed unchanged")
             if "█" * 13 + "░" * 11 not in plain or "█" * 24 not in plain:

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Standardize all CLI output through an internal logger with a two-column
+  lightweight symbol field and one separating space. Prefix ordinary and
+  continuation lines with an empty field, including help, version, queries and
+  redirected progress. Preserve existing wording, empty output and exit codes.
 - Capitalize CLI results and use `Selected` for version selection. Add terminal
   empty-query messages while keeping redirected
   query output plain. Format operational errors with recovery suggestions,

@@ -62,14 +62,21 @@ build metadata are rejected. `list` and `current` take no positional arguments.
 exit 1 with empty stdout and diagnostics on stderr; invalid CLI usage exits 2.
 The five commands do not execute installed Node.js.
 
+Every emitted text line reserves two terminal columns for a lightweight symbol,
+followed by one space. Successful operations use `✔`, repeated operations use `·`,
+and errors use `✘`. Lines without a symbol, including help, query data, diagnostic
+continuations and blank lines, use three leading spaces. Redirected text uses the
+same column without ANSI color; completely empty output stays empty.
+
 Successful operations print one sentence: `Installed node@22.0.0`,
 `Selected node@22.0.0`, or `Uninstalled node@22.0.0`. Repeated operations print
 `Already installed ...` or `Already selected ...`. In interactive terminals,
 `list` shows an aligned `Tool`/`Version` table with purple italic headers, cyan
 tool names, green for the selected version and gray for other versions. Empty
 queries print `No installed versions` or `No version selected`. Redirected queries
-retain plain version lines and empty output for empty results. Listing remains
-available when selection state cannot be read; in that case no version is highlighted.
+retain version lines with the blank symbol column and empty output for empty
+results. Listing remains available when selection state cannot be read; in that
+case no version is highlighted.
 
 Installation progress uses one updating stderr line for fetching checksums,
 downloading, verifying and installing. Interactive terminals use a cyan dot
@@ -77,14 +84,16 @@ spinner (`⠋ ⠙ ⠹`). Downloads with a known total show the original 24-chara
 block bar (`█` filled, `░` remaining), percentage and bytes/total. Unknown or
 inconsistent totals use the spinner and downloaded bytes. The spinner keeps
 animating while reads wait. Uninstalling uses the same dot spinner.
-Progress clears before the final result or error. Redirected output uses plain
-stage lines and byte snapshots, throttled to once per second except initial and
+Progress clears before the final result or error. The spinner occupies the same
+two-column symbol field; download bars use a blank symbol field. Redirected output
+uses plain stage lines and byte snapshots, throttled to once per second except initial and
 final snapshots. Progress reporting is best-effort and does not affect results.
 
 Operational diagnostics start with `error:`, followed by an indented cause when
 needed. Missing selection targets and attempts to uninstall the selected version
 include a short recovery suggestion. Cleanup failures retain actual operation
-state and paths. Success results use the terminal's default text color. Error
+state and paths. Result text uses the terminal's default text color; success
+symbols are green and repeated-operation symbols are gray. Error symbols and
 labels are red on terminals; redirected output, nonempty `NO_COLOR`, or
 `TERM=dumb` disable color. Terminal lists keep their two-column layout when
 color is disabled.

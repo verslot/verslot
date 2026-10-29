@@ -28,7 +28,40 @@ fn version_reports_the_package_version() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(format!("verslot {}\n", env!("CARGO_PKG_VERSION")));
+        .stdout(format!("   verslot {}\n", env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn help_version_and_argument_errors_share_the_symbol_column() {
+    for (arguments, code, stderr, first_prefix) in [
+        (vec!["--help"], 0, false, "   "),
+        (vec!["install", "--help"], 0, false, "   "),
+        (vec!["--version"], 0, false, "   "),
+        (vec![], 2, true, "   "),
+        (vec!["invalid-command"], 2, true, "✘  "),
+        (vec!["install"], 2, true, "✘  "),
+        (vec!["use", "node@22"], 2, true, "✘  "),
+    ] {
+        let output = verslot_command()
+            .args(&arguments)
+            .env("NO_COLOR", "1")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(code), "{arguments:?}");
+        let (message, other) = if stderr {
+            (&output.stderr, &output.stdout)
+        } else {
+            (&output.stdout, &output.stderr)
+        };
+        assert!(other.is_empty(), "{arguments:?}");
+        let message = std::str::from_utf8(message).unwrap();
+        assert!(!message.is_empty(), "{arguments:?}");
+        assert!(!message.contains('\x1b'), "{message}");
+        for (index, line) in message.lines().enumerate() {
+            let prefix = if index == 0 { first_prefix } else { "   " };
+            assert!(line.starts_with(prefix), "{arguments:?}: {line:?}");
+        }
+    }
 }
 
 #[test]
@@ -410,15 +443,15 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .args(["uninstall", "node@22.0.0"])
         .assert()
         .success()
-        .stdout("Uninstalled node@22.0.0\n")
-        .stderr("Uninstalling\n");
+        .stdout("✔  Uninstalled node@22.0.0\n")
+        .stderr("   Uninstalling\n");
     verslot_command()
         .env("HOME", &directory)
         .env("LOCALAPPDATA", &directory)
         .arg("list")
         .assert()
         .success()
-        .stdout("node@24.0.0\n")
+        .stdout("   node@24.0.0\n")
         .stderr("");
     assert!(fs::symlink_metadata(&current).is_ok());
     assert!(selected.join(".verslot-install").exists());
@@ -524,7 +557,7 @@ fn install_and_list_preserve_invalid_entries_and_current_state() {
         .env("LOCALAPPDATA", &directory)
         .assert()
         .success()
-        .stdout("Already installed node@22.0.0\n")
+        .stdout("·  Already installed node@22.0.0\n")
         .stderr("");
     assert_eq!(fs::read(&current).unwrap(), b"invalid current state");
     assert!(!root.join("tmp").exists());
@@ -570,7 +603,7 @@ fn install_and_list_preserve_invalid_entries_and_current_state() {
         .env("LOCALAPPDATA", &directory)
         .assert()
         .success()
-        .stdout("node@2.2.2\nnode@2.2.10\nnode@2.10.0\nnode@10.0.0\nnode@22.0.0\n")
+        .stdout("   node@2.2.2\n   node@2.2.10\n   node@2.10.0\n   node@10.0.0\n   node@22.0.0\n")
         .stderr("");
     assert_eq!(fs::read(&current).unwrap(), b"invalid current state");
     fs::create_dir(root.join("installs/node/24.0.0")).unwrap();
@@ -644,15 +677,15 @@ fn offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory() {
     );
     fs::write(installation.join(".verslot-install"), &receipt).unwrap();
     for (arguments, stdout) in [
-        (vec!["list"], "node@22.0.0\n"),
+        (vec!["list"], "   node@22.0.0\n"),
         (
             vec!["install", "node@22.0.0"],
-            "Already installed node@22.0.0\n",
+            "·  Already installed node@22.0.0\n",
         ),
-        (vec!["list"], "node@22.0.0\n"),
+        (vec!["list"], "   node@22.0.0\n"),
         (
             vec!["uninstall", "node@22.0.0"],
-            "Uninstalled node@22.0.0\n",
+            "✔  Uninstalled node@22.0.0\n",
         ),
         (vec!["list"], ""),
     ] {
@@ -664,7 +697,7 @@ fn offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory() {
             .success()
             .stdout(stdout)
             .stderr(if arguments[0] == "uninstall" {
-                "Uninstalling\n"
+                "   Uninstalling\n"
             } else {
                 ""
             });

@@ -3,6 +3,8 @@ use std::time::{Duration, Instant};
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 
+use crate::logger;
+
 const DOT_TICKS: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", " "];
 
 pub(crate) enum Progress<'a> {
@@ -18,12 +20,12 @@ pub(crate) enum Progress<'a> {
 
 impl<'a> Progress<'a> {
     fn spinner_style() -> ProgressStyle {
-        let template = if crate::output::color_enabled(true) {
-            "{spinner:.cyan} {msg}"
+        let template = if logger::color_enabled(true) {
+            format!("{{spinner:<{}.cyan}} {{msg}}", logger::SYMBOL_WIDTH)
         } else {
-            "{spinner} {msg}"
+            format!("{{spinner:<{}}} {{msg}}", logger::SYMBOL_WIDTH)
         };
-        ProgressStyle::with_template(template)
+        ProgressStyle::with_template(&template)
             .unwrap_or_else(|_| ProgressStyle::default_spinner())
             .tick_strings(DOT_TICKS)
     }
@@ -83,12 +85,13 @@ impl<'a> Progress<'a> {
             Self::Terminal(bar) => {
                 if let Some(total) = total {
                     bar.set_length(total);
-                    let template = if crate::output::color_enabled(true) {
+                    let template = if logger::color_enabled(true) {
                         "Downloading  {bar:24.cyan}  {msg}"
                     } else {
                         "Downloading  {bar:24}  {msg}"
                     };
-                    if let Ok(style) = ProgressStyle::with_template(template) {
+                    let template = logger::format_lines(logger::Symbol::None, template, false);
+                    if let Ok(style) = ProgressStyle::with_template(&template) {
                         bar.set_style(style.progress_chars("██░"));
                     }
                 } else {
@@ -162,7 +165,7 @@ impl<'a> Progress<'a> {
 
     fn write_plain(writer: &mut Option<Box<dyn Write + 'a>>, message: &str) {
         if let Some(output) = writer
-            && writeln!(output, "{message}")
+            && logger::write_plain_line(output, message)
                 .and_then(|()| output.flush())
                 .is_err()
         {
@@ -231,8 +234,8 @@ mod tests {
         const CASE_VARIABLE: &str = "VERSLOT_TEST_PROGRESS_COLOR";
         if let Ok(expected) = std::env::var(CASE_VARIABLE) {
             let expected = expected == "true";
-            assert!(!crate::output::color_enabled(false));
-            assert_eq!(crate::output::color_enabled(true), expected);
+            assert!(!logger::color_enabled(false));
+            assert_eq!(logger::color_enabled(true), expected);
             let output = Arc::new(Mutex::new(String::new()));
             let bar = ProgressBar::with_draw_target(
                 None,
@@ -245,6 +248,14 @@ mod tests {
             progress.downloaded(4097, true);
             progress.finish();
             let output = output.lock().unwrap();
+            let plain = output.replace("\x1b[36m", "").replace("\x1b[0m", "");
+            assert!(
+                DOT_TICKS[..DOT_TICKS.len() - 1]
+                    .iter()
+                    .any(|dot| plain.contains(&format!("{dot}  Fetching checksums"))),
+                "{plain}"
+            );
+            assert!(plain.contains("   Downloading"), "{plain}");
             for text in [
                 "Fetching checksums",
                 "50%",
@@ -343,7 +354,7 @@ mod tests {
         progress.stage("Verifying");
         progress.finish();
         drop(progress);
-        assert_eq!(output, b"Downloading archive...\nDownloaded 0 bytes\nDownloaded 2 bytes\nDownloaded 4 bytes\nDownloaded 5 bytes\nVerifying\n");
+        assert_eq!(output, b"   Downloading archive...\n   Downloaded 0 bytes\n   Downloaded 2 bytes\n   Downloaded 4 bytes\n   Downloaded 5 bytes\n   Verifying\n");
     }
 
     #[test]
@@ -380,7 +391,7 @@ mod tests {
         progress.stage("Verifying");
         progress.finish();
         drop(progress);
-        assert_eq!(output, b"Downloading archive...\nDownloaded 0/4 bytes (0%)\nDownloaded 2/4 bytes (50%)\nDownloaded 4/4 bytes (100%)\nDownloaded 5 bytes\nDownloaded 6 bytes\nVerifying\n");
+        assert_eq!(output, b"   Downloading archive...\n   Downloaded 0/4 bytes (0%)\n   Downloaded 2/4 bytes (50%)\n   Downloaded 4/4 bytes (100%)\n   Downloaded 5 bytes\n   Downloaded 6 bytes\n   Verifying\n");
     }
 
     #[test]
@@ -409,7 +420,7 @@ mod tests {
         progress.downloaded(u64::MAX - 1, true);
         progress.finish();
         drop(progress);
-        assert_eq!(output, b"Downloaded 999/1000 bytes (99%)\nDownloaded 18446744073709551614/18446744073709551615 bytes (99%)\n");
+        assert_eq!(output, b"   Downloaded 999/1000 bytes (99%)\n   Downloaded 18446744073709551614/18446744073709551615 bytes (99%)\n");
     }
 
     #[test]

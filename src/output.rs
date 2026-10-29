@@ -1,15 +1,13 @@
-use std::io::{self, IsTerminal};
-
+use crate::logger::{self, Symbol};
 use crate::target::{Target, Version};
 
-pub(crate) fn color_enabled(terminal: bool) -> bool {
-    terminal
-        && std::env::var_os("NO_COLOR").is_none_or(|value| value.is_empty())
-        && std::env::var_os("TERM").is_none_or(|value| value != "dumb")
-}
-
 pub(crate) fn print_result(message: &str) {
-    println!("{}", format_result(message));
+    let symbol = if message.starts_with("already ") {
+        Symbol::Unchanged
+    } else {
+        Symbol::Success
+    };
+    logger::print_stdout(symbol, &format!("{}\n", format_result(message)));
 }
 
 fn format_result(message: &str) -> String {
@@ -20,18 +18,16 @@ fn format_result(message: &str) -> String {
     message
 }
 
-#[cfg(windows)]
-fn enable_windows_ansi(console: io::Result<winapi_util::console::Console>) -> bool {
-    console
-        .and_then(|mut console| console.set_virtual_terminal_processing(true))
-        .is_ok()
-}
-
 pub(crate) fn print_list(installations: &[Target], selected: Option<Version>, terminal: bool) {
-    let color = color_enabled(terminal);
-    #[cfg(windows)]
-    let color = color && enable_windows_ansi(winapi_util::console::Console::stdout());
-    print!("{}", format_list(installations, selected, terminal, color));
+    logger::print_stdout(
+        Symbol::None,
+        &format_list(
+            installations,
+            selected,
+            terminal,
+            logger::stdout_color_enabled(),
+        ),
+    );
 }
 
 fn format_list(
@@ -85,10 +81,13 @@ pub(crate) fn format_current(selected: Option<Version>, terminal: bool) -> Strin
 }
 
 pub(crate) fn print_error(error: &str) {
-    let color = color_enabled(io::stderr().is_terminal());
-    #[cfg(windows)]
-    let color = color && enable_windows_ansi(winapi_util::console::Console::stderr());
-    eprintln!("{}", format_diagnostic(error, color));
+    logger::print_stderr(
+        Symbol::Error,
+        &format!(
+            "{}\n",
+            format_diagnostic(error, logger::stderr_color_enabled())
+        ),
+    );
 }
 
 fn format_diagnostic(error: &str, color: bool) -> String {
@@ -163,12 +162,6 @@ mod tests {
             format_diagnostic(error, true),
             "\x1b[31merror:\x1b[0m failed to install node@22.0.0\n  permission denied"
         );
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn unavailable_windows_console_disables_ansi() {
-        assert!(!enable_windows_ansi(Err(io::Error::other("no console"))));
     }
 
     #[test]

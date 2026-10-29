@@ -6,6 +6,7 @@ pub mod download;
 mod install;
 pub mod installation;
 mod inventory;
+mod logger;
 mod mutation;
 mod output;
 mod progress;
@@ -13,11 +14,10 @@ pub mod storage;
 pub mod target;
 mod uninstall;
 
-use clap::Parser;
-use cli::{Cli, Command};
+use cli::Command;
 
 pub fn run() -> Result<(), String> {
-    let cli = Cli::parse();
+    let cli = cli::parse();
 
     match cli.command {
         Command::Install { target } => {
@@ -63,9 +63,9 @@ pub fn run() -> Result<(), String> {
             let selected = storage
                 .read_selected()
                 .map_err(|error| format!("current: {error}"))?;
-            print!(
-                "{}",
-                output::format_current(selected, io::stdout().is_terminal())
+            logger::print_stdout(
+                logger::Symbol::None,
+                &output::format_current(selected, io::stdout().is_terminal()),
             );
             Ok(())
         }

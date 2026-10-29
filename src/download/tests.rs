@@ -27,9 +27,12 @@ fn known_length_download_reports_total_and_percentage() {
     task.join().unwrap();
     assert_eq!(result.unwrap(), ABC_DIGEST);
     let output = String::from_utf8(output).unwrap();
-    assert!(output.contains("Downloaded 0/3 bytes (0%)\n"), "{output}");
     assert!(
-        output.contains("Downloaded 3/3 bytes (100%)\nVerifying\n"),
+        output.contains("   Downloaded 0/3 bytes (0%)\n"),
+        "{output}"
+    );
+    assert!(
+        output.contains("   Downloaded 3/3 bytes (100%)\n   Verifying\n"),
         "{output}"
     );
     assert!(
@@ -104,7 +107,7 @@ fn unknown_or_encoded_http_responses_keep_byte_only_output() {
         task.join().unwrap();
         assert_eq!(result.unwrap(), ABC_DIGEST);
         let output = String::from_utf8(output).unwrap();
-        assert!(output.contains("Downloaded 3 bytes\nVerifying"), "{output}");
+        assert!(output.contains("   Downloaded 3 bytes\n   Verifying"), "{output}");
         assert!(!output.contains('%'), "{output}");
     }
 }
@@ -126,9 +129,9 @@ fn download_progress_is_visible_before_eof() {
                 output: Arc::clone(&output),
                 progress_sent: Some(progress_sent),
                 expected: if known_total {
-                    b"Downloaded 2/3 bytes (66%)\n"
+                    b"   Downloaded 2/3 bytes (66%)\n"
                 } else {
-                    b"Downloaded 2 bytes\n"
+                    b"   Downloaded 2 bytes\n"
                 },
             }),
         );
@@ -140,12 +143,18 @@ fn download_progress_is_visible_before_eof() {
         assert_eq!(result.unwrap(), ABC_DIGEST);
         let output = String::from_utf8(output.lock().unwrap().clone()).unwrap();
         if known_total {
-            assert!(output.contains("Downloaded 2/3 bytes (66%)\n"), "{output}");
-            assert!(output.contains("Downloaded 3/3 bytes (100%)\n"), "{output}");
-        } else {
-            assert!(output.contains("Downloaded 2 bytes\n"), "{output}");
             assert!(
-                output.contains("Downloaded 3 bytes\n") && !output.contains('%'),
+                output.contains("   Downloaded 2/3 bytes (66%)\n"),
+                "{output}"
+            );
+            assert!(
+                output.contains("   Downloaded 3/3 bytes (100%)\n"),
+                "{output}"
+            );
+        } else {
+            assert!(output.contains("   Downloaded 2 bytes\n"), "{output}");
+            assert!(
+                output.contains("   Downloaded 3 bytes\n") && !output.contains('%'),
                 "{output}"
             );
         }
@@ -289,7 +298,7 @@ fn download_failure_does_not_report_later_stages() {
         (
             vec![response(b"invalid")],
             "missing entry",
-            "Fetching checksums\n",
+            "   Fetching checksums\n",
         ),
         (
             vec![
@@ -297,7 +306,7 @@ fn download_failure_does_not_report_later_stages() {
                 b"HTTP/1.1 500 Error\r\nContent-Length: 0\r\n\r\n".to_vec(),
             ],
             "received 500",
-            "Fetching checksums\nDownloading\n",
+            "   Fetching checksums\n   Downloading\n",
         ),
         (
             vec![
@@ -305,7 +314,7 @@ fn download_failure_does_not_report_later_stages() {
                 response(b"bad"),
             ],
             "SHA-256 mismatch",
-            "Fetching checksums\nDownloading\nDownloaded 0/3 bytes (0%)\nDownloaded 3/3 bytes (100%)\nDownloaded 3/3 bytes (100%)\nVerifying\n",
+            "   Fetching checksums\n   Downloading\n   Downloaded 0/3 bytes (0%)\n   Downloaded 3/3 bytes (100%)\n   Downloaded 3/3 bytes (100%)\n   Verifying\n",
         ),
     ] {
         let (url, task) = serve(responses);
@@ -333,9 +342,9 @@ fn download_reports_stages_in_order_without_changing_the_digest() {
         vec![response(checksums.as_bytes()), response(b"abc")],
         move |request| {
             let expected = if request == 0 {
-                "Fetching checksums\n"
+                "   Fetching checksums\n"
             } else {
-                "Fetching checksums\nDownloading\n"
+                "   Fetching checksums\n   Downloading\n"
             };
             assert_eq!(
                 *observed.lock().unwrap(),
@@ -358,7 +367,7 @@ fn download_reports_stages_in_order_without_changing_the_digest() {
     assert_eq!(digest, ABC_DIGEST);
     assert_eq!(
         *output.lock().unwrap(),
-        b"Fetching checksums\nDownloading\nDownloaded 0/3 bytes (0%)\nDownloaded 3/3 bytes (100%)\nDownloaded 3/3 bytes (100%)\nVerifying\n"
+        b"   Fetching checksums\n   Downloading\n   Downloaded 0/3 bytes (0%)\n   Downloaded 3/3 bytes (100%)\n   Downloaded 3/3 bytes (100%)\n   Verifying\n"
     );
 }
 
@@ -512,11 +521,11 @@ fn write_and_flush_failures_do_not_return_a_verified_digest() {
 #[test]
 fn failed_archive_copy_never_reports_unwritten_bytes_or_a_final_snapshot() {
     for (fail_flush, expected_error, expected_output) in [
-        (false, "write download", "Downloaded 0 bytes\n"),
+        (false, "write download", "   Downloaded 0 bytes\n"),
         (
             true,
             "flush download",
-            "Downloaded 0 bytes\nDownloaded 3 bytes\n",
+            "   Downloaded 0 bytes\n   Downloaded 3 bytes\n",
         ),
     ] {
         let mut output = Vec::new();
@@ -548,7 +557,7 @@ fn read_limit_and_deadline_errors_stop_byte_reporting() {
         error.contains("read response") && error.contains("injected read failure"),
         "{error}"
     );
-    assert_eq!(output, b"Downloaded 0 bytes\nDownloaded 2 bytes\n");
+    assert_eq!(output, b"   Downloaded 0 bytes\n   Downloaded 2 bytes\n");
 
     for until in [deadline(), Instant::now()] {
         let mut output = Vec::new();
@@ -566,7 +575,7 @@ fn read_limit_and_deadline_errors_stop_byte_reporting() {
             "{error}"
         );
         assert!(archive.is_empty());
-        assert_eq!(output, b"Downloaded 0 bytes\n");
+        assert_eq!(output, b"   Downloaded 0 bytes\n");
     }
 }
 
@@ -591,7 +600,7 @@ fn truncated_archive_stops_before_final_bytes_or_verification() {
     let output = String::from_utf8(output).unwrap();
     assert!(!output.contains("Verifying"), "{output}");
     assert!(
-        output.matches("Downloaded 3 bytes\n").count() <= 1,
+        output.matches("   Downloaded 3 bytes\n").count() <= 1,
         "{output}"
     );
     assert!(!output.contains("Downloaded 4 bytes"), "{output}");
