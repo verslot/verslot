@@ -6,7 +6,6 @@ pub(crate) const SYMBOL_WIDTH: usize = 2;
 pub(crate) enum Symbol {
     None,
     Success,
-    Unchanged,
     Error,
 }
 
@@ -42,7 +41,6 @@ fn format_prefix(symbol: Symbol, color: bool) -> String {
     let (glyph, code) = match symbol {
         Symbol::None => ("", 0),
         Symbol::Success => ("✔", 32),
-        Symbol::Unchanged => ("·", 90),
         Symbol::Error => ("✘", 31),
     };
     if color && !glyph.is_empty() {
@@ -95,7 +93,6 @@ mod tests {
         for (symbol, expected) in [
             (Symbol::None, "   message\n"),
             (Symbol::Success, "✔  message\n"),
-            (Symbol::Unchanged, "·  message\n"),
             (Symbol::Error, "✘  message\n"),
         ] {
             assert_eq!(format_lines(symbol, "message\n", false), expected);

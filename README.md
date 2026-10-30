@@ -52,19 +52,19 @@ A selected version cannot be uninstalled.
 | `verslot install node@<version>` | Download the official archive, verify SHA-256, and install; complete duplicates are a no-op |
 | `verslot uninstall node@<version>` | Remove a complete inactive installation |
 | `verslot use node@<version>` | Select an installed version; selecting it again is a no-op |
-| `verslot list` | Print complete installations, sorted numerically; show a Tool/Version table in terminals |
+| `verslot list` / `verslot ls` | Print complete installations, sorted numerically; show a Tool/Version table in terminals |
 | `verslot current` | Print the selected complete version, or nothing if none is selected |
 
 Only `node@major.minor.patch` is accepted, with three ASCII decimal components
 in the `u32` range. Leading zeros, partial versions, aliases, prereleases and
-build metadata are rejected. `list` and `current` take no positional arguments.
+build metadata are rejected. `list` (alias `ls`) and `current` take no positional arguments.
 `verslot --help` and `verslot --version` exit successfully. Operational errors
 exit 1 with empty stdout and diagnostics on stderr; invalid CLI usage exits 2.
 The five commands do not execute installed Node.js.
 
 Every emitted text line reserves two terminal columns for a lightweight symbol,
-followed by one space. Successful operations use `✔`, repeated operations use `·`,
-and errors use `✘`. Lines without a symbol, including help, query data, diagnostic
+followed by one space. Successful operations use `✔` and errors use `✘`.
+Lines without a symbol, including repeated operations, help, query data, diagnostic
 continuations and blank lines, use three leading spaces. Redirected text uses the
 same column without ANSI color; completely empty output stays empty.
 
@@ -93,7 +93,7 @@ Operational diagnostics start with `error:`, followed by an indented cause when
 needed. Missing selection targets and attempts to uninstall the selected version
 include a short recovery suggestion. Cleanup failures retain actual operation
 state and paths. Result text uses the terminal's default text color; success
-symbols are green and repeated-operation symbols are gray. Error symbols and
+symbols are green. Error symbols and
 labels are red on terminals; redirected output, nonempty `NO_COLOR`, or
 `TERM=dumb` disable color. Terminal lists keep their two-column layout when
 color is disabled.

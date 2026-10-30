@@ -18,6 +18,7 @@ fn help_describes_the_cli() {
         .stdout(predicate::str::contains("uninstall"))
         .stdout(predicate::str::contains("use"))
         .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("[alias: ls]"))
         .stdout(predicate::str::contains("not implemented yet").not())
         .stdout(predicate::str::contains("current"));
 }
@@ -113,16 +114,18 @@ fn use_reports_storage_errors() {
 }
 
 #[test]
-fn list_reports_storage_errors() {
-    verslot_command()
-        .arg("list")
-        .env_remove("HOME")
-        .env_remove("LOCALAPPDATA")
-        .assert()
-        .code(1)
-        .stdout("")
-        .stderr(predicate::str::contains("list"))
-        .stderr(predicate::str::contains("is missing"));
+fn list_and_alias_report_storage_errors() {
+    for command in ["list", "ls"] {
+        verslot_command()
+            .arg(command)
+            .env_remove("HOME")
+            .env_remove("LOCALAPPDATA")
+            .assert()
+            .code(1)
+            .stdout("")
+            .stderr(predicate::str::contains("list"))
+            .stderr(predicate::str::contains("is missing"));
+    }
 }
 
 #[test]
@@ -258,6 +261,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
         vec!["uninstall", "node@22.0.0"],
         vec!["use", "node@22.0.0"],
         vec!["list"],
+        vec!["ls"],
         vec!["current"],
         vec!["install", "node@22"],
         vec!["uninstall", "node@22"],
@@ -273,7 +277,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
             .assert()
             .code(if invalid {
                 2
-            } else if matches!(arguments[0], "list" | "current") {
+            } else if matches!(arguments[0], "list" | "ls" | "current") {
                 0
             } else {
                 1
@@ -316,7 +320,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
 
 #[test]
 fn query_commands_reject_targets() {
-    for command in ["list", "current"] {
+    for command in ["list", "ls", "current"] {
         verslot_command()
             .args([command, "node@22.0.0"])
             .assert()
@@ -486,6 +490,17 @@ fn each_command_provides_help() {
 }
 
 #[test]
+fn ls_help_matches_list_help() {
+    let list = verslot_command()
+        .args(["list", "--help"])
+        .assert()
+        .success();
+    let ls = verslot_command().args(["ls", "--help"]).assert().success();
+    assert_eq!(ls.get_output().stdout, list.get_output().stdout);
+    assert_eq!(ls.get_output().stderr, list.get_output().stderr);
+}
+
+#[test]
 fn install_and_list_preserve_invalid_entries_and_current_state() {
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -557,7 +572,7 @@ fn install_and_list_preserve_invalid_entries_and_current_state() {
         .env("LOCALAPPDATA", &directory)
         .assert()
         .success()
-        .stdout("·  Already installed node@22.0.0\n")
+        .stdout("   Already installed node@22.0.0\n")
         .stderr("");
     assert_eq!(fs::read(&current).unwrap(), b"invalid current state");
     assert!(!root.join("tmp").exists());
@@ -597,14 +612,18 @@ fn install_and_list_preserve_invalid_entries_and_current_state() {
         .unwrap();
     }
     fs::write(root.join("installs/node/02.0.0"), b"ignored").unwrap();
-    verslot_command()
-        .arg("list")
-        .env("HOME", &directory)
-        .env("LOCALAPPDATA", &directory)
-        .assert()
-        .success()
-        .stdout("   node@2.2.2\n   node@2.2.10\n   node@2.10.0\n   node@10.0.0\n   node@22.0.0\n")
-        .stderr("");
+    for command in ["list", "ls"] {
+        verslot_command()
+            .arg(command)
+            .env("HOME", &directory)
+            .env("LOCALAPPDATA", &directory)
+            .assert()
+            .success()
+            .stdout(
+                "   node@2.2.2\n   node@2.2.10\n   node@2.10.0\n   node@10.0.0\n   node@22.0.0\n",
+            )
+            .stderr("");
+    }
     assert_eq!(fs::read(&current).unwrap(), b"invalid current state");
     fs::create_dir(root.join("installs/node/24.0.0")).unwrap();
     verslot_command()
@@ -680,7 +699,7 @@ fn offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory() {
         (vec!["list"], "   node@22.0.0\n"),
         (
             vec!["install", "node@22.0.0"],
-            "·  Already installed node@22.0.0\n",
+            "   Already installed node@22.0.0\n",
         ),
         (vec!["list"], "   node@22.0.0\n"),
         (

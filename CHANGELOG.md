@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Remove the logger's unchanged-result dot; repeated operations use the empty
+  symbol field (#20).
+- Add `verslot ls` as a visible alias for `verslot list` (#19).
 - Standardize all CLI output through an internal logger with a two-column
   lightweight symbol field and one separating space. Prefix ordinary and
   continuation lines with an empty field, including help, version, queries and

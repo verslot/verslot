@@ -65,6 +65,7 @@ pub(crate) enum Command {
         target: Target,
     },
     /// List installed tool versions.
+    #[command(visible_alias = "ls")]
     List,
     /// Show the selected tool version.
     Current,

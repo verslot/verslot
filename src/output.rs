@@ -3,7 +3,7 @@ use crate::target::{Target, Version};
 
 pub(crate) fn print_result(message: &str) {
     let symbol = if message.starts_with("already ") {
-        Symbol::Unchanged
+        Symbol::None
     } else {
         Symbol::Success
     };

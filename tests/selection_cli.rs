@@ -143,7 +143,7 @@ fn selection_cli_switches_and_preserves_m3_behavior() {
         .args(["install", "node@24.0.0"])
         .assert()
         .success()
-        .stdout("·  Already installed node@24.0.0\n")
+        .stdout("   Already installed node@24.0.0\n")
         .stderr("");
     fixture.assert_current("   node@22.0.0\n");
     fixture.select("24.0.0");
@@ -208,7 +208,7 @@ fn selecting_same_version_does_not_replace_current_link() {
         .args(["use", "node@22.0.0"])
         .assert()
         .success()
-        .stdout("·  Already selected node@22.0.0\n")
+        .stdout("   Already selected node@22.0.0\n")
         .stderr("");
     #[cfg(unix)]
     {
