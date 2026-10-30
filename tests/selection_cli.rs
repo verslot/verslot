@@ -289,6 +289,8 @@ fn current_and_use_fail_while_writer_holds_lock_then_succeed_after_release() {
         .open(fixture.root.join(".mutation.lock"))
         .unwrap();
     lock.try_lock().unwrap();
+    // Model a concurrent child retaining a duplicate until it reaches exec.
+    let inherited_lock = lock.try_clone().unwrap();
     for arguments in [vec!["current"], vec!["use", "node@24.0.0"]] {
         fixture
             .command()
@@ -300,10 +302,12 @@ fn current_and_use_fail_while_writer_holds_lock_then_succeed_after_release() {
                 "storage is busy; retry after the active operation finishes",
             ));
     }
+    lock.unlock().unwrap();
     drop(lock);
     fixture.assert_current("   node@22.0.0\n");
     fixture.select("24.0.0");
     fixture.assert_current("   node@24.0.0\n");
+    drop(inherited_lock);
     fixture.finish();
 }
 
