@@ -511,6 +511,8 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .open(root.join(".mutation.lock"))
         .unwrap();
     lock.try_lock().unwrap();
+    // Keep a duplicate alive across the release boundary, as a child spawn can.
+    let inherited_lock = lock.try_clone().unwrap();
     verslot_command()
         .env("HOME", &directory)
         .env("LOCALAPPDATA", &directory)
@@ -519,6 +521,7 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .code(1)
         .stdout("")
         .stderr(predicate::str::contains("mutation lock"));
+    lock.unlock().unwrap();
     drop(lock);
     verslot_command()
         .env("HOME", &directory)
@@ -528,6 +531,7 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .success()
         .stdout("✔  Uninstalled node@22.0.0\n")
         .stderr("   Uninstalling\n");
+    drop(inherited_lock);
     verslot_command()
         .env("HOME", &directory)
         .env("LOCALAPPDATA", &directory)
