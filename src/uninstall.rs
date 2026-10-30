@@ -4,13 +4,26 @@ use std::path::Path;
 
 use crate::installation::{real_directory, validate_installation};
 use crate::mutation::{acquire_lock, allocate_operation, remove_operation};
+use crate::progress::Progress;
 use crate::storage::Storage;
 use crate::target::Target;
 
 pub(crate) fn uninstall(target: &Target) -> Result<String, String> {
     let storage = Storage::from_env().map_err(|error| format!("uninstall {target}: {error}"))?;
-    uninstall_at(&storage, target, remove_operation)
+    uninstall_with_progress(&storage, target, &mut Progress::stderr(), remove_operation)
         .map_err(|error| format!("uninstall {target}: {error}"))
+}
+
+fn uninstall_with_progress(
+    storage: &Storage,
+    target: &Target,
+    progress: &mut Progress<'_>,
+    cleanup: impl FnOnce(&Path, &Path) -> io::Result<()>,
+) -> Result<String, String> {
+    progress.stage("Uninstalling");
+    let result = uninstall_at(storage, target, cleanup);
+    progress.finish();
+    result
 }
 
 // The private cleanup closure exercises partial deletion failures in offline tests.

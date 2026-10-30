@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- Show a `Fetching versions` spinner on stderr during remote discovery, clear it
+  before results or errors, and use a plain stage line when redirected (#21).
+- Add `list-remote` with the visible alias `ls-remote` for official Node.js
+  release discovery, numeric text-prefix queries and historical LTS filtering.
+  Fetch a fresh index for every query, filter by the current build's archive
+  support, and print unique `v<version>` lines in numeric ascending order (#21).
+- Remove the logger's unchanged-result dot; repeated operations use the empty
+  symbol field (#20).
+- Add `verslot ls` as a visible alias for `verslot list` (#19).
+- Standardize all CLI output through an internal logger with a two-column
+  lightweight symbol field and one separating space. Prefix ordinary and
+  continuation lines with an empty field, including help, version, queries and
+  redirected progress. Preserve existing wording, empty output and exit codes.
+- Capitalize CLI results and use `Selected` for version selection. Add terminal
+  empty-query messages while keeping redirected
+  query output plain. Format operational errors with recovery suggestions,
+  keep success results in the default text color, color error labels on supported
+  terminals, and honor `NO_COLOR` and `TERM=dumb` for errors and progress.
+  Shorten progress stage labels.
+- Show terminal `list` output as an aligned `Tool`/`Version` table with colored
+  headers, tool names and selected versions. Keep redirected version lines plain.
+- Use a cyan block bar for terminal download progress and cyan stage spinners.
+- Show a leading spinner during uninstall on stderr, with plain text for
+  redirected output, and clear it on success or failure.
 - Show installation stages on stderr with an ASCII terminal spinner and plain
   stage lines for redirected output (#15). Preserve final stdout results,
   errors and duplicate-installation behavior.

@@ -1,30 +1,34 @@
+use std::io::{self, IsTerminal};
+
 mod cli;
 pub mod distribution;
 pub mod download;
 mod install;
 pub mod installation;
 mod inventory;
+mod logger;
 mod mutation;
+mod output;
 mod progress;
+mod remote;
 pub mod storage;
 pub mod target;
 mod uninstall;
 
-use clap::Parser;
-use cli::{Cli, Command};
+use cli::Command;
 
 pub fn run() -> Result<(), String> {
-    let cli = Cli::parse();
+    let cli = cli::parse();
 
     match cli.command {
         Command::Install { target } => {
             let message = install::install(&target)?;
-            println!("{message}");
+            output::print_result(&message);
             Ok(())
         }
         Command::Uninstall { target } => {
             let message = uninstall::uninstall(&target)?;
-            println!("{message}");
+            output::print_result(&message);
             Ok(())
         }
         Command::Use { target } => {
@@ -34,29 +38,45 @@ pub fn run() -> Result<(), String> {
                 .select(&target)
                 .map_err(|error| format!("use {target}: {error}"))?;
             if changed {
-                println!("using {target}");
+                output::print_result(&format!("selected {target}"));
             } else {
-                println!("already using {target}");
+                output::print_result(&format!("already selected {target}"));
             }
             Ok(())
         }
         Command::List => {
             let installations = inventory::list_installed()?;
-            for target in installations {
-                println!("{target}");
-            }
+            let terminal = io::stdout().is_terminal();
+            // Listing remains available when selection state cannot be read.
+            let selected = if terminal {
+                storage::Storage::from_env()
+                    .ok()
+                    .and_then(|storage| storage.read_selected().ok().flatten())
+            } else {
+                None
+            };
+            output::print_list(&installations, selected, terminal);
             Ok(())
         }
         Command::Current => {
             let storage =
                 storage::Storage::from_env().map_err(|error| format!("current: {error}"))?;
-            if let Some(version) = storage
+            let selected = storage
                 .read_selected()
-                .map_err(|error| format!("current: {error}"))?
-            {
-                println!("node@{version}");
-            }
+                .map_err(|error| format!("current: {error}"))?;
+            logger::print_stdout(
+                logger::Symbol::None,
+                &output::format_current(selected, io::stdout().is_terminal()),
+            );
             Ok(())
         }
+        Command::ListRemote { query } => {
+            remote::list(&query).map_err(|error| format!("list-remote {query}: {error}"))
+        }
     }
+}
+
+/// Prints an operational diagnostic to stderr using the CLI output style.
+pub fn print_error(error: &str) {
+    output::print_error(error);
 }

@@ -41,7 +41,7 @@ fn install_with_progress(
             real_directory(root, operation).map_err(|error| error.to_string())?;
             let archive = operation.join("archive");
             let digest = download(target.version, &archive, progress)?;
-            progress.stage("Extracting and installing...");
+            progress.stage("Installing");
             extract_verified_archive(root, &archive, staging, target.version, &digest)
                 .map_err(|error| error.to_string())
         },

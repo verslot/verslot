@@ -99,6 +99,54 @@ fn remove_link(link: &Path) {
 }
 
 #[test]
+fn uninstall_progress_finishes_after_success_or_cleanup_failure() {
+    for fail_cleanup in [false, true] {
+        let fixture = Fixture::new();
+        let directory = fixture.install("22.0.0");
+        let mut output = Vec::new();
+        let mut progress = Progress::plain(&mut output);
+        let result = uninstall_with_progress(
+            &fixture.storage,
+            &fixture.target(),
+            &mut progress,
+            |root, operation| {
+                if fail_cleanup {
+                    Err(io::Error::other("injected cleanup failure"))
+                } else {
+                    remove_operation(root, operation)
+                }
+            },
+        );
+        if fail_cleanup {
+            assert!(result.unwrap_err().contains("injected cleanup failure"));
+        } else {
+            assert_eq!(result.unwrap(), "uninstalled node@22.0.0");
+        }
+        assert!(!directory.exists());
+        assert!(matches!(progress, Progress::Silent));
+        drop(progress);
+        assert_eq!(output, b"   Uninstalling\n");
+    }
+}
+
+#[test]
+fn uninstall_progress_finishes_when_version_is_not_installed() {
+    let fixture = Fixture::new();
+    let mut output = Vec::new();
+    let mut progress = Progress::plain(&mut output);
+    let result = uninstall_with_progress(
+        &fixture.storage,
+        &fixture.target(),
+        &mut progress,
+        remove_operation,
+    );
+    assert_eq!(result.unwrap_err(), "not installed: node@22.0.0");
+    assert!(matches!(progress, Progress::Silent));
+    drop(progress);
+    assert_eq!(output, b"   Uninstalling\n");
+}
+
+#[test]
 fn uninstall_removes_only_the_inactive_installation_and_own_operation() {
     let fixture = Fixture::new();
     let directory = fixture.install("22.0.0");

@@ -84,8 +84,7 @@ def run_with_pty(command, stdout, stderr):
 def check_output(test, mode, stdout, stderr):
     if "1 passed; 0 failed" not in stdout:
         raise AssertionError("The exact smoke test did not run and pass")
-    for stage in ["Fetching checksums...", "Downloading archive...",
-                  "Verifying SHA-256...", "Extracting and installing..."]:
+    for stage in ["Fetching checksums", "Downloading", "Verifying", "Installing"]:
         if stage not in stderr or stage in stdout:
             raise AssertionError(f"Missing or misplaced stderr stage: {stage}")
     if "Downloaded " in stdout or any(dot in stdout for dot in DOTS):
@@ -97,8 +96,11 @@ def check_output(test, mode, stdout, stderr):
         raise AssertionError("The PTY did not exercise animated terminal output")
 
     if test == TESTS[0]:
-        for amount in ["1024 bytes", "2048/4096 bytes (50%)",
-                       "4096/4096 bytes (100%)", "4097 bytes"]:
+        amounts = ["1024 bytes", "4097 bytes"]
+        amounts += (["50%  2048/4096 bytes", "100%  4096/4096 bytes"]
+                    if mode == "pty" else
+                    ["2048/4096 bytes (50%)", "4096/4096 bytes (100%)"])
+        for amount in amounts:
             if amount not in stderr:
                 raise AssertionError(f"Missing reporter amount/fallback: {amount}")
         marker = "stage output smoke complete"
@@ -106,12 +108,13 @@ def check_output(test, mode, stdout, stderr):
         if not separator or any(dot in after for dot in DOTS) or "Downloading" in after:
             raise AssertionError("Animation did not stop before final output")
         if mode == "pty":
-            frames = re.findall(rf"([{DOTS}]) Downloading archive\.\.\. 1024 bytes", before)
+            plain = re.sub(r"\x1b\[[0-9;]*m", "", before)
+            frames = re.findall(rf"([{DOTS}])  Downloading 1024 bytes", plain)
             if len(set(frames)) < 2:
                 raise AssertionError("Spinner did not advance while bytes stayed unchanged")
-            if "[============>-----------]" not in before or "[========================]" not in before:
+            if "█" * 13 + "░" * 11 not in plain or "█" * 24 not in plain:
                 raise AssertionError("Terminal progress bar did not reach half/full states")
-            last_stage = before.rsplit("Extracting and installing...", 1)[-1]
+            last_stage = before.rsplit("Installing", 1)[-1]
             if not re.search(r"\x1b\[[0-9;]*K", last_stage):
                 raise AssertionError("Progress line was not cleared before the final marker")
     else:

@@ -6,6 +6,85 @@ fn verslot_command() -> Command {
 }
 
 #[test]
+fn remote_list_help_exposes_required_query_and_alias() {
+    verslot_command()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list-remote"))
+        .stdout(predicate::str::contains("[alias: ls-remote]"));
+    let primary = verslot_command()
+        .args(["list-remote", "--help"])
+        .output()
+        .unwrap();
+    let alias = verslot_command()
+        .args(["ls-remote", "--help"])
+        .output()
+        .unwrap();
+    assert!(primary.status.success());
+    assert_eq!(primary.stdout, alias.stdout);
+    assert_eq!(primary.stderr, alias.stderr);
+    assert!(
+        String::from_utf8(primary.stdout)
+            .unwrap()
+            .contains("<QUERY>")
+    );
+}
+
+#[test]
+fn remote_list_rejects_invalid_queries_before_execution() {
+    for command in ["list-remote", "ls-remote"] {
+        for query in [
+            "",
+            "python",
+            "Node",
+            "node@",
+            "node@@18",
+            "node@v18",
+            "node@018",
+            "node@18.01",
+            "node@18.1.01",
+            "node@4294967296",
+            "node@18.1.2.3",
+            "node@１８",
+            "node@18.",
+            "node@lts.18",
+            "node@latest",
+            "node@../18",
+            "node@18 ",
+        ] {
+            verslot_command()
+                .args([command, query])
+                .env("NO_COLOR", "1")
+                .timeout(std::time::Duration::from_secs(3))
+                .assert()
+                .code(2)
+                .stdout("")
+                .stderr(predicate::str::contains("✘  error:"))
+                .stderr(predicate::str::contains("invalid remote query"));
+        }
+    }
+}
+
+#[test]
+fn remote_list_requires_exactly_one_query() {
+    for command in ["list-remote", "ls-remote"] {
+        verslot_command()
+            .arg(command)
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains("<QUERY>"));
+        verslot_command()
+            .args([command, "node", "node@18"])
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains("unexpected argument"));
+    }
+}
+
+#[test]
 fn help_describes_the_cli() {
     verslot_command()
         .arg("--help")
@@ -18,6 +97,7 @@ fn help_describes_the_cli() {
         .stdout(predicate::str::contains("uninstall"))
         .stdout(predicate::str::contains("use"))
         .stdout(predicate::str::contains("list"))
+        .stdout(predicate::str::contains("[alias: ls]"))
         .stdout(predicate::str::contains("not implemented yet").not())
         .stdout(predicate::str::contains("current"));
 }
@@ -28,7 +108,40 @@ fn version_reports_the_package_version() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(format!("verslot {}\n", env!("CARGO_PKG_VERSION")));
+        .stdout(format!("   verslot {}\n", env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn help_version_and_argument_errors_share_the_symbol_column() {
+    for (arguments, code, stderr, first_prefix) in [
+        (vec!["--help"], 0, false, "   "),
+        (vec!["install", "--help"], 0, false, "   "),
+        (vec!["--version"], 0, false, "   "),
+        (vec![], 2, true, "   "),
+        (vec!["invalid-command"], 2, true, "✘  "),
+        (vec!["install"], 2, true, "✘  "),
+        (vec!["use", "node@22"], 2, true, "✘  "),
+    ] {
+        let output = verslot_command()
+            .args(&arguments)
+            .env("NO_COLOR", "1")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(code), "{arguments:?}");
+        let (message, other) = if stderr {
+            (&output.stderr, &output.stdout)
+        } else {
+            (&output.stdout, &output.stderr)
+        };
+        assert!(other.is_empty(), "{arguments:?}");
+        let message = std::str::from_utf8(message).unwrap();
+        assert!(!message.is_empty(), "{arguments:?}");
+        assert!(!message.contains('\x1b'), "{message}");
+        for (index, line) in message.lines().enumerate() {
+            let prefix = if index == 0 { first_prefix } else { "   " };
+            assert!(line.starts_with(prefix), "{arguments:?}: {line:?}");
+        }
+    }
 }
 
 #[test]
@@ -49,7 +162,7 @@ fn install_reports_storage_errors_without_network_access() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("install node@22.0.0:"))
+        .stderr(predicate::str::contains("install node@22.0.0"))
         .stderr(predicate::str::contains("is missing"));
 }
 
@@ -62,7 +175,7 @@ fn uninstall_reports_storage_errors() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("uninstall node@22.0.0:"))
+        .stderr(predicate::str::contains("uninstall node@22.0.0"))
         .stderr(predicate::str::contains("is missing"));
 }
 
@@ -75,21 +188,23 @@ fn use_reports_storage_errors() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("use node@22.0.0:"))
+        .stderr(predicate::str::contains("select node@22.0.0"))
         .stderr(predicate::str::contains("is missing"));
 }
 
 #[test]
-fn list_reports_storage_errors() {
-    verslot_command()
-        .arg("list")
-        .env_remove("HOME")
-        .env_remove("LOCALAPPDATA")
-        .assert()
-        .code(1)
-        .stdout("")
-        .stderr(predicate::str::contains("list:"))
-        .stderr(predicate::str::contains("is missing"));
+fn list_and_alias_report_storage_errors() {
+    for command in ["list", "ls"] {
+        verslot_command()
+            .arg(command)
+            .env_remove("HOME")
+            .env_remove("LOCALAPPDATA")
+            .assert()
+            .code(1)
+            .stdout("")
+            .stderr(predicate::str::contains("list"))
+            .stderr(predicate::str::contains("is missing"));
+    }
 }
 
 #[test]
@@ -101,7 +216,7 @@ fn current_reports_storage_errors() {
         .assert()
         .code(1)
         .stdout("")
-        .stderr(predicate::str::contains("current:"))
+        .stderr(predicate::str::contains("current"))
         .stderr(predicate::str::contains("is missing"));
 }
 
@@ -149,7 +264,7 @@ fn valid_use_targets_reach_storage_resolution() {
             .assert()
             .code(1)
             .stdout("")
-            .stderr(predicate::str::contains(format!("use {target}:")))
+            .stderr(predicate::str::contains(format!("select {target}")))
             .stderr(predicate::str::contains("is missing"));
     }
 }
@@ -225,6 +340,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
         vec!["uninstall", "node@22.0.0"],
         vec!["use", "node@22.0.0"],
         vec!["list"],
+        vec!["ls"],
         vec!["current"],
         vec!["install", "node@22"],
         vec!["uninstall", "node@22"],
@@ -240,7 +356,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
             .assert()
             .code(if invalid {
                 2
-            } else if matches!(arguments[0], "list" | "current") {
+            } else if matches!(arguments[0], "list" | "ls" | "current") {
                 0
             } else {
                 1
@@ -283,7 +399,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
 
 #[test]
 fn query_commands_reject_targets() {
-    for command in ["list", "current"] {
+    for command in ["list", "ls", "current"] {
         verslot_command()
             .args([command, "node@22.0.0"])
             .assert()
@@ -387,7 +503,7 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .code(1)
         .stdout("")
         .stderr(predicate::str::contains(
-            "cannot uninstall current version: node@24.0.0",
+            "node@24.0.0 is currently selected",
         ));
     let lock = fs::OpenOptions::new()
         .read(true)
@@ -410,15 +526,15 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
         .args(["uninstall", "node@22.0.0"])
         .assert()
         .success()
-        .stdout("uninstalled node@22.0.0\n")
-        .stderr("");
+        .stdout("✔  Uninstalled node@22.0.0\n")
+        .stderr("   Uninstalling\n");
     verslot_command()
         .env("HOME", &directory)
         .env("LOCALAPPDATA", &directory)
         .arg("list")
         .assert()
         .success()
-        .stdout("node@24.0.0\n")
+        .stdout("   node@24.0.0\n")
         .stderr("");
     assert!(fs::symlink_metadata(&current).is_ok());
     assert!(selected.join(".verslot-install").exists());
@@ -450,6 +566,17 @@ fn each_command_provides_help() {
             .stderr("")
             .stdout(predicate::str::contains("not implemented yet").not());
     }
+}
+
+#[test]
+fn ls_help_matches_list_help() {
+    let list = verslot_command()
+        .args(["list", "--help"])
+        .assert()
+        .success();
+    let ls = verslot_command().args(["ls", "--help"]).assert().success();
+    assert_eq!(ls.get_output().stdout, list.get_output().stdout);
+    assert_eq!(ls.get_output().stderr, list.get_output().stderr);
 }
 
 #[test]
@@ -524,7 +651,7 @@ fn install_and_list_preserve_invalid_entries_and_current_state() {
         .env("LOCALAPPDATA", &directory)
         .assert()
         .success()
-        .stdout("already installed node@22.0.0\n")
+        .stdout("   Already installed node@22.0.0\n")
         .stderr("");
     assert_eq!(fs::read(&current).unwrap(), b"invalid current state");
     assert!(!root.join("tmp").exists());
@@ -564,14 +691,18 @@ fn install_and_list_preserve_invalid_entries_and_current_state() {
         .unwrap();
     }
     fs::write(root.join("installs/node/02.0.0"), b"ignored").unwrap();
-    verslot_command()
-        .arg("list")
-        .env("HOME", &directory)
-        .env("LOCALAPPDATA", &directory)
-        .assert()
-        .success()
-        .stdout("node@2.2.2\nnode@2.2.10\nnode@2.10.0\nnode@10.0.0\nnode@22.0.0\n")
-        .stderr("");
+    for command in ["list", "ls"] {
+        verslot_command()
+            .arg(command)
+            .env("HOME", &directory)
+            .env("LOCALAPPDATA", &directory)
+            .assert()
+            .success()
+            .stdout(
+                "   node@2.2.2\n   node@2.2.10\n   node@2.10.0\n   node@10.0.0\n   node@22.0.0\n",
+            )
+            .stderr("");
+    }
     assert_eq!(fs::read(&current).unwrap(), b"invalid current state");
     fs::create_dir(root.join("installs/node/24.0.0")).unwrap();
     verslot_command()
@@ -644,15 +775,15 @@ fn offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory() {
     );
     fs::write(installation.join(".verslot-install"), &receipt).unwrap();
     for (arguments, stdout) in [
-        (vec!["list"], "node@22.0.0\n"),
+        (vec!["list"], "   node@22.0.0\n"),
         (
             vec!["install", "node@22.0.0"],
-            "already installed node@22.0.0\n",
+            "   Already installed node@22.0.0\n",
         ),
-        (vec!["list"], "node@22.0.0\n"),
+        (vec!["list"], "   node@22.0.0\n"),
         (
             vec!["uninstall", "node@22.0.0"],
-            "uninstalled node@22.0.0\n",
+            "✔  Uninstalled node@22.0.0\n",
         ),
         (vec!["list"], ""),
     ] {
@@ -663,7 +794,11 @@ fn offline_cli_duplicate_list_uninstall_workflow_returns_empty_inventory() {
             .assert()
             .success()
             .stdout(stdout)
-            .stderr("");
+            .stderr(if arguments[0] == "uninstall" {
+                "   Uninstalling\n"
+            } else {
+                ""
+            });
         if arguments[0] == "install" {
             assert_eq!(
                 fs::read_to_string(installation.join(".verslot-install")).unwrap(),
