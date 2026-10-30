@@ -615,11 +615,11 @@ fn expired_deadline_prevents_reads_and_writes() {
 }
 
 // Serves generated fixtures on loopback only, never nodejs.org. Bounds every accept/read.
-fn serve(responses: Vec<Vec<u8>>) -> (String, JoinHandle<()>) {
+pub(crate) fn serve(responses: Vec<Vec<u8>>) -> (String, JoinHandle<()>) {
     serve_observed(responses, |_| {})
 }
 
-fn serve_observed(
+pub(crate) fn serve_observed(
     responses: Vec<Vec<u8>>,
     observe: impl Fn(usize) + Send + 'static,
 ) -> (String, JoinHandle<()>) {
@@ -667,7 +667,7 @@ fn serve_observed(
     (url, task)
 }
 
-fn response(body: &[u8]) -> Vec<u8> {
+pub(crate) fn response(body: &[u8]) -> Vec<u8> {
     let mut response = format!(
         "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
@@ -677,7 +677,7 @@ fn response(body: &[u8]) -> Vec<u8> {
     response
 }
 
-fn local_agent() -> Agent {
+pub(crate) fn local_agent() -> Agent {
     let config = Agent::config_builder()
         .https_only(false)
         .proxy(None)

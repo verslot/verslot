@@ -6,6 +6,45 @@ pub enum ArchiveFormat {
     TarGz,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct NodePlatform {
+    name: &'static str,
+    archive_format: ArchiveFormat,
+    pub(crate) index_file: &'static str,
+}
+
+impl NodePlatform {
+    pub(crate) fn current() -> Result<Self, String> {
+        let environment = if cfg!(target_env = "gnu") { "gnu" } else { "" };
+        Self::for_platform(std::env::consts::OS, std::env::consts::ARCH, environment)
+    }
+
+    pub(crate) fn for_platform(
+        os: &str,
+        architecture: &str,
+        environment: &str,
+    ) -> Result<Self, String> {
+        let (name, archive_format, index_file) = match (os, architecture, environment) {
+            ("windows", "x86_64", _) => ("win-x64", ArchiveFormat::Zip, "win-x64-zip"),
+            ("windows", "aarch64", _) => ("win-arm64", ArchiveFormat::Zip, "win-arm64-zip"),
+            ("macos", "x86_64", _) => ("darwin-x64", ArchiveFormat::TarGz, "osx-x64-tar"),
+            ("macos", "aarch64", _) => ("darwin-arm64", ArchiveFormat::TarGz, "osx-arm64-tar"),
+            ("linux", "x86_64", "gnu") => ("linux-x64", ArchiveFormat::TarGz, "linux-x64"),
+            ("linux", "aarch64", "gnu") => ("linux-arm64", ArchiveFormat::TarGz, "linux-arm64"),
+            _ => {
+                return Err(format!(
+                    "unsupported Node.js distribution platform: os={os}, architecture={architecture}, environment={environment}"
+                ));
+            }
+        };
+        Ok(Self {
+            name,
+            archive_format,
+            index_file,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeDistribution {
     pub archive_format: ArchiveFormat,
@@ -16,46 +55,36 @@ pub struct NodeDistribution {
 
 impl NodeDistribution {
     pub fn for_current_build(version: Version) -> Result<Self, String> {
-        let environment = if cfg!(target_env = "gnu") { "gnu" } else { "" };
-        Self::for_platform(
-            version,
-            std::env::consts::OS,
-            std::env::consts::ARCH,
-            environment,
-        )
+        Ok(Self::for_node_platform(version, NodePlatform::current()?))
     }
 
+    #[cfg(test)]
     fn for_platform(
         version: Version,
         os: &str,
         architecture: &str,
         environment: &str,
     ) -> Result<Self, String> {
-        let (platform, archive_format) = match (os, architecture, environment) {
-            ("windows", "x86_64", _) => ("win-x64", ArchiveFormat::Zip),
-            ("windows", "aarch64", _) => ("win-arm64", ArchiveFormat::Zip),
-            ("macos", "x86_64", _) => ("darwin-x64", ArchiveFormat::TarGz),
-            ("macos", "aarch64", _) => ("darwin-arm64", ArchiveFormat::TarGz),
-            ("linux", "x86_64", "gnu") => ("linux-x64", ArchiveFormat::TarGz),
-            ("linux", "aarch64", "gnu") => ("linux-arm64", ArchiveFormat::TarGz),
-            _ => {
-                return Err(format!(
-                    "unsupported Node.js distribution platform: os={os}, architecture={architecture}, environment={environment}"
-                ));
-            }
-        };
+        Ok(Self::for_node_platform(
+            version,
+            NodePlatform::for_platform(os, architecture, environment)?,
+        ))
+    }
+
+    fn for_node_platform(version: Version, platform: NodePlatform) -> Self {
+        let archive_format = platform.archive_format;
         let extension = match archive_format {
             ArchiveFormat::Zip => "zip",
             ArchiveFormat::TarGz => "tar.gz",
         };
-        let archive_filename = format!("node-v{version}-{platform}.{extension}");
+        let archive_filename = format!("node-v{version}-{}.{extension}", platform.name);
         let base_url = format!("https://nodejs.org/dist/v{version}/");
-        Ok(Self {
+        Self {
             archive_format,
             archive_url: format!("{base_url}{archive_filename}"),
             checksum_url: format!("{base_url}SHASUMS256.txt"),
             archive_filename,
-        })
+        }
     }
 }
 

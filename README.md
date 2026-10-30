@@ -3,7 +3,7 @@
 A minimal tool version manager written in Rust. Version management. Nothing else.
 
 `v0.5.0` is the first source release intended for actual use, following M1–M5
-focused development. It manages official Node.js distributions with five commands.
+focused development. It manages official Node.js distributions.
 No precompiled binaries or crates.io package are published.
 
 ## Install from source
@@ -45,7 +45,7 @@ The final selection is `node@24.0.0`. Configure PATH below to run it as `node`.
 Installing does not select a version; switching requires an installed version.
 A selected version cannot be uninstalled.
 
-## Five commands
+## Commands
 
 | Command | Behavior |
 | --- | --- |
@@ -53,14 +53,15 @@ A selected version cannot be uninstalled.
 | `verslot uninstall node@<version>` | Remove a complete inactive installation |
 | `verslot use node@<version>` | Select an installed version; selecting it again is a no-op |
 | `verslot list` / `verslot ls` | Print complete installations, sorted numerically; show a Tool/Version table in terminals |
+| `verslot list-remote node` / `verslot ls-remote node` | Discover official releases available for this build's platform; unreleased feature |
 | `verslot current` | Print the selected complete version, or nothing if none is selected |
 
-Only `node@major.minor.patch` is accepted, with three ASCII decimal components
+`install`, `uninstall` and `use` accept only `node@major.minor.patch`, with three ASCII decimal components
 in the `u32` range. Leading zeros, partial versions, aliases, prereleases and
 build metadata are rejected. `list` (alias `ls`) and `current` take no positional arguments.
 `verslot --help` and `verslot --version` exit successfully. Operational errors
 exit 1 with empty stdout and diagnostics on stderr; invalid CLI usage exits 2.
-The five commands do not execute installed Node.js.
+These commands do not execute installed Node.js.
 
 Every emitted text line reserves two terminal columns for a lightweight symbol,
 followed by one space. Successful operations use `✔` and errors use `✘`.
@@ -73,7 +74,7 @@ Successful operations print one sentence: `Installed node@22.0.0`,
 `Already installed ...` or `Already selected ...`. In interactive terminals,
 `list` shows an aligned `Tool`/`Version` table with purple italic headers, cyan
 tool names, green for the selected version and gray for other versions. Empty
-queries print `No installed versions` or `No version selected`. Redirected queries
+local queries print `No installed versions` or `No version selected`. Redirected local queries
 retain version lines with the blank symbol column and empty output for empty
 results. Listing remains available when selection state cannot be read; in that
 case no version is highlighted.
@@ -97,6 +98,42 @@ symbols are green. Error symbols and
 labels are red on terminals; redirected output, nonempty `NO_COLOR`, or
 `TERM=dumb` disable color. Terminal lists keep their two-column layout when
 color is disabled.
+
+## Discover Node.js versions (Unreleased)
+
+Remote discovery is available in the development branch, after `v0.5.0`:
+
+```text
+verslot ls-remote node
+verslot ls-remote node@18
+verslot ls-remote node@18.1
+verslot ls-remote node@18.1.0
+verslot ls-remote node@lts
+```
+
+`list-remote` and its visible alias `ls-remote` require exactly one query.
+`node` lists all formal three-component releases with an official archive for
+the current Verslot build's system and architecture, including old releases.
+Numeric queries accept one to three ASCII decimal components, each in the `u32`
+range without leading zeros. They match the start of the version text:
+`node@18.1` includes both `18.1.0` and `18.10.0`, and `node@1` can include
+`10.x`, `18.x` and `19.x`.
+
+`node@lts` lists every release carrying an LTS marker in the official index,
+including releases from series that have reached end of life. Earlier releases
+from the same series without an LTS marker are excluded. Prereleases, nightly
+builds, io.js and versions with build metadata are excluded from all queries.
+
+Results are complete, deduplicated and sorted numerically from oldest to newest.
+Each line contains `v<version>` with the logger's three leading spaces, in both
+terminals and redirected output. Empty results succeed without output.
+
+Each query fetches the complete official `https://nodejs.org/dist/index.tab`
+before filtering; no cache or local installation is required. Responses are
+limited to 4 MiB with a 60-second query deadline. TLS verification and the existing
+no-redirect policy apply. Fetch or parse failures exit 1 with a reason on stderr
+and empty stdout; invalid arguments exit 2. Discovery uses archive availability
+metadata; installation still downloads and verifies the actual archive.
 
 ## Configure Node.js PATH
 

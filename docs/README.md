@@ -4,6 +4,11 @@
 
 - [README](../README.md): installation, commands, supported platforms and limitations.
 - [AGENTS.md](../AGENTS.md): rules for AI coding agents.
+- [Glossary](../GLOSSARY.md): release and remote discovery terms.
+- [Remote version prefix matching](adr/0001-remote-version-prefix-matching.md):
+  the query matching decision.
+- [Remote version discovery spec](https://github.com/verslot/verslot/issues/21):
+  accepted scope and acceptance criteria for `list-remote` / `ls-remote`.
 - [CONTRIBUTING](../CONTRIBUTING.md): the sole ongoing maintenance and release procedure.
 - [GitHub Issues](https://github.com/verslot/verslot/issues): the only backlog for new work.
 - [CHANGELOG](../CHANGELOG.md): user-visible changes by release.

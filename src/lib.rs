@@ -10,6 +10,7 @@ mod logger;
 mod mutation;
 mod output;
 mod progress;
+mod remote;
 pub mod storage;
 pub mod target;
 mod uninstall;
@@ -68,6 +69,9 @@ pub fn run() -> Result<(), String> {
                 &output::format_current(selected, io::stdout().is_terminal()),
             );
             Ok(())
+        }
+        Command::ListRemote { query } => {
+            remote::list(&query).map_err(|error| format!("list-remote {query}: {error}"))
         }
     }
 }

@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
 use crate::logger::{self, Symbol};
+use crate::remote::RemoteQuery;
 use crate::target::Target;
 
 pub(crate) fn parse() -> Cli {
@@ -67,6 +68,12 @@ pub(crate) enum Command {
     /// List installed tool versions.
     #[command(visible_alias = "ls")]
     List,
+    /// List remotely available tool versions.
+    #[command(visible_alias = "ls-remote")]
+    ListRemote {
+        #[arg(value_name = "QUERY")]
+        query: RemoteQuery,
+    },
     /// Show the selected tool version.
     Current,
 }

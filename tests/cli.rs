@@ -6,6 +6,85 @@ fn verslot_command() -> Command {
 }
 
 #[test]
+fn remote_list_help_exposes_required_query_and_alias() {
+    verslot_command()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("list-remote"))
+        .stdout(predicate::str::contains("[alias: ls-remote]"));
+    let primary = verslot_command()
+        .args(["list-remote", "--help"])
+        .output()
+        .unwrap();
+    let alias = verslot_command()
+        .args(["ls-remote", "--help"])
+        .output()
+        .unwrap();
+    assert!(primary.status.success());
+    assert_eq!(primary.stdout, alias.stdout);
+    assert_eq!(primary.stderr, alias.stderr);
+    assert!(
+        String::from_utf8(primary.stdout)
+            .unwrap()
+            .contains("<QUERY>")
+    );
+}
+
+#[test]
+fn remote_list_rejects_invalid_queries_before_execution() {
+    for command in ["list-remote", "ls-remote"] {
+        for query in [
+            "",
+            "python",
+            "Node",
+            "node@",
+            "node@@18",
+            "node@v18",
+            "node@018",
+            "node@18.01",
+            "node@18.1.01",
+            "node@4294967296",
+            "node@18.1.2.3",
+            "node@１８",
+            "node@18.",
+            "node@lts.18",
+            "node@latest",
+            "node@../18",
+            "node@18 ",
+        ] {
+            verslot_command()
+                .args([command, query])
+                .env("NO_COLOR", "1")
+                .timeout(std::time::Duration::from_secs(3))
+                .assert()
+                .code(2)
+                .stdout("")
+                .stderr(predicate::str::contains("✘  error:"))
+                .stderr(predicate::str::contains("invalid remote query"));
+        }
+    }
+}
+
+#[test]
+fn remote_list_requires_exactly_one_query() {
+    for command in ["list-remote", "ls-remote"] {
+        verslot_command()
+            .arg(command)
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains("<QUERY>"));
+        verslot_command()
+            .args([command, "node", "node@18"])
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains("unexpected argument"));
+    }
+}
+
+#[test]
 fn help_describes_the_cli() {
     verslot_command()
         .arg("--help")

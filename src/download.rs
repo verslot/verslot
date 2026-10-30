@@ -37,7 +37,7 @@ pub(crate) fn download_verified_archive_with_progress(
     download_distribution_with_progress(&agent, &distribution, archive_path, progress)
 }
 
-fn download_agent() -> Agent {
+pub(crate) fn download_agent() -> Agent {
     let config = Agent::config_builder()
         .https_only(true)
         .max_redirects(0)
@@ -128,7 +128,7 @@ fn archive_display_total(headers: &ureq::http::HeaderMap) -> Option<u64> {
         .filter(|length| (1..=ARCHIVE_LIMIT).contains(length))
 }
 
-fn fetch_response(
+pub(crate) fn fetch_response(
     agent: &Agent,
     url: &str,
     deadline: Instant,
@@ -184,10 +184,10 @@ fn remaining_time(deadline: Instant) -> Result<Duration, String> {
     deadline
         .checked_duration_since(Instant::now())
         .filter(|remaining| !remaining.is_zero())
-        .ok_or_else(|| "download deadline exceeded (15 minutes)".to_owned())
+        .ok_or_else(|| "download deadline exceeded".to_owned())
 }
 
-fn copy_bounded(
+pub(crate) fn copy_bounded(
     reader: &mut impl Read,
     writer: &mut impl Write,
     limit: u64,

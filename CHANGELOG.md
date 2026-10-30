@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add `list-remote` with the visible alias `ls-remote` for official Node.js
+  release discovery, numeric text-prefix queries and historical LTS filtering.
+  Fetch a fresh index for every query, filter by the current build's archive
+  support, and print unique `v<version>` lines in numeric ascending order (#21).
 - Remove the logger's unchanged-result dot; repeated operations use the empty
   symbol field (#20).
 - Add `verslot ls` as a visible alias for `verslot list` (#19).
