@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show a `Fetching versions` spinner on stderr during remote discovery, clear it
+  before results or errors, and use a plain stage line when redirected (#21).
 - Add `list-remote` with the visible alias `ls-remote` for official Node.js
   release discovery, numeric text-prefix queries and historical LTS filtering.
   Fetch a fresh index for every query, filter by the current build's archive

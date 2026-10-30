@@ -7,7 +7,8 @@ use ureq::Agent;
 use crate::distribution::NodePlatform;
 use crate::download;
 use crate::logger;
-use crate::target::Target;
+use crate::progress::Progress;
+use crate::target::{Target, Version};
 
 const INDEX_URL: &str = "https://nodejs.org/dist/index.tab";
 const INDEX_LIMIT: u64 = 4 * 1024 * 1024;
@@ -61,16 +62,37 @@ impl fmt::Display for RemoteQuery {
 
 pub(crate) fn list(query: &RemoteQuery) -> Result<(), String> {
     let platform = NodePlatform::current()?;
-    list_with(
+    list_with_progress(
         query,
         platform.index_file,
         &download::download_agent(),
         INDEX_URL,
         Instant::now() + QUERY_TIMEOUT,
         &mut std::io::stdout().lock(),
+        &mut Progress::stderr(),
     )
 }
 
+fn list_with_progress(
+    query: &RemoteQuery,
+    index_file: &str,
+    agent: &Agent,
+    url: &str,
+    deadline: Instant,
+    output: &mut impl Write,
+    progress: &mut Progress<'_>,
+) -> Result<(), String> {
+    progress.stage("Fetching versions");
+    let result = fetch_versions(query, index_file, agent, url, deadline);
+    progress.finish();
+    for version in result? {
+        logger::write_plain_line(output, &format!("v{version}"))
+            .map_err(|error| format!("write release list: {error}"))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
 fn list_with(
     query: &RemoteQuery,
     index_file: &str,
@@ -79,6 +101,24 @@ fn list_with(
     deadline: Instant,
     output: &mut impl Write,
 ) -> Result<(), String> {
+    list_with_progress(
+        query,
+        index_file,
+        agent,
+        url,
+        deadline,
+        output,
+        &mut Progress::Silent,
+    )
+}
+
+fn fetch_versions(
+    query: &RemoteQuery,
+    index_file: &str,
+    agent: &Agent,
+    url: &str,
+    deadline: Instant,
+) -> Result<Vec<Version>, String> {
     let mut response = download::fetch_response(agent, url, deadline)?;
     let mut bytes = Vec::new();
     download::copy_bounded(
@@ -154,11 +194,7 @@ fn list_with(
     }
     versions.sort_unstable_by_key(|version| (version.major, version.minor, version.patch));
     versions.dedup();
-    for version in versions {
-        logger::write_plain_line(output, &format!("v{version}"))
-            .map_err(|error| format!("write release list: {error}"))?;
-    }
-    Ok(())
+    Ok(versions)
 }
 
 #[cfg(test)]

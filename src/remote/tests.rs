@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::download::tests::{local_agent, response, serve};
@@ -10,6 +11,195 @@ fn remote_query(input: &str) -> RemoteQuery {
     match cli.command {
         crate::cli::Command::ListRemote { query } => query,
         _ => panic!("expected remote query"),
+    }
+}
+
+#[derive(Clone)]
+struct ProgressLog(Arc<Mutex<Vec<u8>>>);
+
+impl Write for ProgressLog {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn loading_is_visible_before_the_remote_index_response() {
+    let log = ProgressLog(Arc::new(Mutex::new(Vec::new())));
+    let observed = log.clone();
+    let (url, server) = crate::download::tests::serve_observed(
+        vec![response(b"version\tfiles\tlts\nv18.1.0\twin-x64-zip\t-\n")],
+        move |_| assert_eq!(*observed.0.lock().unwrap(), b"   Fetching versions\n"),
+    );
+    let mut output = Vec::new();
+    let mut progress = Progress::plain(log.clone());
+    list_with_progress(
+        &remote_query("node"),
+        "win-x64-zip",
+        &local_agent(),
+        &url,
+        Instant::now() + Duration::from_secs(5),
+        &mut output,
+        &mut progress,
+    )
+    .unwrap();
+    server.join().unwrap();
+    assert_eq!(output, b"   v18.1.0\n");
+    assert_eq!(*log.0.lock().unwrap(), b"   Fetching versions\n");
+}
+
+#[derive(Clone, Debug)]
+struct LoadingScreen(Arc<Mutex<String>>);
+
+impl indicatif::TermLike for LoadingScreen {
+    fn width(&self) -> u16 {
+        120
+    }
+    fn move_cursor_up(&self, _: usize) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn move_cursor_down(&self, _: usize) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn move_cursor_right(&self, _: usize) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn move_cursor_left(&self, _: usize) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn write_line(&self, line: &str) -> std::io::Result<()> {
+        self.write_str(&format!("{line}\n"))
+    }
+    fn write_str(&self, text: &str) -> std::io::Result<()> {
+        self.0.lock().unwrap().push_str(text);
+        Ok(())
+    }
+    fn clear_line(&self) -> std::io::Result<()> {
+        self.0.lock().unwrap().clear();
+        Ok(())
+    }
+    fn flush(&self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+struct AfterLoadingOutput {
+    screen: LoadingScreen,
+    bytes: Vec<u8>,
+}
+
+impl Write for AfterLoadingOutput {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        assert!(
+            self.screen.0.lock().unwrap().is_empty(),
+            "loading must clear before result output"
+        );
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn loading_clears_before_results_and_on_empty_results_or_errors() {
+    use indicatif::{ProgressBar, ProgressDrawTarget};
+    let cases: &[(Vec<u8>, Option<&[u8]>)] = &[
+        (
+            response(b"version\tfiles\tlts\nv18.1.0\twin-x64-zip\t-\n"),
+            Some(b"   v18.1.0\n"),
+        ),
+        (
+            response(b"version\tfiles\tlts\nv18.1.0\tsrc\t-\n"),
+            Some(b""),
+        ),
+        (response(b"invalid index"), None),
+        (
+            b"HTTP/1.1 503 unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(),
+            None,
+        ),
+    ];
+    for (fixture, expected) in cases {
+        let screen = LoadingScreen(Arc::new(Mutex::new(String::new())));
+        let observed = screen.clone();
+        let (url, server) =
+            crate::download::tests::serve_observed(vec![fixture.clone()], move |_| {
+                assert!(observed.0.lock().unwrap().contains("Fetching versions"))
+            });
+        let bar = ProgressBar::with_draw_target(
+            None,
+            ProgressDrawTarget::term_like(Box::new(screen.clone())),
+        );
+        let mut progress = Progress::Terminal(bar);
+        let mut output = AfterLoadingOutput {
+            screen: screen.clone(),
+            bytes: Vec::new(),
+        };
+        let result = list_with_progress(
+            &remote_query("node"),
+            "win-x64-zip",
+            &local_agent(),
+            &url,
+            Instant::now() + Duration::from_secs(5),
+            &mut output,
+            &mut progress,
+        );
+        server.join().unwrap();
+        match expected {
+            Some(expected) => {
+                result.unwrap();
+                assert_eq!(output.bytes, *expected);
+            }
+            None => {
+                assert!(result.is_err());
+                assert!(output.bytes.is_empty());
+            }
+        }
+        assert!(screen.0.lock().unwrap().is_empty());
+    }
+}
+
+struct FailingLoadingOutput(bool);
+
+impl Write for FailingLoadingOutput {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if self.0 {
+            Err(std::io::Error::other("loading write failed"))
+        } else {
+            Ok(bytes.len())
+        }
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Err(std::io::Error::other("loading flush failed"))
+    }
+}
+
+#[test]
+fn failed_loading_output_does_not_fail_a_successful_query() {
+    for fail_write in [false, true] {
+        let (url, server) = serve(vec![response(
+            b"version\tfiles\tlts\nv18.1.0\twin-x64-zip\t-\n",
+        )]);
+        let mut output = Vec::new();
+        let mut progress = Progress::plain(FailingLoadingOutput(fail_write));
+        list_with_progress(
+            &remote_query("node"),
+            "win-x64-zip",
+            &local_agent(),
+            &url,
+            Instant::now() + Duration::from_secs(5),
+            &mut output,
+            &mut progress,
+        )
+        .unwrap();
+        server.join().unwrap();
+        assert_eq!(output, b"   v18.1.0\n");
     }
 }
 

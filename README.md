@@ -126,7 +126,12 @@ builds, io.js and versions with build metadata are excluded from all queries.
 
 Results are complete, deduplicated and sorted numerically from oldest to newest.
 Each line contains `v<version>` with the logger's three leading spaces, in both
-terminals and redirected output. Empty results succeed without output.
+terminals and redirected output. Empty results succeed with empty stdout.
+
+During retrieval and processing, stderr shows `Fetching versions` using the
+existing dot spinner in terminals, or a single logger-prefixed plain stage line
+when redirected. The spinner clears before results or errors. Loading feedback
+is best-effort; stdout contains only version data.
 
 Each query fetches the complete official `https://nodejs.org/dist/index.tab`
 before filtering; no cache or local installation is required. Responses are
