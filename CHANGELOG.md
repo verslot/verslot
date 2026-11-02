@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.6.0 — 2026-11-02
+
+Source release with remote Node.js version discovery and CLI output changes.
+No precompiled binaries or crates.io publication.
+
+### Changes since v0.5.0
+
 - Show a `Fetching versions` spinner on stderr during remote discovery, clear it
   before results or errors, and use a plain stage line when redirected (#21).
 - Add `list-remote` with the visible alias `ls-remote` for official Node.js
@@ -37,6 +44,22 @@
   the response supplies a usable total (#17). Fall back to byte-only output for
   unknown, invalid or inconsistent totals. Use a leading dot spinner, replacing
   the initial ASCII rotation, and keep redirected output plain text.
+
+### Migration from v0.5.0
+
+The CLI text output contract has changed. All emitted lines now reserve a
+two-column symbol field and a separating space; plain data, help and version
+lines have three leading spaces, including when redirected. Success messages
+are capitalized and selection uses `Selected` instead of `using`. Scripts that
+compare exact lines must adapt to the prefix and wording. Capture stdout and
+stderr separately because progress is now written to stderr.
+
+Interactive `list` output is a table, and empty local queries show a message.
+Redirect local queries to retain plain version lines and empty output for no
+results. Remote queries always print plain `v<version>` lines and require a
+query such as `node`, `node@18.1` or `node@lts`. Installation targets, storage
+layout, PATH configuration and exit codes are unchanged; no storage migration
+is required.
 
 ## v0.5.0 — 2026-10-04
 

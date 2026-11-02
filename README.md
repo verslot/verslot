@@ -2,8 +2,8 @@
 
 A minimal tool version manager written in Rust. Version management. Nothing else.
 
-`v0.5.0` is the first source release intended for actual use, following M1–M5
-focused development. It manages official Node.js distributions.
+`v0.6.0` manages official Node.js distributions, including remote release
+discovery and local installation, selection and removal.
 No precompiled binaries or crates.io package are published.
 
 ## Install from source
@@ -16,16 +16,17 @@ and linker on Linux GNU. Cargo needs registry/dependency access. M5 used Rust
 These commands work in PowerShell and Bash. Use a new checkout:
 
 ```text
-git clone --branch v0.5.0 --depth 1 https://github.com/verslot/verslot.git verslot
+git clone --branch v0.6.0 --depth 1 https://github.com/verslot/verslot.git verslot
 cargo install --path verslot --locked
 verslot --version
 verslot --help
 ```
 
-Expected version: `verslot 0.5.0`. Add Cargo's bin directory to PATH (normally
-`%USERPROFILE%\.cargo\bin` or `$HOME/.cargo/bin`). This is separate from the
-Node.js PATH entry below. Source builds are not signed binary release artifacts.
-See the [Release](https://github.com/verslot/verslot/releases/tag/v0.5.0) and
+Expected version: `verslot 0.6.0` (with three leading spaces). Add Cargo's bin
+directory to PATH (normally `%USERPROFILE%\.cargo\bin` or `$HOME/.cargo/bin`).
+This is separate from the Node.js PATH entry below. Source builds are not signed
+binary release artifacts.
+See the [Release](https://github.com/verslot/verslot/releases/tag/v0.6.0) and
 [CHANGELOG](CHANGELOG.md).
 
 ## Quick start
@@ -53,7 +54,7 @@ A selected version cannot be uninstalled.
 | `verslot uninstall node@<version>` | Remove a complete inactive installation |
 | `verslot use node@<version>` | Select an installed version; selecting it again is a no-op |
 | `verslot list` / `verslot ls` | Print complete installations, sorted numerically; show a Tool/Version table in terminals |
-| `verslot list-remote node` / `verslot ls-remote node` | Discover official releases available for this build's platform; unreleased feature |
+| `verslot list-remote node` / `verslot ls-remote node` | Discover official releases available for this build's platform |
 | `verslot current` | Print the selected complete version, or nothing if none is selected |
 
 `install`, `uninstall` and `use` accept only `node@major.minor.patch`, with three ASCII decimal components
@@ -99,9 +100,18 @@ labels are red on terminals; redirected output, nonempty `NO_COLOR`, or
 `TERM=dumb` disable color. Terminal lists keep their two-column layout when
 color is disabled.
 
-## Discover Node.js versions (Unreleased)
+## Upgrade from v0.5.0
 
-Remote discovery is available in the development branch, after `v0.5.0`:
+The CLI text output contract changes in v0.6.0. Scripts must allow for the symbol
+column, three leading spaces on plain data lines and capitalized result wording.
+Capture stdout and stderr separately to keep progress out of query data.
+Redirect local queries to retain plain lines instead of terminal tables or
+empty-query messages. See [migration notes](CHANGELOG.md#migration-from-v050).
+Storage layout and PATH configuration are unchanged; no data migration is needed.
+
+## Discover Node.js versions
+
+Remote discovery is available starting with `v0.6.0`:
 
 ```text
 verslot ls-remote node
@@ -178,7 +188,7 @@ their original executable; selection affects subsequent launches.
 M5 native acceptance covers Windows x86_64 MSVC, macOS arm64 and Linux x86_64
 GNU with official Node.js 22.0.0 / 24.0.0 workflows. See the historical
 [M5 evidence and final decision](docs/archive/milestones/m5/m5-validation.md#final-acceptance-on-2026-10-04).
-These workflows are retained evidence, not new v0.5.0 release runs.
+These workflows are retained evidence, not acceptance reruns for v0.6.0.
 
 | Platform | Status |
 | --- | --- |
