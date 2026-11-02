@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::installation::validate_installation;
 use crate::mutation::{acquire_read_lock, reject_switch_residue};
-use crate::target::{Target, Version};
+use crate::target::{Target, Version, VersionRequest};
 
 mod links;
 
@@ -30,6 +30,16 @@ pub struct Storage {
 }
 
 impl Storage {
+    // Resolve partial requests only while the caller holds the mutation lock.
+    fn resolve_selection(root: &Path, request: &VersionRequest) -> io::Result<Target> {
+        if let Some(target) = request.exact() {
+            return Ok(target);
+        }
+        crate::inventory::read_matching_installations(root, |target| request.matches(target))?
+            .pop()
+            .ok_or_else(|| selection_not_installed(request))
+    }
+
     pub fn from_env() -> io::Result<Self> {
         Self::from_source(std::env::var_os(ROOT_VARIABLE).as_deref())
     }
@@ -177,6 +187,14 @@ impl Storage {
             }
         }
         Ok(path)
+    }
+}
+
+fn selection_not_installed(request: &VersionRequest) -> io::Error {
+    if let Some(target) = request.exact() {
+        io::Error::other(format!("not installed: {target}"))
+    } else {
+        io::Error::other(format!("no installed version matches {request}"))
     }
 }
 

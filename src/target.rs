@@ -40,6 +40,73 @@ impl fmt::Display for Target {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct VersionRequest {
+    target: Target,
+    components: usize,
+}
+
+impl VersionRequest {
+    pub(crate) fn exact(&self) -> Option<Target> {
+        (self.components == 3).then_some(self.target)
+    }
+
+    pub(crate) fn matches(&self, target: &Target) -> bool {
+        self.target.tool == target.tool
+            && self.target.version.major == target.version.major
+            && (self.components < 2 || self.target.version.minor == target.version.minor)
+            && (self.components < 3 || self.target.version.patch == target.version.patch)
+    }
+}
+
+impl From<Target> for VersionRequest {
+    fn from(target: Target) -> Self {
+        Self {
+            target,
+            components: 3,
+        }
+    }
+}
+
+impl fmt::Display for VersionRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let version = self.target.version;
+        write!(f, "{}@{}", self.target.tool, version.major)?;
+        if self.components >= 2 {
+            write!(f, ".{}", version.minor)?;
+        }
+        if self.components == 3 {
+            write!(f, ".{}", version.patch)?;
+        }
+        Ok(())
+    }
+}
+
+impl FromStr for VersionRequest {
+    type Err = String;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        let (tool, version) = input
+            .split_once('@')
+            .ok_or_else(|| ParseTargetError::InvalidStructure.to_string())?;
+        if tool.is_empty() || version.is_empty() || version.contains('@') {
+            return Err(ParseTargetError::InvalidStructure.to_string());
+        }
+        let components = version.split('.').count();
+        let target = match components {
+            1 => format!("{input}.0.0").parse::<Target>(),
+            2 => format!("{input}.0").parse::<Target>(),
+            _ => input.parse::<Target>(),
+        }
+        .map_err(|error| match error {
+            ParseTargetError::ComponentCount =>
+                "invalid version: expected major, major.minor, or major.minor.patch; example: node@18.1".to_owned(),
+            _ => error.to_string(),
+        })?;
+        Ok(Self { target, components })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParseTargetError {
     InvalidStructure,
     UnsupportedTool,
@@ -110,7 +177,82 @@ impl FromStr for Target {
 
 #[cfg(test)]
 mod tests {
-    use super::{ParseTargetError, Target, Tool, Version};
+    use super::{ParseTargetError, Target, Tool, Version, VersionRequest};
+
+    #[test]
+    fn version_requests_accept_canonical_full_and_partial_versions() {
+        for input in [
+            "node@18",
+            "node@18.1",
+            "node@18.1.2",
+            "node@0",
+            "node@0.0",
+            "node@0.0.0",
+            "node@4294967295",
+            "node@4294967295.4294967295",
+            "node@4294967295.4294967295.4294967295",
+        ] {
+            let request = input.parse::<VersionRequest>().unwrap();
+            assert_eq!(request.to_string(), input);
+        }
+    }
+
+    #[test]
+    fn version_requests_match_supplied_components_exactly() {
+        let target = "node@18.1.10".parse::<Target>().unwrap();
+        for (input, expected) in [
+            ("node@18", true),
+            ("node@18.1", true),
+            ("node@18.1.10", true),
+            ("node@1", false),
+            ("node@18.10", false),
+            ("node@18.1.1", false),
+            ("node@19", false),
+        ] {
+            let request = input.parse::<VersionRequest>().unwrap();
+            assert_eq!(request.matches(&target), expected, "{input}");
+        }
+    }
+
+    #[test]
+    fn partial_version_requests_preserve_canonical_component_rules() {
+        for input in [
+            "",
+            "node",
+            "@18",
+            "node@",
+            "node@@18",
+            "node@18@",
+            "Node@18",
+            "nodejs@18.1",
+            "node@latest",
+            "node@lts",
+            "node@*",
+            "node@v18",
+            "node@18.",
+            "node@.1",
+            "node@18..1",
+            "node@18.1.2.3",
+            "node@018",
+            "node@18.01",
+            "node@4294967296",
+            "node@18.4294967296",
+            "node@１８",
+            "node@18.１",
+            "node@ 18",
+            "node@18.1 ",
+            "node@-18",
+            "node@+18",
+            "node@18-beta",
+            "node@18.1+build",
+            "node@18/1",
+            "node@18\\1",
+            "node@../18",
+            "node@18\0",
+        ] {
+            assert!(input.parse::<VersionRequest>().is_err(), "{input:?}");
+        }
+    }
 
     #[test]
     fn full_versions_return_numeric_data_and_canonical_names() {

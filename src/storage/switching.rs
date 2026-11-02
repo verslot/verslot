@@ -2,11 +2,11 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use super::Storage;
 use super::links::UnixLink;
+use super::{Storage, selection_not_installed};
 use crate::installation::{real_directory, validate_installation};
 use crate::mutation::{acquire_lock, create_directory};
-use crate::target::{Target, Tool, Version};
+use crate::target::{Target, Tool, Version, VersionRequest};
 
 // Private checkpoints allow deterministic failures without production environment switches.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,10 +30,23 @@ impl Storage {
     fn select_unix(
         &self,
         target: &Target,
-        mut checkpoint: impl FnMut(SwitchStep) -> io::Result<()>,
+        checkpoint: impl FnMut(SwitchStep) -> io::Result<()>,
     ) -> io::Result<bool> {
+        self.select_requested_unix(&VersionRequest::from(*target), checkpoint)
+            .map(|(_, changed)| changed)
+    }
+
+    pub(crate) fn select_requested(&self, request: &VersionRequest) -> io::Result<(Target, bool)> {
+        self.select_requested_unix(request, |_| Ok(()))
+    }
+
+    fn select_requested_unix(
+        &self,
+        request: &VersionRequest,
+        mut checkpoint: impl FnMut(SwitchStep) -> io::Result<()>,
+    ) -> io::Result<(Target, bool)> {
         self.current_link_path()?;
-        let not_installed = || io::Error::other(format!("not installed: {target}"));
+        let not_installed = || selection_not_installed(request);
         match fs::symlink_metadata(self.root()) {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Err(not_installed()),
             Err(error) => return Err(error),
@@ -42,6 +55,7 @@ impl Storage {
         let root = fs::canonicalize(self.root())?;
         let lock = acquire_lock(&root)?;
         let previous = self.read_complete_current(&root)?;
+        let target = &Self::resolve_selection(&root, request)?;
         let destination = root.join("installs/node").join(target.version.to_string());
         real_directory(&root, destination.parent().unwrap()).map_err(|error| {
             if error.kind() == io::ErrorKind::NotFound {
@@ -58,7 +72,7 @@ impl Storage {
         validate_installation(&root, target)?;
         if previous == Some(target.version) {
             lock.unlock()?;
-            return Ok(false);
+            return Ok((*target, false));
         }
 
         let current_directory = root.join("current");
@@ -208,7 +222,7 @@ impl Storage {
             )));
         }
         lock.unlock()?;
-        Ok(true)
+        Ok((*target, true))
     }
 }
 

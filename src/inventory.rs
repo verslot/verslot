@@ -12,6 +12,13 @@ pub(crate) fn list_installed() -> Result<Vec<Target>, String> {
 }
 
 fn read_installations(root: &Path) -> io::Result<Vec<Target>> {
+    read_matching_installations(root, |_| true)
+}
+
+pub(crate) fn read_matching_installations(
+    root: &Path,
+    matches: impl Fn(&Target) -> bool,
+) -> io::Result<Vec<Target>> {
     match fs::symlink_metadata(root) {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => return Err(error),
@@ -40,6 +47,9 @@ fn read_installations(root: &Path) -> io::Result<Vec<Target>> {
         let Ok(target) = format!("node@{name}").parse::<Target>() else {
             continue;
         };
+        if !matches(&target) {
+            continue;
+        }
         validate_installation(&root, &target)
             .map_err(|error| io::Error::new(error.kind(), format!("inspect {target}: {error}")))?;
         installations.push(target);

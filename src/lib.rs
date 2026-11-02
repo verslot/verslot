@@ -34,13 +34,13 @@ pub fn run() -> Result<(), String> {
         Command::Use { target } => {
             let storage =
                 storage::Storage::from_env().map_err(|error| format!("use {target}: {error}"))?;
-            let changed = storage
-                .select(&target)
+            let (resolved, changed) = storage
+                .select_requested(&target)
                 .map_err(|error| format!("use {target}: {error}"))?;
             if changed {
-                output::print_result(&format!("selected {target}"));
+                output::print_result(&format!("selected {resolved}"));
             } else {
-                output::print_result(&format!("already selected {target}"));
+                output::print_result(&format!("already selected {resolved}"));
             }
             Ok(())
         }

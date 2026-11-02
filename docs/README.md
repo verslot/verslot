@@ -9,6 +9,8 @@
   the query matching decision.
 - [Remote version discovery spec](https://github.com/verslot/verslot/issues/21):
   accepted scope and acceptance criteria for `list-remote` / `ls-remote`.
+- [Partial version requests](https://github.com/verslot/verslot/issues/27):
+  local selection and remote installation by major or minor series.
 - [CONTRIBUTING](../CONTRIBUTING.md): the sole ongoing maintenance and release procedure.
 - [GitHub Issues](https://github.com/verslot/verslot/issues): the only backlog for new work.
 - [CHANGELOG](../CHANGELOG.md): user-visible changes by release.

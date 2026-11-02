@@ -1,9 +1,16 @@
 # Verslot
 
-Verslot manages tool versions. This glossary defines the release terms used in
-version discovery.
+Verslot manages tool versions. This glossary defines release and version-request
+terms used in discovery, installation and selection.
 
 ## Language
+
+**Version request**:
+A tool name with one to three numeric version components, identifying an exact
+release or a major/minor release series whose supplied components must match.
+
+**Resolved target**:
+A tool and complete major, minor and patch version identifying one release.
 
 **Official release**:
 A Node.js version identified by major, minor, and patch numbers, without a

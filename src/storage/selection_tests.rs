@@ -35,7 +35,7 @@ fn mutations_during_switch_child() {
     for error in [
         storage.select(&second).unwrap_err().to_string(),
         storage.read_selected().unwrap_err().to_string(),
-        crate::install::install(&first).unwrap_err(),
+        crate::install::install(&first.into()).unwrap_err(),
         crate::uninstall::uninstall(&first).unwrap_err(),
     ] {
         assert!(error.contains("storage is busy"), "{error}");

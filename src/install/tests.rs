@@ -6,6 +6,237 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 struct Fixture(PathBuf);
 
+fn install_request(input: &str) -> VersionRequest {
+    use clap::Parser;
+    let cli = crate::cli::Cli::try_parse_from(["verslot", "install", input]).unwrap();
+    match cli.command {
+        crate::cli::Command::Install { target } => target,
+        _ => panic!("expected installation request"),
+    }
+}
+
+fn remote_versions_from(url: &str) -> Result<Vec<Version>, String> {
+    crate::remote::fetch_versions(
+        &crate::remote::RemoteQuery::All,
+        NodePlatform::current()?.index_file,
+        &crate::download::tests::local_agent(),
+        url,
+        std::time::Instant::now() + std::time::Duration::from_secs(5),
+    )
+}
+
+#[test]
+fn partial_install_resolves_numeric_components_and_installs_the_latest_eligible_release() {
+    let files = NodePlatform::current().unwrap().index_file;
+    let index = format!(
+        "version\tfiles\tlts\nv18.1.9\t{files}\t-\nv18.10.0\t{files}\tHydrogen\nv18.1.10\t{files}\t-\nv18.9.9\t{files}\t-\nv1.20.0\t{files}\t-\nv118.0.0\t{files}\t-\nv19.1.100\t{files}\t-\nv18.99.0\tsrc\t-\nv18.1.99\tsrc\t-\nv18.100.0-beta\t{files}\t-\nv18.100.0+build\t{files}\t-\nv018.100.0\t{files}\t-\nv18.1.10\t{files}\t-\n"
+    );
+    for (input, version) in [
+        ("node@18", "18.10.0"),
+        ("node@18.1", "18.1.10"),
+        ("node@1", "1.20.0"),
+    ] {
+        let fixture = Fixture::new();
+        let target = format!("node@{version}").parse::<Target>().unwrap();
+        let bytes = archive_fixture(&target);
+        let (url, server) =
+            crate::download::tests::serve(vec![crate::download::tests::response(index.as_bytes())]);
+        let mut output = Vec::new();
+        let result = install_requested_with_progress(
+            &fixture.0,
+            &install_request(input),
+            &mut Progress::plain(&mut output),
+            || remote_versions_from(&url),
+            |resolved, archive, progress| {
+                crate::download::tests::download_fixture(resolved, &bytes, archive, progress, false)
+            },
+            remove_operation,
+        );
+        server.join().unwrap();
+        assert_eq!(result.unwrap(), format!("installed {target}"));
+        validate_installation(&fixture.0, &target).unwrap();
+        assert_eq!(
+            fs::read_dir(fixture.0.join("installs/node"))
+                .unwrap()
+                .count(),
+            1
+        );
+        assert!(!fixture.0.join("current").exists());
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.starts_with(&format!(
+            "   Resolving {input}\n   Fetching checksums {target}\n"
+        )));
+        assert!(output.contains(&format!("   Downloading {target}\n")));
+        assert!(output.ends_with(&format!("   Verifying {target}\n   Installing {target}\n")));
+    }
+}
+
+#[test]
+fn exact_install_skips_version_discovery_and_preserves_silent_duplicates() {
+    let fixture = Fixture::new();
+    let target = fixture.target();
+    let bytes = archive_fixture(&target);
+    let request = install_request("node@22.0.0");
+    let mut output = Vec::new();
+    let result = install_requested_with_progress(
+        &fixture.0,
+        &request,
+        &mut Progress::plain(&mut output),
+        || panic!("exact requests must not fetch a release index"),
+        |version, archive, progress| {
+            crate::download::tests::download_fixture(version, &bytes, archive, progress, false)
+        },
+        remove_operation,
+    )
+    .unwrap();
+    assert_eq!(result, "installed node@22.0.0");
+    validate_installation(&fixture.0, &target).unwrap();
+    assert!(!String::from_utf8(output).unwrap().contains("Resolving"));
+    let receipt = fs::read(fixture.destination().join(".verslot-install")).unwrap();
+    let mut output = Vec::new();
+    let duplicate = install_requested_with_progress(
+        &fixture.0,
+        &request,
+        &mut Progress::plain(&mut output),
+        || panic!("exact duplicates must not fetch a release index"),
+        |_, _, _| panic!("duplicates must not fetch a checksum or archive"),
+        remove_operation,
+    )
+    .unwrap();
+    assert_eq!(duplicate, "already installed node@22.0.0");
+    assert!(output.is_empty());
+    assert_eq!(
+        fs::read(fixture.destination().join(".verslot-install")).unwrap(),
+        receipt
+    );
+}
+
+#[test]
+fn partial_install_checks_fresh_remote_versions_even_with_an_installed_match() {
+    let fixture = Fixture::new();
+    let old = "node@18.1.9".parse::<Target>().unwrap();
+    fs::create_dir_all(fixture.0.join("installs/node")).unwrap();
+    complete_staging(&fixture.0.join("installs/node/18.1.9"), &old);
+    let files = NodePlatform::current().unwrap().index_file;
+    let responses = ["18.1.10", "18.1.10", "18.1.11"].map(|version| {
+        crate::download::tests::response(
+            format!("version\tfiles\tlts\nv18.1.9\t{files}\t-\nv{version}\t{files}\t-\n")
+                .as_bytes(),
+        )
+    });
+    let (url, server) = crate::download::tests::serve(responses.into());
+    for (version, install_new) in [("18.1.10", true), ("18.1.10", false), ("18.1.11", true)] {
+        let target = format!("node@{version}").parse::<Target>().unwrap();
+        let bytes = archive_fixture(&target);
+        let mut output = Vec::new();
+        let result = install_requested_with_progress(
+            &fixture.0,
+            &install_request("node@18.1"),
+            &mut Progress::plain(&mut output),
+            || remote_versions_from(&url),
+            |resolved, archive, progress| {
+                assert!(install_new, "duplicate must not download");
+                crate::download::tests::download_fixture(resolved, &bytes, archive, progress, false)
+            },
+            remove_operation,
+        )
+        .unwrap();
+        assert_eq!(
+            result,
+            format!(
+                "{} {target}",
+                if install_new {
+                    "installed"
+                } else {
+                    "already installed"
+                }
+            )
+        );
+        validate_installation(&fixture.0, &target).unwrap();
+        if !install_new {
+            assert_eq!(output, b"   Resolving node@18.1\n");
+        }
+    }
+    server.join().unwrap();
+    validate_installation(&fixture.0, &old).unwrap();
+    assert_eq!(
+        fs::read_dir(fixture.0.join("installs/node"))
+            .unwrap()
+            .count(),
+        3
+    );
+    assert!(!fixture.0.join("current").exists());
+}
+
+#[test]
+fn failed_partial_install_resolution_preserves_selection_without_local_fallback() {
+    let fixture = Fixture::new();
+    let storage = Storage::from_source(Some(fixture.0.as_os_str())).unwrap();
+    let old = "node@18.1.9".parse::<Target>().unwrap();
+    fs::create_dir_all(storage.root().join("installs/node")).unwrap();
+    let destination = storage.root().join("installs/node/18.1.9");
+    complete_staging(&destination, &old);
+    storage.select(&old).unwrap();
+    let receipt = fs::read(destination.join(".verslot-install")).unwrap();
+    let files = NodePlatform::current().unwrap().index_file;
+    for (response, reason) in [
+        (
+            crate::download::tests::response(format!("version\tfiles\tlts\nv18.10.0\t{files}\t-\n").as_bytes()),
+            "no remotely available version matches node@18.1",
+        ),
+        (crate::download::tests::response(b"invalid index"), "release index"),
+        (
+            crate::download::tests::response(format!("version\tfiles\tlts\nv18.1.10\t{files}\t-\ninvalid row\n").as_bytes()),
+            "malformed row",
+        ),
+        (b"HTTP/1.1 503 unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(), "received 503"),
+        (b"HTTP/1.1 302 redirect\r\nLocation: http://127.0.0.1:1/never\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(), "received 302"),
+    ] {
+        let (url, server) = crate::download::tests::serve(vec![response]);
+        let mut output = Vec::new();
+        let error = install_requested_with_progress(
+            storage.root(),
+            &install_request("node@18.1"),
+            &mut Progress::plain(&mut output),
+            || remote_versions_from(&url),
+            |_, _, _| panic!("failed resolution must not download"),
+            remove_operation,
+        ).unwrap_err();
+        server.join().unwrap();
+        assert!(error.contains(reason), "{error}");
+        assert_eq!(output, b"   Resolving node@18.1\n");
+        assert_eq!(storage.read_selected().unwrap(), Some(old.version));
+        assert_eq!(fs::read(destination.join(".verslot-install")).unwrap(), receipt);
+        assert_eq!(fs::read_dir(storage.root().join("installs/node")).unwrap().count(), 1);
+        assert!(!storage.root().join("tmp").exists());
+    }
+}
+
+#[test]
+fn failed_partial_install_resolution_finishes_loading_without_creating_storage() {
+    for versions in [Ok(Vec::new()), Err("release index unavailable".to_owned())] {
+        let fixture = Fixture::new();
+        let root = fixture.0.join("missing-storage");
+        let bar = indicatif::ProgressBar::hidden();
+        let mut progress = Progress::Terminal(bar.clone());
+        let error = install_requested_with_progress(
+            &root,
+            &install_request("node@18"),
+            &mut progress,
+            || versions,
+            |_, _, _| panic!("failed resolution must not download"),
+            remove_operation,
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("no remotely available version matches")
+                || error.contains("release index unavailable")
+        );
+        assert!(bar.is_finished());
+        assert!(!root.exists());
+    }
+}
+
 // Run directly from the test executable in a native terminal, then redirect stderr.
 #[test]
 #[ignore = "manual native terminal/redirected lifecycle acceptance"]
@@ -83,14 +314,14 @@ fn progress_install_extracts_real_archive_and_preserves_final_result() {
     let output = String::from_utf8(output).unwrap();
     assert!(
         output.starts_with(&format!(
-            "   Fetching checksums\n   Downloading\n   Downloaded 0/{} bytes (0%)\n",
+            "   Fetching checksums node@22.0.0\n   Downloading node@22.0.0\n   Downloaded 0/{} bytes (0%)\n",
             bytes.len()
         )),
         "{output}"
     );
     assert!(
         output.contains(&format!(
-            "   Downloaded {0}/{0} bytes (100%)\n   Verifying\n   Installing\n",
+            "   Downloaded {0}/{0} bytes (100%)\n   Verifying node@22.0.0\n   Installing node@22.0.0\n",
             bytes.len()
         )),
         "{output}"
@@ -140,7 +371,7 @@ fn progress_install_finishes_reporting_even_when_cleanup_fails() {
     validate_installation(&fixture.0, &target).unwrap();
     let output = String::from_utf8(output).unwrap();
     assert!(
-        output.ends_with("   Verifying\n   Installing\n"),
+        output.ends_with("   Verifying node@22.0.0\n   Installing node@22.0.0\n"),
         "{output}"
     );
     assert!(
@@ -184,7 +415,7 @@ fn progress_install_preserves_download_and_extraction_failures() {
             assert_eq!(error, "injected download failure");
             assert!(output.is_empty());
         } else {
-            assert_eq!(output, b"   Fetching checksums\n   Downloading\n   Downloaded 0/15 bytes (0%)\n   Downloaded 15/15 bytes (100%)\n   Downloaded 15/15 bytes (100%)\n   Verifying\n   Installing\n");
+            assert_eq!(output, b"   Fetching checksums node@22.0.0\n   Downloading node@22.0.0\n   Downloaded 0/15 bytes (0%)\n   Downloaded 15/15 bytes (100%)\n   Downloaded 15/15 bytes (100%)\n   Verifying node@22.0.0\n   Installing node@22.0.0\n");
         }
         assert!(!fixture.destination().exists());
         assert_eq!(fs::read_dir(fixture.0.join("tmp")).unwrap().count(), 0);
@@ -882,7 +1113,10 @@ fn offline_workflow_child() {
     });
     assert_eq!(fs::read(&npm).unwrap(), b"offline fixture");
     let receipt = fs::read(installation.join(".verslot-install")).unwrap();
-    assert_eq!(install(&target).unwrap(), "already installed node@22.0.0");
+    assert_eq!(
+        install(&target.into()).unwrap(),
+        "already installed node@22.0.0"
+    );
     assert_eq!(
         fs::read(installation.join(".verslot-install")).unwrap(),
         receipt
@@ -981,7 +1215,10 @@ fn offline_install_switch_query_uninstall_child() {
     let payload = fs::read(&executable).unwrap();
     assert!(storage.select(&first).unwrap());
     assert_eq!(storage.read_selected().unwrap(), Some(first.version));
-    assert_eq!(install(&second).unwrap(), "already installed node@24.0.0");
+    assert_eq!(
+        install(&second.into()).unwrap(),
+        "already installed node@24.0.0"
+    );
     assert_eq!(storage.read_selected().unwrap(), Some(first.version));
     assert!(storage.select(&second).unwrap());
     assert!(!storage.select(&second).unwrap());

@@ -84,8 +84,9 @@ def run_with_pty(command, stdout, stderr):
 def check_output(test, mode, stdout, stderr):
     if "1 passed; 0 failed" not in stdout:
         raise AssertionError("The exact smoke test did not run and pass")
+    target = "node@18.20.8" if test == TESTS[0] else "node@22.0.0"
     for stage in ["Fetching checksums", "Downloading", "Verifying", "Installing"]:
-        if stage not in stderr or stage in stdout:
+        if f"{stage} {target}" not in stderr or stage in stdout:
             raise AssertionError(f"Missing or misplaced stderr stage: {stage}")
     if "Downloaded " in stdout or any(dot in stdout for dot in DOTS):
         raise AssertionError("Progress leaked to stdout")
@@ -96,6 +97,8 @@ def check_output(test, mode, stdout, stderr):
         raise AssertionError("The PTY did not exercise animated terminal output")
 
     if test == TESTS[0]:
+        if "Resolving node@18" not in stderr or "Resolving" in stdout:
+            raise AssertionError("Missing or misplaced resolution stage")
         amounts = ["1024 bytes", "4097 bytes"]
         amounts += (["50%  2048/4096 bytes", "100%  4096/4096 bytes"]
                     if mode == "pty" else
@@ -109,7 +112,7 @@ def check_output(test, mode, stdout, stderr):
             raise AssertionError("Animation did not stop before final output")
         if mode == "pty":
             plain = re.sub(r"\x1b\[[0-9;]*m", "", before)
-            frames = re.findall(rf"([{DOTS}])  Downloading 1024 bytes", plain)
+            frames = re.findall(rf"([{DOTS}])  Downloading {re.escape(target)} 1024 bytes", plain)
             if len(set(frames)) < 2:
                 raise AssertionError("Spinner did not advance while bytes stayed unchanged")
             if "█" * 13 + "░" * 11 not in plain or "█" * 24 not in plain:
