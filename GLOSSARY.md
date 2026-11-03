@@ -1,9 +1,22 @@
 # Verslot
 
-Verslot manages tool versions. This glossary defines release and version-request
-terms used in discovery, installation and selection.
+Verslot manages tool versions. This glossary defines managed-tool, selection,
+release and version-request terms used in discovery, installation and selection.
 
 ## Language
+
+**Managed tool**:
+Named software whose installed versions and global selection Verslot manages
+independently of other tools.
+
+**Global selection**:
+The installed version selected for a managed tool across directories until the
+user changes it. Each tool has its own selection.
+
+**Bundled command**:
+A command supplied with a managed tool version, such as npm or npx in a Node.js
+distribution. It follows the supplying tool's selection rather than having an
+independent Verslot selection.
 
 **Version request**:
 A tool name with one to three numeric version components, identifying an exact

@@ -1,4 +1,6 @@
-use clap::{Parser, Subcommand};
+use std::ffi::OsStr;
+
+use clap::{CommandFactory, Parser, Subcommand};
 
 use crate::logger::{self, Symbol};
 use crate::remote::RemoteQuery;
@@ -14,11 +16,7 @@ pub(crate) fn parse() -> Cli {
             } else {
                 logger::stdout_color_enabled()
             };
-            let message = if color {
-                error.render().ansi().to_string()
-            } else {
-                error.render().to_string()
-            };
+            let message = format_cli_message(&error, color, std::env::args_os().nth(1).as_deref());
             let symbol = match error.kind() {
                 clap::error::ErrorKind::DisplayHelp
                 | clap::error::ErrorKind::DisplayVersion
@@ -36,9 +34,29 @@ pub(crate) fn parse() -> Cli {
     }
 }
 
+fn format_cli_message(error: &clap::Error, color: bool, subcommand_name: Option<&OsStr>) -> String {
+    let rendered = error.render();
+    let mut message = if color {
+        rendered.ansi().to_string()
+    } else {
+        rendered.to_string()
+    };
+    let help_hint = "\n\nFor more information, try '";
+    if let Some(index) = message.rfind(help_hint) {
+        let cli = Cli::command();
+        let command = match subcommand_name.and_then(|name| cli.find_subcommand(name)) {
+            Some(subcommand) => format!("verslot {}", subcommand.get_name()),
+            None => "verslot".to_owned(),
+        };
+        message.insert_str(index + help_hint.len(), &format!("{command} "));
+    }
+    message
+}
+
 #[derive(Debug, Parser)]
 #[command(
     name = "verslot",
+    bin_name = "verslot",
     version,
     about = "A minimal, extensible tool version manager written in Rust."
 )]
@@ -49,6 +67,8 @@ pub(crate) struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// Create or refresh the unified command entry points.
+    Setup,
     /// Install a tool version.
     Install {
         /// Exact version, major, or major.minor; partial versions install the newest remote match.
@@ -78,4 +98,25 @@ pub(crate) enum Command {
     },
     /// Show the selected tool version.
     Current,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn complete_help_commands_preserve_colored_diagnostics() {
+        for arguments in [
+            vec!["verslot.exe", "-v"],
+            vec!["verslot.exe", "use"],
+            vec!["verslot.exe", "use", "node@22."],
+        ] {
+            let error = Cli::try_parse_from(arguments.iter().copied()).unwrap_err();
+            let subcommand_name = arguments.get(1).map(OsStr::new);
+            let plain = format_cli_message(&error, false, subcommand_name);
+            let colored = format_cli_message(&error, true, subcommand_name);
+            assert!(colored.contains('\x1b'));
+            assert_eq!(clap::builder::StyledStr::from(colored).to_string(), plain);
+        }
+    }
 }

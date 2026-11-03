@@ -1,5 +1,24 @@
+use std::path::Path;
+
 use crate::logger::{self, Symbol};
 use crate::target::{Target, Version};
+
+pub(crate) fn format_path_for_display(path: &Path) -> String {
+    let display = path.display().to_string();
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+
+        if let Some(Component::Prefix(prefix)) = path.components().next() {
+            match prefix.kind() {
+                Prefix::VerbatimDisk(_) => return display[4..].to_owned(),
+                Prefix::VerbatimUNC(_, _) => return format!("\\\\{}", &display[8..]),
+                _ => {}
+            }
+        }
+    }
+    display
+}
 
 pub(crate) fn print_result(message: &str) {
     let symbol = if message.starts_with("already ") {
@@ -131,6 +150,35 @@ fn format_error(error: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn display_paths_use_standard_drive_and_unc_notation() {
+        for (path, expected) in [
+            (
+                r"\\?\C:\Users\用户\verslot\shims",
+                r"C:\Users\用户\verslot\shims",
+            ),
+            (
+                r"\\?\UNC\server\share\verslot\shims",
+                r"\\server\share\verslot\shims",
+            ),
+            (
+                r"C:\Users\用户\verslot\shims",
+                r"C:\Users\用户\verslot\shims",
+            ),
+            (
+                r"\\server\share\verslot\shims",
+                r"\\server\share\verslot\shims",
+            ),
+            (
+                r"\\?\Volume{test}\verslot\shims",
+                r"\\?\Volume{test}\verslot\shims",
+            ),
+        ] {
+            assert_eq!(format_path_for_display(Path::new(path)), expected);
+        }
+    }
 
     #[test]
     fn results_capitalize_without_color() {

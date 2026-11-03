@@ -196,7 +196,7 @@ pub(crate) fn real_directory(root: &Path, directory: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn regular_file(root: &Path, path: &Path) -> io::Result<Metadata> {
+pub(crate) fn regular_file(root: &Path, path: &Path) -> io::Result<Metadata> {
     real_directory(
         root,
         path.parent().ok_or_else(|| invalid("file has no parent"))?,

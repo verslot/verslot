@@ -11,6 +11,8 @@ mod mutation;
 mod output;
 mod progress;
 mod remote;
+mod setup;
+mod shim;
 pub mod storage;
 pub mod target;
 mod uninstall;
@@ -18,9 +20,22 @@ mod uninstall;
 use cli::Command;
 
 pub fn run() -> Result<(), String> {
+    if let Some(command) = shim::invoked_command() {
+        return shim::execute(command).map_err(|error| format!("{command}: {error}"));
+    }
     let cli = cli::parse();
 
     match cli.command {
+        Command::Setup => {
+            let directory = setup::setup().map_err(|error| format!("setup: {error}"))?;
+            let directory = output::format_path_for_display(&directory);
+            output::print_result(&format!("configured shims at {directory}"));
+            logger::print_stdout(
+                logger::Symbol::None,
+                &format!("Prepend this directory to PATH: {directory}\n"),
+            );
+            Ok(())
+        }
         Command::Install { target } => {
             let message = install::install(&target)?;
             output::print_result(&message);
