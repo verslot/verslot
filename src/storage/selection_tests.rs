@@ -34,7 +34,7 @@ fn mutations_during_switch_child() {
     let second: Target = "node@24.0.0".parse().unwrap();
     for error in [
         storage.select(&second).unwrap_err().to_string(),
-        storage.read_selected().unwrap_err().to_string(),
+        storage.read_selected(Tool::Node).unwrap_err().to_string(),
         crate::install::install(&first.into()).unwrap_err(),
         crate::uninstall::uninstall(&first).unwrap_err(),
     ] {
@@ -117,16 +117,16 @@ fn create_link(target: &Path, link: &Path) {
 #[test]
 fn empty_queries_create_nothing_with_or_without_a_lock() {
     let fixture = Fixture::new();
-    assert_eq!(fixture.storage.read_selected().unwrap(), None);
+    assert_eq!(fixture.storage.read_selected(Tool::Node).unwrap(), None);
     assert!(!fixture.storage.root().exists());
     fs::create_dir(fixture.storage.root()).unwrap();
-    assert_eq!(fixture.storage.read_selected().unwrap(), None);
+    assert_eq!(fixture.storage.read_selected(Tool::Node).unwrap(), None);
     assert_eq!(fs::read_dir(fixture.storage.root()).unwrap().count(), 0);
     fs::create_dir(fixture.storage.root().join("current")).unwrap();
-    assert_eq!(fixture.storage.read_selected().unwrap(), None);
+    assert_eq!(fixture.storage.read_selected(Tool::Node).unwrap(), None);
     assert!(!fixture.storage.root().join(".mutation.lock").exists());
     drop(acquire_lock(fixture.storage.root()).unwrap());
-    assert_eq!(fixture.storage.read_selected().unwrap(), None);
+    assert_eq!(fixture.storage.read_selected(Tool::Node).unwrap(), None);
     assert_eq!(
         fs::read(fixture.storage.root().join(".mutation.lock")).unwrap(),
         b""
@@ -141,7 +141,7 @@ fn complete_queries_require_an_existing_lock_and_preserve_its_contents() {
     assert!(
         fixture
             .storage
-            .read_selected()
+            .read_selected(Tool::Node)
             .unwrap_err()
             .to_string()
             .contains("without mutation lock")
@@ -150,7 +150,10 @@ fn complete_queries_require_an_existing_lock_and_preserve_its_contents() {
     assert!(!path.exists());
     fs::write(&path, b"lock sentinel").unwrap();
     let version = "node@22.0.0".parse::<Target>().unwrap().version;
-    assert_eq!(fixture.storage.read_selected().unwrap(), Some(version));
+    assert_eq!(
+        fixture.storage.read_selected(Tool::Node).unwrap(),
+        Some(version)
+    );
     assert_eq!(fs::read(path).unwrap(), b"lock sentinel");
 }
 
@@ -185,11 +188,11 @@ fn structural_state_remains_distinct_from_complete_selection() {
             "empty" => fs::write(executable, b"").unwrap(),
             _ => unreachable!(),
         }
-        assert!(fixture.storage.read_current().unwrap().is_some());
+        assert!(fixture.storage.read_current(Tool::Node).unwrap().is_some());
         assert!(
             fixture
                 .storage
-                .read_selected()
+                .read_selected(Tool::Node)
                 .unwrap_err()
                 .to_string()
                 .contains("current installation is not complete")
@@ -236,13 +239,21 @@ fn invalid_current_entries_never_become_empty_selection() {
                 create_link(&destination, &current);
             }
         }
-        assert!(fixture.storage.read_selected().is_err(), "{state}");
+        assert!(
+            fixture.storage.read_selected(Tool::Node).is_err(),
+            "{state}"
+        );
     }
 }
 
 #[test]
 fn residues_are_errors_even_without_a_lock_or_current_selection() {
-    for name in [".node-next", ".node-previous"] {
+    for name in [
+        ".node-next",
+        ".node-previous",
+        ".yarn-next",
+        ".yarn-previous",
+    ] {
         for kind in ["file", "directory", "link", "dangling"] {
             let fixture = Fixture::new();
             let directory = fixture.installation();
@@ -258,7 +269,11 @@ fn residues_are_errors_even_without_a_lock_or_current_selection() {
                     }
                 }
             }
-            let error = fixture.storage.read_selected().unwrap_err().to_string();
+            let error = fixture
+                .storage
+                .read_selected(Tool::Node)
+                .unwrap_err()
+                .to_string();
             assert!(error.contains("unfinished switch"));
             assert!(error.contains(&residue.display().to_string()));
             assert!(fs::symlink_metadata(&residue).is_ok());
@@ -272,7 +287,7 @@ fn residues_are_errors_even_without_a_lock_or_current_selection() {
             assert!(
                 fixture
                     .storage
-                    .read_selected()
+                    .read_selected(Tool::Node)
                     .unwrap_err()
                     .to_string()
                     .contains("unfinished switch")
@@ -289,7 +304,7 @@ fn readers_share_locks_and_exclude_writers_without_truncation() {
     drop(acquire_lock(fixture.storage.root()).unwrap());
     let first = acquire_read_lock(fixture.storage.root()).unwrap().unwrap();
     let second = acquire_read_lock(fixture.storage.root()).unwrap().unwrap();
-    assert!(fixture.storage.read_selected().unwrap().is_some());
+    assert!(fixture.storage.read_selected(Tool::Node).unwrap().is_some());
     assert!(
         acquire_lock(fixture.storage.root())
             .unwrap_err()
@@ -303,14 +318,14 @@ fn readers_share_locks_and_exclude_writers_without_truncation() {
     assert!(
         fixture
             .storage
-            .read_complete_current(fixture.storage.root())
+            .read_complete_current(fixture.storage.root(), Tool::Node)
             .unwrap()
             .is_some()
     );
     assert!(
         fixture
             .storage
-            .read_selected()
+            .read_selected(Tool::Node)
             .unwrap_err()
             .to_string()
             .contains("storage is busy")
@@ -324,7 +339,7 @@ fn readers_share_locks_and_exclude_writers_without_truncation() {
     assert!(
         fixture
             .storage
-            .read_selected()
+            .read_selected(Tool::Node)
             .unwrap_err()
             .to_string()
             .contains("storage is busy")
@@ -333,7 +348,7 @@ fn readers_share_locks_and_exclude_writers_without_truncation() {
     assert!(
         fixture
             .storage
-            .read_selected()
+            .read_selected(Tool::Node)
             .unwrap_err()
             .to_string()
             .contains("unfinished switch")
@@ -351,11 +366,11 @@ fn residue_beside_a_complete_selection_is_not_silently_ignored() {
         b"preserved",
     )
     .unwrap();
-    assert!(fixture.storage.read_current().unwrap().is_some());
+    assert!(fixture.storage.read_current(Tool::Node).unwrap().is_some());
     assert!(
         fixture
             .storage
-            .read_selected()
+            .read_selected(Tool::Node)
             .unwrap_err()
             .to_string()
             .contains("unfinished switch")
@@ -371,13 +386,13 @@ fn complete_queries_support_a_linked_root_but_reject_linked_descendants() {
     let directory = fixture.installation();
     fixture.select(&fs::canonicalize(&directory).unwrap());
     drop(acquire_lock(&fs::canonicalize(fixture.storage.root()).unwrap()).unwrap());
-    assert!(fixture.storage.read_selected().unwrap().is_some());
+    assert!(fixture.storage.read_selected(Tool::Node).unwrap().is_some());
     let node = real_root.join("installs/node");
     let retained = real_root.join("installs/retained");
     fs::rename(&node, &retained).unwrap();
     create_link(&retained, &node);
-    assert!(fixture.storage.read_current().unwrap().is_some());
-    assert!(fixture.storage.read_selected().is_err());
+    assert!(fixture.storage.read_current(Tool::Node).unwrap().is_some());
+    assert!(fixture.storage.read_selected(Tool::Node).is_err());
     #[cfg(unix)]
     {
         fs::remove_file(node).unwrap();
@@ -413,7 +428,10 @@ fn invalid_lock_files_and_current_ancestors_are_preserved() {
             }
             _ => create_link(&outside, &fixture.storage.root().join("current")),
         }
-        assert!(fixture.storage.read_selected().is_err(), "{state}");
+        assert!(
+            fixture.storage.read_selected(Tool::Node).is_err(),
+            "{state}"
+        );
         assert!(acquire_lock(fixture.storage.root()).is_err(), "{state}");
         assert_eq!(fs::read(outside.join("sentinel")).unwrap(), b"preserved");
     }
@@ -426,5 +444,5 @@ fn complete_query_accepts_existing_relative_links() {
     fixture.installation();
     drop(acquire_lock(fixture.storage.root()).unwrap());
     fixture.select(Path::new("../installs/node/22.0.0"));
-    assert!(fixture.storage.read_selected().unwrap().is_some());
+    assert!(fixture.storage.read_selected(Tool::Node).unwrap().is_some());
 }

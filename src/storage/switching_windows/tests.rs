@@ -10,6 +10,53 @@ struct Fixture {
     storage: Storage,
 }
 
+#[test]
+fn yarn_readback_failure_restores_only_yarn_selection() {
+    let fixture = Fixture::new();
+    fixture.install("22.0.0");
+    fixture.storage.select(&Fixture::target("22.0.0")).unwrap();
+    let root = fixture.storage.root();
+    let first: Target = "yarn@1.22.22".parse().unwrap();
+    let second: Target = "yarn@4.9.2".parse().unwrap();
+    fs::create_dir_all(root.join("installs/yarn")).unwrap();
+    for target in [first, second] {
+        let archive = root.join(format!("fixture-{}.tgz", target.version));
+        fs::write(
+            &archive,
+            crate::yarn::tests::archive_fixture(target.version),
+        )
+        .unwrap();
+        crate::yarn::extract_archive(
+            root,
+            &archive,
+            &root.join("installs/yarn").join(target.version.to_string()),
+            target.version,
+            &"a".repeat(128),
+        )
+        .unwrap();
+    }
+    fixture.storage.select(&first).unwrap();
+    let error = fixture
+        .storage
+        .select_windows(&second, |step| {
+            if step == SwitchStep::ReadBack {
+                Err(io::Error::other("injected Yarn read-back failure"))
+            } else {
+                Ok(())
+            }
+        })
+        .unwrap_err();
+    assert!(error.to_string().contains("previous selection restored"));
+    assert_eq!(
+        fixture.storage.read_selected(Tool::Yarn).unwrap(),
+        Some(first.version)
+    );
+    fixture.selected(Some("22.0.0"));
+    for name in [".yarn-next", ".yarn-previous"] {
+        assert!(fs::symlink_metadata(root.join("current").join(name)).is_err());
+    }
+}
+
 impl Fixture {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -62,7 +109,7 @@ impl Fixture {
 
     fn selected(&self, expected: Option<&str>) {
         assert_eq!(
-            self.storage.read_selected().unwrap(),
+            self.storage.read_selected(Tool::Node).unwrap(),
             expected.map(|version| Self::target(version).version)
         );
     }
@@ -200,7 +247,7 @@ fn native_candidate_and_backup_collisions_preserve_unexpected_directories() {
             b"preserved"
         );
         assert_eq!(
-            fixture.storage.read_current().unwrap(),
+            fixture.storage.read_current(Tool::Node).unwrap(),
             Some(Fixture::target("22.0.0").version)
         );
         fixture.unchanged_installations();
@@ -298,7 +345,7 @@ fn publish_gap_is_locked_and_failed_publish_restores_previous_junction() {
                 assert!(
                     fixture
                         .storage
-                        .read_selected()
+                        .read_selected(Tool::Node)
                         .unwrap_err()
                         .to_string()
                         .contains("storage is busy")
@@ -400,7 +447,7 @@ fn rollback_and_restore_failures_keep_backup_and_report_observed_state() {
         assert!(
             fixture
                 .storage
-                .read_selected()
+                .read_selected(Tool::Node)
                 .unwrap_err()
                 .to_string()
                 .contains("unfinished switch")
@@ -466,7 +513,7 @@ fn cleanup_failures_report_residue_and_preserve_committed_or_old_selection() {
         };
         assert!(error.contains(&fixture.sibling(name).display().to_string()));
         assert_eq!(
-            fixture.storage.read_current().unwrap(),
+            fixture.storage.read_current(Tool::Node).unwrap(),
             Some(Fixture::target(version).version)
         );
         assert!(junction::get_target(fixture.sibling(name)).is_ok());
@@ -530,7 +577,7 @@ fn same_target_backup_replacement_is_detected_by_file_id() {
         first
     );
     assert_eq!(
-        fixture.storage.read_current().unwrap(),
+        fixture.storage.read_current(Tool::Node).unwrap(),
         Some(Fixture::target("24.0.0").version)
     );
     fixture.unchanged_installations();
@@ -627,7 +674,7 @@ fn native_sharing_failures_during_readback_rollback_restore_and_cleanup_keep_bac
         }
         drop(held);
         assert!(junction::get_target(fixture.sibling(".node-previous")).is_ok());
-        assert!(fixture.storage.read_selected().is_err());
+        assert!(fixture.storage.read_selected(Tool::Node).is_err());
         fixture.unchanged_installations();
     }
 }

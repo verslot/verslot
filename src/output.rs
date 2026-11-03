@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::logger::{self, Symbol};
-use crate::target::{Target, Version};
+use crate::target::Target;
 
 pub(crate) fn format_path_for_display(path: &Path) -> String {
     let display = path.display().to_string();
@@ -37,7 +37,7 @@ fn format_result(message: &str) -> String {
     message
 }
 
-pub(crate) fn print_list(installations: &[Target], selected: Option<Version>, terminal: bool) {
+pub(crate) fn print_list(installations: &[Target], selected: &[Target], terminal: bool) {
     logger::print_stdout(
         Symbol::None,
         &format_list(
@@ -51,7 +51,7 @@ pub(crate) fn print_list(installations: &[Target], selected: Option<Version>, te
 
 fn format_list(
     installations: &[Target],
-    selected: Option<Version>,
+    selected: &[Target],
     terminal: bool,
     color: bool,
 ) -> String {
@@ -80,7 +80,7 @@ fn format_list(
         let tool = target.tool.to_string();
         let version = target.version;
         if color {
-            let version_color = if selected == Some(version) { 32 } else { 90 };
+            let version_color = if selected.contains(target) { 32 } else { 90 };
             output.push_str(&format!(
                 "\x1b[36m{tool:<tool_width$}\x1b[0m  \x1b[{version_color}m{version}\x1b[0m\n"
             ));
@@ -91,11 +91,14 @@ fn format_list(
     output
 }
 
-pub(crate) fn format_current(selected: Option<Version>, terminal: bool) -> String {
-    match selected {
-        Some(version) => format!("node@{version}\n"),
-        None if terminal => "No version selected\n".to_owned(),
-        None => String::new(),
+pub(crate) fn format_current(selected: &[Target], terminal: bool) -> String {
+    if selected.is_empty() && terminal {
+        "No version selected\n".to_owned()
+    } else {
+        selected
+            .iter()
+            .map(|target| format!("{target}\n"))
+            .collect()
     }
 }
 
@@ -219,7 +222,7 @@ mod tests {
             "node@24.20.0".parse::<Target>().unwrap(),
         ];
         assert_eq!(
-            format_list(&installations, Some(installations[1].version), true, false),
+            format_list(&installations, &installations[1..], true, false),
             "Tool  Version\nnode  18.18.0\nnode  24.20.0\n"
         );
     }
@@ -231,7 +234,7 @@ mod tests {
             "node@24.20.0".parse::<Target>().unwrap(),
         ];
         assert_eq!(
-            format_list(&installations, Some(installations[1].version), true, true),
+            format_list(&installations, &installations[1..], true, true),
             concat!(
                 "\x1b[3;35mTool  Version\x1b[0m\n",
                 "\x1b[36mnode\x1b[0m  \x1b[90m18.18.0\x1b[0m\n",
@@ -244,7 +247,7 @@ mod tests {
     fn list_without_selection_keeps_versions_dim() {
         let target: Target = "node@22.0.0".parse().unwrap();
         assert_eq!(
-            format_list(&[target], None, true, true),
+            format_list(&[target], &[], true, true),
             concat!(
                 "\x1b[3;35mTool  Version\x1b[0m\n",
                 "\x1b[36mnode\x1b[0m  \x1b[90m22.0.0\x1b[0m\n",
@@ -259,7 +262,7 @@ mod tests {
             "node@24.20.0".parse::<Target>().unwrap(),
         ];
         assert_eq!(
-            format_list(&installations, Some(installations[1].version), false, true),
+            format_list(&installations, &installations[1..], false, true),
             "node@18.18.0\nnode@24.20.0\n"
         );
     }
@@ -268,19 +271,32 @@ mod tests {
     fn empty_list_preserves_terminal_and_redirected_messages() {
         for color in [false, true] {
             assert_eq!(
-                format_list(&[], None, true, color),
+                format_list(&[], &[], true, color),
                 "No installed versions\n"
             );
-            assert_eq!(format_list(&[], None, false, color), "");
+            assert_eq!(format_list(&[], &[], false, color), "");
         }
     }
 
     #[test]
     fn current_decorates_only_empty_terminal_output() {
         let target: Target = "node@22.0.0".parse().unwrap();
-        assert_eq!(format_current(None, true), "No version selected\n");
-        assert_eq!(format_current(None, false), "");
-        assert_eq!(format_current(Some(target.version), true), "node@22.0.0\n");
+        assert_eq!(format_current(&[], true), "No version selected\n");
+        assert_eq!(format_current(&[], false), "");
+        assert_eq!(format_current(&[target], true), "node@22.0.0\n");
+    }
+
+    #[test]
+    fn same_numbered_tools_have_independent_selection_colors_and_current_rows() {
+        let node: Target = "node@4.9.2".parse().unwrap();
+        let yarn: Target = "yarn@4.9.2".parse().unwrap();
+        let output = format_list(&[node, yarn], &[yarn], true, true);
+        assert!(output.contains("\x1b[36mnode\x1b[0m  \x1b[90m4.9.2"));
+        assert!(output.contains("\x1b[36myarn\x1b[0m  \x1b[32m4.9.2"));
+        assert_eq!(
+            format_current(&[node, yarn], false),
+            "node@4.9.2\nyarn@4.9.2\n"
+        );
     }
 
     #[test]

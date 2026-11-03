@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::*;
 use crate::distribution::NodeDistribution;
+use crate::target::Tool;
 
 struct Fixture {
     base: PathBuf,
@@ -159,7 +160,7 @@ fn uninstall_removes_only_the_inactive_installation_and_own_operation() {
     assert!(!directory.exists());
     validate_installation(fixture.root(), &"node@24.0.0".parse().unwrap()).unwrap();
     assert_eq!(
-        fixture.storage.read_current().unwrap(),
+        fixture.storage.read_current(Tool::Node).unwrap(),
         Some("node@24.0.0".parse::<Target>().unwrap().version)
     );
     assert_eq!(fs::read(orphan.join("sentinel")).unwrap(), b"preserved");
@@ -183,7 +184,7 @@ fn selected_versions_are_protected_even_without_a_receipt() {
         assert!(directory.exists());
         assert!(!fixture.root().join("tmp").exists());
         assert_eq!(
-            fixture.storage.read_current().unwrap(),
+            fixture.storage.read_current(Tool::Node).unwrap(),
             Some(fixture.target().version)
         );
         remove_link(&fixture.root().join("current/node"));
@@ -312,7 +313,7 @@ fn partial_cleanup_failure_reports_detachment_and_retains_the_leftover_path() {
     assert!(!directory.exists());
     validate_installation(fixture.root(), &"node@24.0.0".parse().unwrap()).unwrap();
     assert_eq!(
-        fixture.storage.read_current().unwrap(),
+        fixture.storage.read_current(Tool::Node).unwrap(),
         Some("node@24.0.0".parse::<Target>().unwrap().version)
     );
     assert_eq!(
@@ -360,7 +361,12 @@ fn linked_storage_root_is_supported() {
 
 #[test]
 fn switch_residue_blocks_uninstall_without_removing_installations() {
-    for name in [".node-next", ".node-previous"] {
+    for name in [
+        ".node-next",
+        ".node-previous",
+        ".yarn-next",
+        ".yarn-previous",
+    ] {
         let fixture = Fixture::new();
         let directory = fixture.install("22.0.0");
         fs::create_dir(fixture.root().join("current")).unwrap();

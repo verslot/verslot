@@ -63,6 +63,34 @@ fn setup_repeats_and_refreshes_the_complete_owned_generation() {
 }
 
 #[test]
+fn setup_upgrades_the_previous_four_command_receipt_with_yarn_entries() {
+    let fixture = Fixture::new();
+    let directory = fixture.setup().unwrap();
+    for name in ["yarn", "yarnpkg"] {
+        fs::remove_file(directory.join(executable_name(name))).unwrap();
+    }
+    let old_commands = ["verslot", "node", "npm", "npx"]
+        .map(executable_name)
+        .join("\n");
+    fs::write(
+        directory.join(RECEIPT),
+        format!(
+            "verslot-shims-v1\n{}\n{old_commands}\n",
+            file_digest(&fixture.source).unwrap()
+        ),
+    )
+    .unwrap();
+    fixture.setup().unwrap();
+    for name in COMMANDS {
+        assert_eq!(
+            fs::read(directory.join(executable_name(name))).unwrap(),
+            b"old executable"
+        );
+    }
+    fixture.finish();
+}
+
+#[test]
 fn setup_preserves_unowned_and_modified_entries() {
     let fixture = Fixture::new();
     let directory = fixture.root.join("shims");

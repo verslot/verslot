@@ -6,7 +6,8 @@ A minimal tool version manager written in Rust. Version management. Nothing else
 discovery and local installation, selection and removal.
 No precompiled binaries or crates.io package are published.
 
-Unreleased builds add a unified shim directory for Verslot and managed commands.
+Unreleased builds add Yarn version management and a unified shim directory for
+Verslot and managed commands.
 Run `verslot setup` and configure the single PATH entry described below. The
 released `v0.6.0` still uses the Node-specific PATH configuration.
 
@@ -195,6 +196,61 @@ no-redirect policy apply. Fetch or parse failures exit 1 with a reason on stderr
 and empty stdout; invalid arguments exit 2. Discovery uses archive availability
 metadata; installation still downloads and verifies the actual archive.
 
+## Manage Yarn versions (Unreleased)
+
+Yarn has its own installed versions and global selection, independent of Node.js.
+The supported official npm distributions are Classic 1.x from `yarn` and modern
+2+ from `@yarnpkg/cli-dist`. Only stable three-component versions with registry
+SHA-512 integrity metadata and the expected official archive URL are available.
+Some early modern releases, such as 2.1.0, and the historical `yarn@2.4.3` package
+are outside this source contract. Prereleases and version tags are not supported.
+
+```text
+verslot ls-remote yarn
+verslot ls-remote yarn@4.9
+verslot install yarn@1
+verslot install yarn@4.9.2
+verslot use yarn@4
+verslot current
+verslot list
+yarn --version
+yarnpkg --version
+verslot use yarn@1
+verslot uninstall yarn@4.9.2
+```
+
+`install` and `use` accept full versions, major versions and major.minor series,
+using the same numeric component matching as Node. `ls-remote` uses textual
+prefix matching; `yarn@1.2` can include 1.22.x. `lts` remains a Node-only query.
+Uninstall requires a complete version and rejects the selected version of that
+tool. `current` prints all selected tools, and `list` includes all installed
+tools, ordered by tool and then numeric version. Selection highlighting is
+independent for Node and Yarn, even when their version numbers are identical.
+
+Install and select Yarn without running or requiring Node. To execute Yarn,
+install and select a compatible Node version with Verslot. Both `yarn` and
+`yarnpkg` run the selected Yarn's JavaScript using the selected Node's absolute
+path; they do not use system Node, Corepack or automatic downloads. Node runtime
+requirements differ by Yarn release; incompatible runtimes retain Yarn's own
+error and exit status. `--help` and management commands do not depend on Node.
+
+The global Yarn selection overrides `.yarnrc` `yarn-path` and `.yarnrc.yml`
+`yarnPath` delegation through `YARN_IGNORE_PATH=1`. Other Yarn behavior, including
+`packageManager` compatibility checks, is preserved. A project asking for another
+Yarn version may therefore report a native error; select the desired installed
+version explicitly with `verslot use`. Verslot does not change project files.
+
+Remote Yarn discovery fetches both official npm indexes afresh, limited to 16 MiB
+each with a shared 60-second deadline. Installation fetches at most 1 MiB of exact
+version metadata and verifies the archive's SHA-512 before extracting it. Archives
+are limited to 512 MiB and a shared 15-minute metadata/download deadline. npm
+archives use the existing bounded tar extraction and reject all links on every
+platform. The receipt records the verified SHA-512; it does not monitor payload
+integrity after installation or independently authenticate the publisher.
+
+See the [Yarn specification](https://github.com/verslot/verslot/issues/30) and
+[global selection decision](docs/adr/0003-yarn-global-selection.md).
+
 ## Configure unified command PATH (Unreleased)
 
 From a current source checkout, install with `cargo install --path . --locked`.
@@ -226,10 +282,10 @@ verslot --version
 
 Persist this one directory in your own environment configuration. `setup` does
 not modify PATH, the registry or shell profiles. The directory provides `verslot`,
-`node`, `npm` and `npx` (native `.exe` entries on Windows); Cargo's bin directory
+`node`, `npm`, `npx`, `yarn` and `yarnpkg` (native `.exe` entries on Windows); Cargo's bin directory
 and tool-specific directories are unnecessary for daily Verslot use. Additional
-supported tools will use the same directory. Yarn is a separate follow-up in
-[Issue #30](https://github.com/verslot/verslot/issues/30).
+supported tools use the same directory. After upgrading from a Node-only build,
+run the new executable's `setup` to add the Yarn entries without another PATH change.
 
 Install and select Node as in the quick start, then run `node --version`, `npm
 --version` or `npx --version`. Each launch resolves the global selection. Missing
@@ -312,7 +368,7 @@ These workflows are retained evidence, not acceptance reruns for v0.6.0.
   unverified. Storage needs write permission and junction/symlink support;
   Unix executables need execute permission. The macOS non-UTF-8 on-disk fixture
   is excluded; native-byte tests do not replace filesystem coverage.
-- Downloads use fixed official `https://nodejs.org/dist/` archives and
+- Node.js downloads use fixed official `https://nodejs.org/dist/` archives and
   `SHASUMS256.txt`, with TLS verification and exact archive SHA-256 matching.
   Redirects and content decoding are disabled. Limits are 1 MiB of checksums,
   512 MiB per archive and a 15-minute overall deadline. Mirrors and proxy
@@ -324,7 +380,8 @@ These workflows are retained evidence, not acceptance reruns for v0.6.0.
   is point-in-time evidence.
 - Mutations use a nonblocking exclusive lock; `current` uses a shared lock.
   Busy storage asks you to retry. Incomplete installations and invalid selection
-  are preserved and rejected. Reserved `.node-next` / `.node-previous` entries
+  are preserved and rejected. Reserved `.node-next` / `.node-previous` and
+  `.yarn-next` / `.yarn-previous` entries
   require manual inspection; there is no unset, automatic repair or crash recovery.
 - Unix replaces the selection symlink atomically. Windows junction publication
   may briefly leave the entry point absent; sharing violations, permissions and

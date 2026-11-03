@@ -2,10 +2,12 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use crate::distribution::{NodeDistribution, NodePlatform};
+#[cfg(test)]
+use crate::distribution::NodeDistribution;
+use crate::distribution::NodePlatform;
 use crate::download::download_verified_archive_with_progress;
 use crate::installation::{
-    extract_verified_archive, real_directory, validate_directory, validate_installation,
+    extract_verified_archive, real_directory, validate_installation, validate_staging,
 };
 use crate::mutation::{acquire_lock, allocate_operation, create_directory, remove_operation};
 use crate::progress::Progress;
@@ -13,14 +15,20 @@ use crate::storage::Storage;
 use crate::target::{Target, Tool, Version, VersionRequest};
 
 pub(crate) fn install(request: &VersionRequest) -> Result<String, String> {
-    NodePlatform::current().map_err(|error| format!("install {request}: {error}"))?;
+    let tool = request.tool();
+    if tool == Tool::Node {
+        NodePlatform::current().map_err(|error| format!("install {request}: {error}"))?;
+    }
     let storage = Storage::from_env().map_err(|error| format!("install {request}: {error}"))?;
     install_requested_with_progress(
         storage.root(),
         request,
         &mut Progress::stderr(),
-        crate::remote::available_versions,
-        download_verified_archive_with_progress,
+        || crate::remote::available_versions_for(tool),
+        |version, archive, progress| match tool {
+            Tool::Node => download_verified_archive_with_progress(version, archive, progress),
+            Tool::Yarn => crate::yarn::download_archive(version, archive, progress),
+        },
         remove_operation,
     )
     .map_err(|error| format!("install {request}: {error}"))
@@ -43,7 +51,7 @@ fn install_requested_with_progress(
                 versions
                     .into_iter()
                     .map(|version| Target {
-                        tool: Tool::Node,
+                        tool: request.tool(),
                         version,
                     })
                     .filter(|target| request.matches(target))
@@ -81,8 +89,15 @@ fn install_with_progress(
             progress.set_target(target);
             let digest = download(target.version, &archive, progress)?;
             progress.stage("Installing");
-            extract_verified_archive(root, &archive, staging, target.version, &digest)
-                .map_err(|error| error.to_string())
+            match target.tool {
+                Tool::Node => {
+                    extract_verified_archive(root, &archive, staging, target.version, &digest)
+                }
+                Tool::Yarn => {
+                    crate::yarn::extract_archive(root, &archive, staging, target.version, &digest)
+                }
+            }
+            .map_err(|error| error.to_string())
         },
         cleanup,
     );
@@ -97,7 +112,12 @@ fn install_at(
     prepare: impl FnOnce(&Path, &Path, &Path) -> Result<(), String>,
     cleanup: impl FnOnce(&Path, &Path) -> io::Result<()>,
 ) -> Result<String, String> {
-    let distribution = NodeDistribution::for_current_build(target.version)?;
+    match target.tool {
+        Tool::Node => {
+            NodePlatform::current()?;
+        }
+        Tool::Yarn => crate::yarn::validate_version(target.version)?,
+    }
     fs::create_dir_all(root).map_err(|error| format!("create storage: {error}"))?;
     let root = fs::canonicalize(root).map_err(|error| format!("resolve storage: {error}"))?;
     let _lock = acquire_lock(&root).map_err(|error| error.to_string())?;
@@ -123,7 +143,7 @@ fn install_at(
     let staging = operation.join("staging");
     let result = (|| {
         prepare(&root, &operation, &staging)?;
-        validate_directory(&root, &staging, target, &distribution)
+        validate_staging(&root, &staging, target)
             .map_err(|error| format!("validate staging: {error}"))?;
         real_directory(&root, &staging).map_err(|error| error.to_string())?;
         real_directory(&root, destination.parent().unwrap()).map_err(|error| error.to_string())?;

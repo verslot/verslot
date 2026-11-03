@@ -8,7 +8,7 @@ use crate::installation::{real_directory, regular_file};
 use crate::storage::Storage;
 use crate::target::{Target, Tool};
 
-pub(crate) const COMMANDS: [&str; 4] = ["verslot", "node", "npm", "npx"];
+pub(crate) const COMMANDS: [&str; 6] = ["verslot", "node", "npm", "npx", "yarn", "yarnpkg"];
 
 pub(crate) fn executable_name(command: &str) -> String {
     if cfg!(windows) {
@@ -44,7 +44,23 @@ pub(crate) fn execute(name: &str) -> io::Result<()> {
 fn selected_command(name: &str) -> io::Result<Command> {
     let storage = Storage::from_env()?;
     // read_selected validates under a shared lock and drops it before returning.
-    let version = storage.read_selected()?.ok_or_else(|| {
+    let yarn = if matches!(name, "yarn" | "yarnpkg") {
+        let selected = storage.read_selections()?;
+        let yarn = selected.iter().find(|target| target.tool == Tool::Yarn).copied().ok_or_else(|| {
+            io::Error::other("no Yarn version selected; run `verslot install yarn@<version>` and `verslot use yarn@<version>`")
+        })?;
+        let node = selected
+            .iter()
+            .find(|target| target.tool == Tool::Node)
+            .map(|target| target.version);
+        Some((yarn, node))
+    } else {
+        None
+    };
+    let version = match yarn {
+        Some((_, node)) => node,
+        None => storage.read_selected(Tool::Node)?,
+    }.ok_or_else(|| {
         io::Error::other(
             "no Node.js version selected; run `verslot install node@<version>` and `verslot use node@<version>`",
         )
@@ -63,7 +79,13 @@ fn selected_command(name: &str) -> io::Result<Command> {
     });
     regular_file(&root, &executable)?;
     let mut command = Command::new(executable);
-    if name != "node" {
+    if let Some((yarn, _)) = yarn {
+        let installation = fs::canonicalize(storage.installation_path(&yarn)?)?;
+        real_directory(&root, &installation)?;
+        let script = installation.join("bin/yarn.js");
+        regular_file(&root, &script)?;
+        command.arg(script).env("YARN_IGNORE_PATH", "1");
+    } else if name != "node" {
         let npm = installation.join(if cfg!(windows) {
             "node_modules/npm/bin"
         } else {

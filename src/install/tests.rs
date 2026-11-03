@@ -6,6 +6,52 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 struct Fixture(PathBuf);
 
+#[test]
+fn yarn_partial_install_resolves_its_own_tool_and_commits_a_verified_package() {
+    use sha2::{Digest, Sha512};
+    for (input, expected) in [("yarn@1", "1.22.22"), ("yarn@4.9", "4.9.2")] {
+        let fixture = Fixture::new();
+        let target: Target = format!("yarn@{expected}").parse().unwrap();
+        let bytes = crate::yarn::tests::archive_fixture(target.version);
+        let result = install_requested_with_progress(
+            &fixture.0,
+            &input.parse().unwrap(),
+            &mut Progress::Silent,
+            || {
+                Ok(["1.22.22", "4.9.2", "4.10.0"]
+                    .iter()
+                    .map(|version| format!("yarn@{version}").parse::<Target>().unwrap().version)
+                    .collect())
+            },
+            |version, archive, _| {
+                assert_eq!(version, target.version);
+                fs::write(archive, &bytes).unwrap();
+                Ok(Sha512::digest(&bytes)
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect())
+            },
+            remove_operation,
+        )
+        .unwrap();
+        assert_eq!(result, format!("installed {target}"));
+        validate_installation(&fixture.0, &target).unwrap();
+        assert!(!fixture.0.join("installs/node").exists());
+        assert!(!fixture.0.join("current").exists());
+        assert_eq!(
+            install_with_progress(
+                &fixture.0,
+                &target,
+                &mut Progress::Silent,
+                |_, _, _| panic!("duplicate Yarn must not download"),
+                remove_operation
+            )
+            .unwrap(),
+            format!("already installed {target}")
+        );
+    }
+}
+
 fn install_request(input: &str) -> VersionRequest {
     use clap::Parser;
     let cli = crate::cli::Cli::try_parse_from(["verslot", "install", input]).unwrap();
@@ -17,7 +63,7 @@ fn install_request(input: &str) -> VersionRequest {
 
 fn remote_versions_from(url: &str) -> Result<Vec<Version>, String> {
     crate::remote::fetch_versions(
-        &crate::remote::RemoteQuery::All,
+        &crate::remote::RemoteQuery::All(Tool::Node),
         NodePlatform::current()?.index_file,
         &crate::download::tests::local_agent(),
         url,
@@ -205,7 +251,7 @@ fn failed_partial_install_resolution_preserves_selection_without_local_fallback(
         server.join().unwrap();
         assert!(error.contains(reason), "{error}");
         assert_eq!(output, b"   Resolving node@18.1\n");
-        assert_eq!(storage.read_selected().unwrap(), Some(old.version));
+        assert_eq!(storage.read_selected(Tool::Node).unwrap(), Some(old.version));
         assert_eq!(fs::read(destination.join(".verslot-install")).unwrap(), receipt);
         assert_eq!(fs::read_dir(storage.root().join("installs/node")).unwrap().count(), 1);
         assert!(!storage.root().join("tmp").exists());
@@ -783,7 +829,12 @@ fn process_lock_is_released_after_exit_or_termination() {
 
 #[test]
 fn switch_residue_blocks_install_before_download_or_directory_creation() {
-    for name in [".node-next", ".node-previous"] {
+    for name in [
+        ".node-next",
+        ".node-previous",
+        ".yarn-next",
+        ".yarn-previous",
+    ] {
         let fixture = Fixture::new();
         fs::create_dir(fixture.0.join("current")).unwrap();
         let residue = fixture.0.join("current").join(name);
@@ -1173,7 +1224,7 @@ fn offline_install_switch_query_uninstall_child() {
     );
     let first: Target = "node@22.0.0".parse().unwrap();
     let second: Target = "node@24.0.0".parse().unwrap();
-    assert_eq!(storage.read_selected().unwrap(), None);
+    assert_eq!(storage.read_selected(Tool::Node).unwrap(), None);
     assert!(crate::inventory::list_installed().unwrap().is_empty());
     assert!(!storage.root().exists());
 
@@ -1199,7 +1250,7 @@ fn offline_install_switch_query_uninstall_child() {
             .unwrap(),
             format!("installed {target}")
         );
-        assert_eq!(storage.read_selected().unwrap(), None);
+        assert_eq!(storage.read_selected(Tool::Node).unwrap(), None);
     }
     assert_eq!(
         crate::inventory::list_installed().unwrap(),
@@ -1214,15 +1265,24 @@ fn offline_install_switch_query_uninstall_child() {
     });
     let payload = fs::read(&executable).unwrap();
     assert!(storage.select(&first).unwrap());
-    assert_eq!(storage.read_selected().unwrap(), Some(first.version));
+    assert_eq!(
+        storage.read_selected(Tool::Node).unwrap(),
+        Some(first.version)
+    );
     assert_eq!(
         install(&second.into()).unwrap(),
         "already installed node@24.0.0"
     );
-    assert_eq!(storage.read_selected().unwrap(), Some(first.version));
+    assert_eq!(
+        storage.read_selected(Tool::Node).unwrap(),
+        Some(first.version)
+    );
     assert!(storage.select(&second).unwrap());
     assert!(!storage.select(&second).unwrap());
-    assert_eq!(storage.read_selected().unwrap(), Some(second.version));
+    assert_eq!(
+        storage.read_selected(Tool::Node).unwrap(),
+        Some(second.version)
+    );
     assert!(
         crate::uninstall::uninstall(&second)
             .unwrap_err()
@@ -1233,7 +1293,10 @@ fn offline_install_switch_query_uninstall_child() {
         "uninstalled node@22.0.0"
     );
     assert_eq!(crate::inventory::list_installed().unwrap(), vec![second]);
-    assert_eq!(storage.read_selected().unwrap(), Some(second.version));
+    assert_eq!(
+        storage.read_selected(Tool::Node).unwrap(),
+        Some(second.version)
+    );
     assert_eq!(
         fs::read(installation.join(".verslot-install")).unwrap(),
         receipt
@@ -1246,7 +1309,12 @@ fn offline_install_switch_query_uninstall_child() {
     });
     assert_eq!(fs::read(npm).unwrap(), b"offline fixture");
     assert!(!storage.installation_path(&first).unwrap().exists());
-    for name in [".node-next", ".node-previous"] {
+    for name in [
+        ".node-next",
+        ".node-previous",
+        ".yarn-next",
+        ".yarn-previous",
+    ] {
         assert_eq!(
             fs::symlink_metadata(storage.root().join("current").join(name))
                 .unwrap_err()

@@ -5,6 +5,23 @@ use crate::download::tests::{local_agent, response, serve};
 
 use super::*;
 
+#[test]
+fn yarn_remote_queries_accept_numeric_prefixes_and_reject_node_only_lts() {
+    for input in ["yarn", "yarn@1", "yarn@4.9", "yarn@4.9.2"] {
+        assert_eq!(input.parse::<RemoteQuery>().unwrap().to_string(), input);
+    }
+    for input in [
+        "yarn@lts",
+        "yarn@latest",
+        "yarn@04",
+        "yarn@4.",
+        "Yarn",
+        "yarn@4.9.2-rc.1",
+    ] {
+        assert!(input.parse::<RemoteQuery>().is_err(), "{input}");
+    }
+}
+
 fn remote_query(input: &str) -> RemoteQuery {
     use clap::Parser;
     let cli = crate::cli::Cli::try_parse_from(["verslot", "list-remote", input]).unwrap();
