@@ -50,19 +50,57 @@ A selected version cannot be uninstalled.
 
 | Command | Behavior |
 | --- | --- |
-| `verslot install node@<version>` | Download the official archive, verify SHA-256, and install; complete duplicates are a no-op |
+| `verslot install node@<version>` | Download the official archive, verify SHA-256, and install; Unreleased builds also accept a major or major.minor |
 | `verslot uninstall node@<version>` | Remove a complete inactive installation |
-| `verslot use node@<version>` | Select an installed version; selecting it again is a no-op |
+| `verslot use node@<version>` | Select an installed version; selecting it again is a no-op; Unreleased builds also accept a major or major.minor |
 | `verslot list` / `verslot ls` | Print complete installations, sorted numerically; show a Tool/Version table in terminals |
 | `verslot list-remote node` / `verslot ls-remote node` | Discover official releases available for this build's platform |
 | `verslot current` | Print the selected complete version, or nothing if none is selected |
 
-`install`, `uninstall` and `use` accept only `node@major.minor.patch`, with three ASCII decimal components
-in the `u32` range. Leading zeros, partial versions, aliases, prereleases and
-build metadata are rejected. `list` (alias `ls`) and `current` take no positional arguments.
+`uninstall` requires `node@major.minor.patch`. In Unreleased builds, `install` and
+`use` also accept `node@major` and `node@major.minor`; v0.6.0 requires full versions.
+Version components must be ASCII decimals in the `u32` range, without leading
+zeros. Aliases, prereleases and build metadata are rejected.
+`list` (alias `ls`) and `current` take no positional arguments.
 `verslot --help` and `verslot --version` exit successfully. Operational errors
 exit 1 with empty stdout and diagnostics on stderr; invalid CLI usage exits 2.
 These commands do not execute installed Node.js.
+
+Partial `use` targets select the numerically newest installed version in the
+requested series:
+
+```text
+verslot use node@18       # newest installed 18.x.y
+verslot use node@18.1     # newest installed 18.1.y
+verslot use node@18.1.0   # exactly 18.1.0
+```
+
+Supplied components match exactly: `18.1` does not match `18.10`, and `1` does not
+match `18`. This differs from the textual prefixes used by remote discovery.
+Results and `current` show the resolved full version. Each invocation checks
+local installations again, without downloading. No matches or a corrupt matching
+installation produce an error and preserve the selection; corrupt installations
+are not silently skipped in favor of an older version.
+
+Partial `install` requests install the numerically newest remotely available
+official release in the requested series for this platform:
+
+```text
+verslot install node@18       # newest remotely available 18.x.y
+verslot install node@18.1     # newest remotely available 18.1.y
+verslot install node@18.1.0   # exactly 18.1.0; skip version discovery
+```
+
+Partial installation uses the same component matching as `use` and shows
+`Resolving <request>` while retrieving a fresh official index. In a terminal,
+this spinner appears after about 200 ms, so fast resolution skips the transient
+message; redirected output records the stage immediately. It checks the remote
+index even when an older matching version is installed. If the resolved full
+version is already installed, the command prints `Already installed <full-target>`
+without downloading its checksum or archive. Exact duplicate requests skip all
+network access and progress output. Failed discovery or no matching release
+leaves storage and selection unchanged. Installation does not select the version;
+run `use` afterwards to select an installed version.
 
 Every emitted text line reserves two terminal columns for a lightweight symbol,
 followed by one space. Successful operations use `✔` and errors use `✘`.
@@ -81,7 +119,8 @@ results. Listing remains available when selection state cannot be read; in that
 case no version is highlighted.
 
 Installation progress uses one updating stderr line for fetching checksums,
-downloading, verifying and installing. Interactive terminals use a cyan dot
+downloading, verifying and installing, with the resolved complete target in each
+stage and in the download bar or byte-only spinner. Interactive terminals use a cyan dot
 spinner (`⠋ ⠙ ⠹`). Downloads with a known total show the original 24-character
 block bar (`█` filled, `░` remaining), percentage and bytes/total. Unknown or
 inconsistent totals use the spinner and downloaded bytes. The spinner keeps

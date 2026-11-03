@@ -73,6 +73,16 @@ pub(crate) fn list(query: &RemoteQuery) -> Result<(), String> {
     )
 }
 
+pub(crate) fn available_versions() -> Result<Vec<Version>, String> {
+    fetch_versions(
+        &RemoteQuery::All,
+        NodePlatform::current()?.index_file,
+        &download::download_agent(),
+        INDEX_URL,
+        Instant::now() + QUERY_TIMEOUT,
+    )
+}
+
 fn list_with_progress(
     query: &RemoteQuery,
     index_file: &str,
@@ -112,7 +122,7 @@ fn list_with(
     )
 }
 
-fn fetch_versions(
+pub(crate) fn fetch_versions(
     query: &RemoteQuery,
     index_file: &str,
     agent: &Agent,

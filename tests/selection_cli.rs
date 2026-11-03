@@ -114,6 +114,18 @@ impl Fixture {
 fn missing_selection_is_read_only_and_use_does_not_install() {
     let fixture = Fixture::new();
     fixture.assert_current("");
+    for request in ["node@18", "node@18.1"] {
+        fixture
+            .command()
+            .args(["use", request])
+            .assert()
+            .code(1)
+            .stdout("")
+            .stderr(predicate::str::contains(format!(
+                "no installed version matches {request}"
+            )));
+        assert!(!fixture.root.exists());
+    }
     fixture
         .command()
         .args(["use", "node@22.0.0"])
@@ -128,6 +140,170 @@ fn missing_selection_is_read_only_and_use_does_not_install() {
     fixture.assert_current("");
     assert!(!fixture.root.join(".mutation.lock").exists());
     assert!(!fixture.root.join("current").exists());
+    fixture.finish();
+}
+
+#[test]
+fn partial_use_selects_the_numerically_latest_installed_major_version() {
+    let fixture = Fixture::new();
+    for version in [
+        "18.9.9", "18.10.0", "18.1.10", "19.0.0", "118.0.0", "1.20.0",
+    ] {
+        fixture.seed(version);
+    }
+    for name in ["18", "018.99.0", "18.100.0-beta", "18.99"] {
+        fs::write(fixture.root.join("installs/node").join(name), b"ignored").unwrap();
+    }
+    fixture
+        .command()
+        .args(["use", "node@18"])
+        .assert()
+        .success()
+        .stdout("✔  Selected node@18.10.0\n")
+        .stderr("");
+    fixture.assert_current("   node@18.10.0\n");
+    fixture
+        .command()
+        .args(["use", "node@1"])
+        .assert()
+        .success()
+        .stdout("✔  Selected node@1.20.0\n")
+        .stderr("");
+    fixture.assert_current("   node@1.20.0\n");
+    fixture.seed("18.11.0");
+    fixture
+        .command()
+        .args(["use", "node@18"])
+        .assert()
+        .success()
+        .stdout("✔  Selected node@18.11.0\n")
+        .stderr("");
+    fixture.assert_current("   node@18.11.0\n");
+    fixture.finish();
+}
+
+#[test]
+fn partial_use_matches_minor_components_and_exact_versions() {
+    let fixture = Fixture::new();
+    for version in ["18.1.1", "18.1.9", "18.1.10", "18.10.100", "19.1.100"] {
+        fixture.seed(version);
+    }
+    fixture
+        .command()
+        .args(["use", "node@18.1"])
+        .assert()
+        .success()
+        .stdout("✔  Selected node@18.1.10\n")
+        .stderr("");
+    fixture.assert_current("   node@18.1.10\n");
+    fixture.select("18.1.1");
+    fixture.assert_current("   node@18.1.1\n");
+    fixture.finish();
+}
+
+#[test]
+fn unmatched_partial_use_preserves_selection_without_installing() {
+    let fixture = Fixture::new();
+    fixture.seed("18.10.0");
+    fixture.select("18.10.0");
+    for request in ["node@1", "node@18.1", "node@19"] {
+        fixture
+            .command()
+            .args(["use", request])
+            .assert()
+            .code(1)
+            .stdout("")
+            .stderr(predicate::str::contains(format!(
+                "no installed version matches {request}"
+            )));
+        fixture.assert_current("   node@18.10.0\n");
+    }
+    assert_eq!(
+        fs::read_dir(fixture.root.join("installs/node"))
+            .unwrap()
+            .count(),
+        1
+    );
+    assert!(!fixture.root.join("tmp").exists());
+    fixture.finish();
+}
+
+#[test]
+fn partial_use_reports_corrupt_matching_installations_without_falling_back() {
+    let fixture = Fixture::new();
+    for version in ["18.1.1", "18.1.10", "22.0.0"] {
+        fixture.seed(version);
+    }
+    fixture.select("22.0.0");
+    let receipt = fixture.root.join("installs/node/18.1.10/.verslot-install");
+    fs::write(&receipt, b"invalid receipt").unwrap();
+    for request in ["node@18", "node@18.1"] {
+        fixture
+            .command()
+            .args(["use", request])
+            .assert()
+            .code(1)
+            .stdout("")
+            .stderr(predicate::str::contains("inspect node@18.1.10"))
+            .stderr(predicate::str::contains(
+                "receipt format, target, or platform",
+            ));
+        fixture.assert_current("   node@22.0.0\n");
+    }
+    assert_eq!(fs::read(&receipt).unwrap(), b"invalid receipt");
+    fixture.finish();
+}
+
+#[test]
+fn partial_use_ignores_corrupt_installations_outside_the_requested_series() {
+    let fixture = Fixture::new();
+    fixture.seed("18.1.10");
+    fixture.seed("18.10.0");
+    fs::write(
+        fixture.root.join("installs/node/18.10.0/.verslot-install"),
+        b"invalid receipt",
+    )
+    .unwrap();
+    fixture
+        .command()
+        .args(["use", "node@18.1"])
+        .assert()
+        .success()
+        .stdout("✔  Selected node@18.1.10\n")
+        .stderr("");
+    fixture.assert_current("   node@18.1.10\n");
+    fixture.finish();
+}
+
+#[test]
+fn partial_use_rejects_linked_installations_and_preserves_their_targets() {
+    let fixture = Fixture::new();
+    fixture.seed("18.1.0");
+    fixture.seed("22.0.0");
+    fixture.select("22.0.0");
+    let outside = fixture.directory.join("outside");
+    fs::create_dir(&outside).unwrap();
+    fs::write(outside.join("sentinel"), b"preserved").unwrap();
+    let linked = fixture.root.join("installs/node/18.10.0");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&outside, &linked).unwrap();
+    #[cfg(windows)]
+    junction::create(&outside, &linked).unwrap();
+    fixture
+        .command()
+        .args(["use", "node@18"])
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicate::str::contains("inspect node@18.10.0"))
+        .stderr(predicate::str::contains("linked"));
+    fixture.assert_current("   node@22.0.0\n");
+    assert_eq!(fs::read(outside.join("sentinel")).unwrap(), b"preserved");
+    assert!(fs::symlink_metadata(&linked).is_ok());
+    #[cfg(unix)]
+    fs::remove_file(&linked).unwrap();
+    #[cfg(windows)]
+    junction::delete(&linked).unwrap();
     fixture.finish();
 }
 
@@ -203,13 +379,15 @@ fn selecting_same_version_does_not_replace_current_link() {
     let link_handle = open_junction();
     #[cfg(windows)]
     let identity = winapi_util::file::information(&link_handle).unwrap();
-    fixture
-        .command()
-        .args(["use", "node@22.0.0"])
-        .assert()
-        .success()
-        .stdout("   Already selected node@22.0.0\n")
-        .stderr("");
+    for request in ["node@22.0.0", "node@22", "node@22.0"] {
+        fixture
+            .command()
+            .args(["use", request])
+            .assert()
+            .success()
+            .stdout("   Already selected node@22.0.0\n")
+            .stderr("");
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
@@ -262,7 +440,12 @@ fn missing_or_incomplete_target_preserves_selection_and_invalid_current_takes_pr
         b"invalid current receipt",
     )
     .unwrap();
-    for arguments in [vec!["current"], vec!["use", "node@26.0.0"]] {
+    for arguments in [
+        vec!["current"],
+        vec!["use", "node@26.0.0"],
+        vec!["use", "node@26"],
+        vec!["use", "node@26.1"],
+    ] {
         fixture
             .command()
             .args(arguments)
@@ -291,7 +474,13 @@ fn current_and_use_fail_while_writer_holds_lock_then_succeed_after_release() {
     lock.try_lock().unwrap();
     // Model a concurrent child retaining a duplicate until it reaches exec.
     let inherited_lock = lock.try_clone().unwrap();
-    for arguments in [vec!["current"], vec!["use", "node@24.0.0"]] {
+    for arguments in [
+        vec!["current"],
+        vec!["use", "node@24.0.0"],
+        vec!["use", "node@24"],
+        vec!["use", "node@24.0"],
+        vec!["use", "node@18"],
+    ] {
         fixture
             .command()
             .args(arguments)
@@ -323,6 +512,8 @@ fn unfinished_switch_blocks_queries_and_writers_but_keeps_list_available() {
         for arguments in [
             vec!["current"],
             vec!["use", "node@22.0.0"],
+            vec!["use", "node@22"],
+            vec!["use", "node@22.0"],
             vec!["install", "node@22.0.0"],
             vec!["uninstall", "node@22.0.0"],
         ] {

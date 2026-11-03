@@ -63,7 +63,9 @@ jobs:
       - name: Native PTY and redirected installation progress
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python .github/scripts/check_terminal_progress.py
+        run: |
+          python -B -m unittest discover -s .github/scripts -p test_terminal_progress.py
+          python .github/scripts/check_terminal_progress.py
 
       - name: Preserve native terminal acceptance evidence
         if: always()

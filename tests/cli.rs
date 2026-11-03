@@ -120,7 +120,7 @@ fn help_version_and_argument_errors_share_the_symbol_column() {
         (vec![], 2, true, "   "),
         (vec!["invalid-command"], 2, true, "✘  "),
         (vec!["install"], 2, true, "✘  "),
-        (vec!["use", "node@22"], 2, true, "✘  "),
+        (vec!["use", "node@22."], 2, true, "✘  "),
     ] {
         let output = verslot_command()
             .args(&arguments)
@@ -251,21 +251,34 @@ fn target_commands_reject_extra_targets() {
 }
 
 #[test]
-fn valid_use_targets_reach_storage_resolution() {
-    for target in [
-        "node@22.0.0",
-        "node@0.0.0",
-        "node@4294967295.4294967295.4294967295",
-    ] {
-        verslot_command()
-            .args(["use", target])
-            .env_remove("HOME")
-            .env_remove("LOCALAPPDATA")
-            .assert()
-            .code(1)
-            .stdout("")
-            .stderr(predicate::str::contains(format!("select {target}")))
-            .stderr(predicate::str::contains("is missing"));
+fn valid_install_and_use_requests_reach_storage_resolution() {
+    for command in ["install", "use"] {
+        for target in [
+            "node@22",
+            "node@22.1",
+            "node@22.0.0",
+            "node@0",
+            "node@0.0",
+            "node@0.0.0",
+            "node@4294967295",
+            "node@4294967295.4294967295",
+            "node@4294967295.4294967295.4294967295",
+        ] {
+            let operation = if command == "use" {
+                "select"
+            } else {
+                "install"
+            };
+            verslot_command()
+                .args([command, target])
+                .env_remove("HOME")
+                .env_remove("LOCALAPPDATA")
+                .assert()
+                .code(1)
+                .stdout("")
+                .stderr(predicate::str::contains(format!("{operation} {target}")))
+                .stderr(predicate::str::contains("is missing"));
+        }
     }
 }
 
@@ -310,12 +323,25 @@ fn invalid_targets_report_shared_diagnostics_before_execution() {
 
     for command in ["install", "uninstall", "use"] {
         for (target, error) in cases {
+            let diagnostic = if command != "uninstall" {
+                match target {
+                    "node@22" | "node@22.1" => continue,
+                    "node@latest" | "node@lts" => NonAsciiDigits.to_string(),
+                    _ if error == ComponentCount => {
+                        "invalid version: expected major, major.minor, or major.minor.patch"
+                            .to_owned()
+                    }
+                    _ => error.to_string(),
+                }
+            } else {
+                error.to_string()
+            };
             verslot_command()
                 .args([command, target])
                 .assert()
                 .code(2)
                 .stdout("")
-                .stderr(predicate::str::contains(error.to_string()))
+                .stderr(predicate::str::contains(diagnostic))
                 .stderr(predicate::str::contains("not implemented").not());
         }
     }
@@ -342,12 +368,13 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
         vec!["list"],
         vec!["ls"],
         vec!["current"],
-        vec!["install", "node@22"],
+        vec!["install", "node@22."],
         vec!["uninstall", "node@22"],
         vec!["use", "node@22"],
     ];
     for arguments in &cases {
-        let invalid = arguments.last() == Some(&"node@22");
+        let invalid = arguments.last() == Some(&"node@22.")
+            || arguments[0] == "uninstall" && arguments.last() == Some(&"node@22");
         verslot_command()
             .current_dir(&directory)
             .env("HOME", &directory)
@@ -376,7 +403,8 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
     // List ignores current state; selection commands must preserve invalid entries.
     fs::write(&current, b"not a link").unwrap();
     for arguments in &cases {
-        let invalid = arguments.last() == Some(&"node@22");
+        let invalid = arguments.last() == Some(&"node@22.")
+            || arguments[0] == "uninstall" && arguments.last() == Some(&"node@22");
         verslot_command()
             .current_dir(&directory)
             .env("HOME", &directory)

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Show `Resolving <request>` during partial installation and include the resolved
+  complete target in subsequent installation progress. Delay the terminal
+  resolution spinner by about 200 ms to avoid flicker, while logging redirected
+  resolution immediately (#27).
+
+- Allow `use` and `install` requests with `node@<major>` or `node@<major>.<minor>`.
+  Match supplied components exactly and resolve the newest installed version for
+  selection or the newest remotely available version for installation. Report
+  complete resolved versions, show remote resolution progress for partial
+  installation, and retain exact targets for uninstall (#27).
+
 ## v0.6.0 — 2026-11-02
 
 Source release with remote Node.js version discovery and CLI output changes.
