@@ -154,6 +154,50 @@ fn invalid_command_fails() {
 }
 
 #[test]
+fn top_level_argument_errors_show_the_complete_help_command() {
+    for argument in ["-v", "--invalid", "invalid-command"] {
+        verslot_command()
+            .arg(argument)
+            .env("NO_COLOR", "1")
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains("Usage: verslot <COMMAND>"))
+            .stderr(predicate::str::contains(
+                "For more information, try 'verslot --help'.",
+            ))
+            .stderr(predicate::str::contains("verslot.exe").not());
+    }
+}
+
+#[test]
+fn subcommand_argument_errors_show_the_complete_help_command() {
+    for (arguments, command) in [
+        (vec!["setup", "--invalid"], "setup"),
+        (vec!["install"], "install"),
+        (vec!["uninstall"], "uninstall"),
+        (vec!["use"], "use"),
+        (vec!["use", "node@22."], "use"),
+        (vec!["list", "--invalid"], "list"),
+        (vec!["ls", "--invalid"], "list"),
+        (vec!["list-remote"], "list-remote"),
+        (vec!["ls-remote"], "list-remote"),
+        (vec!["current", "--invalid"], "current"),
+    ] {
+        verslot_command()
+            .args(arguments)
+            .env("NO_COLOR", "1")
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains(format!(
+                "For more information, try 'verslot {command} --help'.",
+            )))
+            .stderr(predicate::str::contains("verslot.exe").not());
+    }
+}
+
+#[test]
 fn install_reports_storage_errors_without_network_access() {
     verslot_command()
         .args(["install", "node@22.0.0"])
@@ -582,12 +626,11 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
 
 #[test]
 fn each_command_provides_help() {
-    let binary_name = format!("verslot{}", std::env::consts::EXE_SUFFIX);
     for command in ["install", "uninstall", "use", "list", "current"] {
         let expected_usage = if matches!(command, "install" | "uninstall" | "use") {
-            format!("Usage: {binary_name} {command} <TOOL@VERSION>")
+            format!("Usage: verslot {command} <TOOL@VERSION>")
         } else {
-            format!("Usage: {binary_name} {command}")
+            format!("Usage: verslot {command}")
         };
 
         verslot_command()

@@ -6,6 +6,10 @@ A minimal tool version manager written in Rust. Version management. Nothing else
 discovery and local installation, selection and removal.
 No precompiled binaries or crates.io package are published.
 
+Unreleased builds add a unified shim directory for Verslot and managed commands.
+Run `verslot setup` and configure the single PATH entry described below. The
+released `v0.6.0` still uses the Node-specific PATH configuration.
+
 ## Install from source
 
 Install Git, stable Rust with Cargo, and native build tools: MSVC C++ build tools
@@ -50,6 +54,7 @@ A selected version cannot be uninstalled.
 
 | Command | Behavior |
 | --- | --- |
+| `verslot setup` | Unreleased: create or refresh the unified command entry points and print the PATH directory |
 | `verslot install node@<version>` | Download the official archive, verify SHA-256, and install; Unreleased builds also accept a major or major.minor |
 | `verslot uninstall node@<version>` | Remove a complete inactive installation |
 | `verslot use node@<version>` | Select an installed version; selecting it again is a no-op; Unreleased builds also accept a major or major.minor |
@@ -64,7 +69,8 @@ zeros. Aliases, prereleases and build metadata are rejected.
 `list` (alias `ls`) and `current` take no positional arguments.
 `verslot --help` and `verslot --version` exit successfully. Operational errors
 exit 1 with empty stdout and diagnostics on stderr; invalid CLI usage exits 2.
-These commands do not execute installed Node.js.
+Management commands do not execute installed Node.js. Running `node`, `npm` or
+`npx` through an Unreleased shim executes the selected installation.
 
 Partial `use` targets select the numerically newest installed version in the
 requested series:
@@ -189,7 +195,72 @@ no-redirect policy apply. Fetch or parse failures exit 1 with a reason on stderr
 and empty stdout; invalid arguments exit 2. Discovery uses archive availability
 metadata; installation still downloads and verifies the actual archive.
 
-## Configure Node.js PATH
+## Configure unified command PATH (Unreleased)
+
+From a current source checkout, install with `cargo install --path . --locked`.
+Run the newly installed executable's `setup` command, then prepend one directory
+to PATH. The examples use Cargo's default installation location; with a custom
+Cargo home or `--root`, call the executable from that installation's `bin`.
+
+| Platform | Unified PATH directory |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\verslot\shims` |
+| macOS / Linux | `$HOME/.verslot/shims` |
+
+PowerShell:
+
+```powershell
+& "$env:USERPROFILE\.cargo\bin\verslot.exe" setup
+$env:PATH = "$env:LOCALAPPDATA\verslot\shims;$env:PATH"
+verslot --version
+```
+
+Bash:
+
+```bash
+"$HOME/.cargo/bin/verslot" setup
+export PATH="$HOME/.verslot/shims:$PATH"
+hash -r
+verslot --version
+```
+
+Persist this one directory in your own environment configuration. `setup` does
+not modify PATH, the registry or shell profiles. The directory provides `verslot`,
+`node`, `npm` and `npx` (native `.exe` entries on Windows); Cargo's bin directory
+and tool-specific directories are unnecessary for daily Verslot use. Additional
+supported tools will use the same directory. Yarn is a separate follow-up in
+[Issue #30](https://github.com/verslot/verslot/issues/30).
+
+Install and select Node as in the quick start, then run `node --version`, `npm
+--version` or `npx --version`. Each launch resolves the global selection. Missing
+or damaged selections fail on stderr without running a system Node or downloading
+anything. npm and npx use the selected Node with that distribution's bundled JS
+entry point; a historical distribution without npx reports that missing command
+without invalidating Node. Global npm overrides and arbitrary commands installed
+with `npm install -g` are outside this shim contract.
+
+Shims inherit arguments, working directory, environment and stdin/stdout/stderr;
+tool output has no Verslot prefix. Tool exit status and Ctrl+C cleanup are
+preserved. Running tools do not hold the storage lock: `use` affects subsequent
+launches while existing processes continue. Explicitly uninstalling an inactive
+version does not protect processes still using its installation.
+
+After upgrading, invoke the **newly installed executable by its full path** with
+`setup` again to refresh every entry, including `verslot` itself. Updating Cargo's
+copy alone leaves the existing shims unchanged. No PATH adjustment is needed.
+`setup` verifies an ownership receipt and executable checksums before replacing
+an existing shim directory; unknown or modified entries are preserved and cause
+an error. Entries persist even after the last Node version is uninstalled.
+
+Setup stages the complete directory, retains the previous directory during
+publication and rolls back if publication fails. The explicit refresh may
+briefly leave the command directory absent. On Windows, in-use executables can
+prevent replacement or cleanup; close related processes and retry from the new
+executable. If publication succeeded but cleanup failed, diagnostics say so and
+retain `.shims-previous` for a later verified cleanup. An interrupted publication
+with only the previous directory remaining requires inspection before retrying.
+
+## Configure Node.js PATH (released v0.6.0)
 
 Prepend the fixed directory once. Verslot does not edit PATH or shell profiles.
 These examples affect the current shell only; persist the same entry in your

@@ -4,9 +4,13 @@
 
 - [README](../README.md): installation, commands, supported platforms and limitations.
 - [AGENTS.md](../AGENTS.md): rules for AI coding agents.
-- [Glossary](../GLOSSARY.md): release and remote discovery terms.
+- [Glossary](../GLOSSARY.md): managed-tool, selection, release and remote discovery terms.
 - [Remote version prefix matching](adr/0001-remote-version-prefix-matching.md):
   the query matching decision.
+- [Unified command shims](adr/0002-unified-command-shims.md):
+  one PATH entry for Verslot and managed commands.
+- [Unified shim specification](https://github.com/verslot/verslot/issues/29):
+  scope and acceptance criteria for the shared entry point and Node.js integration.
 - [Remote version discovery spec](https://github.com/verslot/verslot/issues/21):
   accepted scope and acceptance criteria for `list-remote` / `ls-remote`.
 - [Partial version requests](https://github.com/verslot/verslot/issues/27):

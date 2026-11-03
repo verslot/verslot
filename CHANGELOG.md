@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Show complete help commands in argument errors, including the relevant
+  subcommand, and consistently display the executable name as `verslot`.
+
+- Add `verslot setup` and a single shim PATH directory providing Verslot, Node.js
+  and the selected distribution's bundled npm/npx. Preserve native process I/O,
+  arguments, exit status and Ctrl+C cleanup; fail without system fallback or
+  automatic installation. Refresh entry points with the newly installed
+  executable after upgrades; version selection does not rewrite them (#29).
+
+- Display setup PATH instructions using standard Windows drive or UNC notation
+  instead of the internal extended-length path prefix (#29).
+
 - Show `Resolving <request>` during partial installation and include the resolved
   complete target in subsequent installation progress. Delay the terminal
   resolution spinner by about 200 ms to avoid flicker, while logging redirected

@@ -33,6 +33,13 @@ pub(crate) fn create_directory(root: &Path, path: &Path) -> io::Result<()> {
 }
 
 pub(crate) fn acquire_lock(root: &Path) -> io::Result<File> {
+    let file = acquire_exclusive_lock(root)?;
+    reject_switch_residue(root)?;
+    Ok(file)
+}
+
+// Setup shares serialization with tool mutations but does not read Node state.
+pub(crate) fn acquire_exclusive_lock(root: &Path) -> io::Result<File> {
     real_directory(root, root)?;
     let path = root.join(".mutation.lock");
     match fs::symlink_metadata(&path) {
@@ -54,7 +61,6 @@ pub(crate) fn acquire_lock(root: &Path) -> io::Result<File> {
     }
     let file = OpenOptions::new().read(true).write(true).open(path)?;
     file.try_lock().map_err(lock_error)?;
-    reject_switch_residue(root)?;
     Ok(file)
 }
 
