@@ -227,18 +227,16 @@ tool. `current` prints all selected tools, and `list` includes all installed
 tools, ordered by tool and then numeric version. Selection highlighting is
 independent for Node and Yarn, even when their version numbers are identical.
 
-Install and select Yarn without running or requiring Node. To execute Yarn,
-install and select a compatible Node version with Verslot. Both `yarn` and
-`yarnpkg` run the selected Yarn's JavaScript using the selected Node's absolute
-path; they do not use system Node, Corepack or automatic downloads. Node runtime
-requirements differ by Yarn release; incompatible runtimes retain Yarn's own
-error and exit status. `--help` and management commands do not depend on Node.
+A compatible Node runtime is needed only when executing Yarn. Both `yarn` and
+`yarnpkg` start the selected release with the Node executable found on `PATH`
+(`node.exe` on Windows). This can be a system Node or the Verslot `node` shim,
+depending on the order of directories in `PATH`.
 
-The global Yarn selection overrides `.yarnrc` `yarn-path` and `.yarnrc.yml`
-`yarnPath` delegation through `YARN_IGNORE_PATH=1`. Other Yarn behavior, including
-`packageManager` compatibility checks, is preserved. A project asking for another
-Yarn version may therefore report a native error; select the desired installed
-version explicitly with `verslot use`. Verslot does not change project files.
+Yarn handles project configuration and environment variables as it does in a
+standalone installation. This includes `.yarnrc` `yarn-path`, `.yarnrc.yml`
+`yarnPath`, and `packageManager` compatibility checks. `verslot current` reports
+the global selection. In a project that redirects to another Yarn release,
+`yarn --version` can report that project's version instead.
 
 Remote Yarn discovery fetches both official npm indexes afresh, limited to 16 MiB
 each with a shared 60-second deadline. Installation fetches at most 1 MiB of exact

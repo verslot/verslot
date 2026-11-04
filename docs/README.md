@@ -10,7 +10,7 @@
 - [Unified command shims](adr/0002-unified-command-shims.md):
   one PATH entry for Verslot and managed commands.
 - [Yarn global selection](adr/0003-yarn-global-selection.md):
-  official package sources, selected Node runtime and project delegation policy.
+  official package sources, Node lookup on PATH and Yarn's project delegation.
 - [Yarn specification](https://github.com/verslot/verslot/issues/30):
   scope and acceptance criteria for the second managed tool.
 - [Unified shim specification](https://github.com/verslot/verslot/issues/29):

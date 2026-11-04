@@ -24,6 +24,15 @@ fn executable_name(name: &str) -> String {
     }
 }
 
+fn write_node_fixture(executable: &Path) {
+    fs::write(executable, tool_bytes()).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(executable, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+}
+
 impl Fixture {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -79,12 +88,7 @@ impl Fixture {
             "bin/node"
         });
         fs::create_dir_all(executable.parent().unwrap()).unwrap();
-        fs::write(&executable, tool_bytes()).unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        write_node_fixture(&executable);
         fs::write(
             installation.join(".verslot-install"),
             format!(
@@ -146,12 +150,13 @@ impl Fixture {
 }
 
 #[test]
-fn yarn_and_yarnpkg_use_both_independent_selections_and_force_global_yarn() {
+fn yarn_and_yarnpkg_use_managed_node_on_path_and_inherit_yarn_settings() {
     let fixture = Fixture::new();
     fixture.setup();
     fixture.seed("22.0.0");
     fixture.seed("24.0.0");
     fixture.select("22.0.0");
+    let path = fixture.root.join("shims");
     for version in ["1.22.22", "4.9.2"] {
         fixture.seed_yarn(version);
         fixture
@@ -160,9 +165,17 @@ fn yarn_and_yarnpkg_use_both_independent_selections_and_force_global_yarn() {
             .assert()
             .success();
         for name in ["yarn", "yarnpkg"] {
-            fixture.shim(name).arg("yarn-env").env("YARN_IGNORE_PATH", "0")
+            fixture
+                .shim(name)
+                .arg("yarn-env")
+                .env("PATH", &path)
+                .env("YARN_IGNORE_PATH", "0")
                 .env("SKIP_YARN_COREPACK_CHECK", "native-value")
-                .assert().success().stdout(format!("bundled=yarn@{version};node=22.0.0\nignore_path=1;corepack_check=native-value\n"));
+                .assert()
+                .success()
+                .stdout(format!(
+                    "bundled=yarn@{version};node=22.0.0\nignore_path=0;corepack_check=native-value\n"
+                ));
         }
         fixture
             .manager()
@@ -175,14 +188,22 @@ fn yarn_and_yarnpkg_use_both_independent_selections_and_force_global_yarn() {
     fixture
         .shim("yarn")
         .args(["exit", "37"])
+        .env("PATH", &path)
         .assert()
         .code(37)
         .stdout("bundled=yarn@4.9.2;node=24.0.0\n");
+    fixture
+        .shim("yarn")
+        .arg("--version")
+        .env("PATH", &fixture.directory)
+        .assert()
+        .code(1)
+        .stdout("");
     fixture.finish();
 }
 
 #[test]
-fn yarn_selection_without_node_is_reported_but_execution_has_no_system_fallback() {
+fn yarn_uses_system_node_on_path_without_a_managed_node_selection() {
     let fixture = Fixture::new();
     fixture.setup();
     fixture.seed_yarn("4.9.2");
@@ -195,15 +216,18 @@ fn yarn_selection_without_node_is_reported_but_execution_has_no_system_fallback(
         .stdout("   yarn@4.9.2\n");
     let system = fixture.directory.join("system");
     fs::create_dir(&system).unwrap();
-    fs::write(system.join(executable_name("node")), tool_bytes()).unwrap();
+    write_node_fixture(&system.join(executable_name("node")));
     fixture
         .shim("yarn")
-        .arg("--version")
+        .arg("yarn-env")
         .env("PATH", system)
+        .env_remove("YARN_IGNORE_PATH")
+        .env("SKIP_YARN_COREPACK_CHECK", "native-value")
         .assert()
-        .code(1)
-        .stdout("")
-        .stderr(predicates::str::contains("no Node.js version selected"));
+        .success()
+        .stdout(
+            "bundled=yarn@4.9.2;node=system\nignore_path=<unset>;corepack_check=native-value\n",
+        );
     fixture.finish();
 }
 
