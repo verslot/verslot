@@ -12,11 +12,16 @@ use crate::shim::{COMMANDS, executable_name, is_command_file};
 use crate::storage::Storage;
 
 const RECEIPT: &str = ".verslot-shims";
+const LEGACY_RECEIPT_VERSION: &str = "verslot-shims-v1";
+const RECEIPT_VERSION: &str = "verslot-shims-v2";
 
 pub(crate) fn setup() -> io::Result<PathBuf> {
     let storage = Storage::from_env()?;
     let source = fs::canonicalize(std::env::current_exe()?)?;
-    setup_at(storage.root(), &source).map_err(|error| {
+    setup_at(storage.root(), &source, |source, shim| {
+        fs::hard_link(source, shim)
+    })
+    .map_err(|error| {
         if cfg!(windows) && matches!(error.raw_os_error(), Some(5 | 32 | 33)) {
             io::Error::new(
                 error.kind(),
@@ -28,7 +33,11 @@ pub(crate) fn setup() -> io::Result<PathBuf> {
     })
 }
 
-fn setup_at(root: &Path, source: &Path) -> io::Result<PathBuf> {
+fn setup_at(
+    root: &Path,
+    source: &Path,
+    create_hard_link: impl Fn(&Path, &Path) -> io::Result<()>,
+) -> io::Result<PathBuf> {
     fs::create_dir_all(root)?;
     let root = fs::canonicalize(root)?;
     let _lock = acquire_exclusive_lock(&root)?;
@@ -56,7 +65,7 @@ fn setup_at(root: &Path, source: &Path) -> io::Result<PathBuf> {
         Err(error) => return Err(error),
     };
     let receipt = format!(
-        "verslot-shims-v1\n{digest}\n{}\n",
+        "{RECEIPT_VERSION}\n{digest}\n{}\n",
         COMMANDS.map(executable_name).join("\n")
     );
     if previous.as_deref() == Some(receipt.as_str()) {
@@ -66,12 +75,15 @@ fn setup_at(root: &Path, source: &Path) -> io::Result<PathBuf> {
     let candidate = operation.join("shims");
     let result = (|| {
         create_directory(&root, &candidate)?;
-        for name in COMMANDS {
-            let mut input = File::open(source)?;
-            let mut output = File::create_new(candidate.join(executable_name(name)))?;
-            io::copy(&mut input, &mut output)?;
-            output.set_permissions(input.metadata()?.permissions())?;
-            output.sync_all()?;
+        let executable = candidate.join(executable_name("verslot"));
+        copy_shim(source, &executable)?;
+        for name in &COMMANDS[1..] {
+            let shim = candidate.join(executable_name(name));
+            match create_hard_link(&executable, &shim) {
+                Ok(()) => {}
+                Err(error) if hard_link_unavailable(&error) => copy_shim(&executable, &shim)?,
+                Err(error) => return Err(error),
+            }
         }
         let mut marker = File::create_new(candidate.join(RECEIPT))?;
         marker.write_all(receipt.as_bytes())?;
@@ -93,6 +105,22 @@ fn setup_at(root: &Path, source: &Path) -> io::Result<PathBuf> {
             operation.display()
         ))),
     }
+}
+
+fn copy_shim(source: &Path, destination: &Path) -> io::Result<()> {
+    let mut input = File::open(source)?;
+    let mut output = File::create_new(destination)?;
+    io::copy(&mut input, &mut output)?;
+    output.set_permissions(input.metadata()?.permissions())?;
+    output.sync_all()
+}
+
+fn hard_link_unavailable(error: &io::Error) -> bool {
+    // Windows can report ERROR_INVALID_FUNCTION or ERROR_NOT_SUPPORTED.
+    // Linux uses EPERM for both unsupported filesystems and link policy restrictions.
+    error.kind() == io::ErrorKind::Unsupported
+        || (cfg!(windows) && matches!(error.raw_os_error(), Some(1 | 50)))
+        || (cfg!(target_os = "linux") && error.raw_os_error() == Some(1))
 }
 
 fn publish_shims(
@@ -147,8 +175,8 @@ fn require_missing(path: &Path) -> io::Result<()> {
     }
 }
 
-// Receipts prove which flat files setup may replace or remove. Unknown entries
-// and modified executables are preserved, including links and reparse points.
+// Receipts prove which flat files setup may replace or remove. Unknown entries,
+// modified executables, symlinks and reparse points are preserved.
 fn validate_owned_directory(
     root: &Path,
     directory: &Path,
@@ -164,7 +192,7 @@ fn validate_owned_directory(
     let lines: Vec<_> = receipt.lines().collect();
     if receipt.len() > 4096
         || lines.len() < 3
-        || lines[0] != "verslot-shims-v1"
+        || !matches!(lines[0], LEGACY_RECEIPT_VERSION | RECEIPT_VERSION)
         || lines[1].len() != 64
         || !lines[1].bytes().all(|byte| byte.is_ascii_hexdigit())
         || !lines[2..].contains(&executable_name("verslot").as_str())
