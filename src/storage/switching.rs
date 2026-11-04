@@ -30,20 +30,20 @@ impl Storage {
     fn select_unix(
         &self,
         target: &Target,
-        checkpoint: impl FnMut(SwitchStep) -> io::Result<()>,
+        mut checkpoint: impl FnMut(SwitchStep) -> io::Result<()>,
     ) -> io::Result<bool> {
-        self.select_requested_unix(&VersionRequest::from(*target), checkpoint)
+        self.select_requested_unix(&VersionRequest::from(*target), |step, _| checkpoint(step))
             .map(|(_, changed)| changed)
     }
 
     pub(crate) fn select_requested(&self, request: &VersionRequest) -> io::Result<(Target, bool)> {
-        self.select_requested_unix(request, |_| Ok(()))
+        self.select_requested_unix(request, |_, _| Ok(()))
     }
 
     fn select_requested_unix(
         &self,
         request: &VersionRequest,
-        mut checkpoint: impl FnMut(SwitchStep) -> io::Result<()>,
+        mut checkpoint: impl FnMut(SwitchStep, &fs::File) -> io::Result<()>,
     ) -> io::Result<(Target, bool)> {
         let tool = request.tool();
         self.current_link_path(tool)?;
@@ -55,6 +55,7 @@ impl Storage {
         }
         let root = fs::canonicalize(self.root())?;
         let lock = acquire_lock(&root)?;
+        let mut checkpoint = |step| checkpoint(step, &lock);
         let previous = self.read_complete_current(&root, tool)?;
         let target = &Self::resolve_selection(&root, request)?;
         let destination = root
@@ -177,10 +178,8 @@ impl Storage {
                 }
                 verify_current(self, &root, tool, previous)
             })();
-            return match rollback {
-                Ok(()) => Err(io::Error::other(format!(
-                    "{error}; previous selection restored"
-                ))),
+            let failure = match rollback {
+                Ok(()) => io::Error::other(format!("{error}; previous selection restored")),
                 Err(rollback_error) => {
                     let observed = match self.read_complete_current(&root, tool) {
                         Ok(Some(version)) => format!("{tool}@{version}"),
@@ -204,11 +203,18 @@ impl Storage {
                             format!("cannot inspect rollback path {}: {error}", backup.display())
                         }
                     };
-                    Err(io::Error::other(format!(
+                    io::Error::other(format!(
                         "{error}; rollback failed: {rollback_error}; current state: {observed}; {residue}"
-                    )))
+                    ))
                 }
             };
+            // A child can briefly retain a duplicate of the lock descriptor across fork.
+            return Err(match lock.unlock() {
+                Ok(()) => failure,
+                Err(error) => io::Error::other(format!(
+                    "{failure} (could not release mutation lock: {error})"
+                )),
+            });
         }
 
         let mut cleanup_error = String::new();

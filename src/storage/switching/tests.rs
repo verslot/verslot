@@ -36,10 +36,13 @@ fn yarn_readback_failure_restores_only_yarn_selection() {
         .unwrap();
     }
     fixture.storage.select(&first).unwrap();
+    let mut inherited_lock = None;
     let error = fixture
         .storage
-        .select_unix(&second, |step| {
+        .select_requested_unix(&VersionRequest::from(second), |step, lock| {
             if step == SwitchStep::ReadBack {
+                // Model a child that still holds the descriptor when rollback returns.
+                inherited_lock = Some(lock.try_clone()?);
                 Err(io::Error::other("injected Yarn read-back failure"))
             } else {
                 Ok(())
@@ -52,6 +55,7 @@ fn yarn_readback_failure_restores_only_yarn_selection() {
         Some(first.version)
     );
     fixture.selected(Some("22.0.0"));
+    drop(inherited_lock.expect("read-back checkpoint must duplicate the lock"));
     for name in [".yarn-next", ".yarn-previous"] {
         assert!(fs::symlink_metadata(root.join("current").join(name)).is_err());
     }
