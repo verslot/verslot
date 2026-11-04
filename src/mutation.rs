@@ -101,7 +101,12 @@ pub(crate) fn reject_switch_residue(root: &Path) -> io::Result<()> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error),
     }
-    for name in [".node-next", ".node-previous"] {
+    for name in [
+        ".node-next",
+        ".node-previous",
+        ".yarn-next",
+        ".yarn-previous",
+    ] {
         let path = current.join(name);
         match fs::symlink_metadata(&path) {
             Ok(_) => {

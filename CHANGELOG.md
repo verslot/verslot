@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add independent Yarn version discovery, installation, global selection and
+  removal for official Classic `yarn` 1.x and modern `@yarnpkg/cli-dist` stable
+  packages. Verify registry SHA-512 before safe tar extraction on every platform.
+  Add `yarn` / `yarnpkg` to the unified shims. They use Node from `PATH` and
+  leave project version delegation and compatibility checks to Yarn. Show all
+  tools in `current` / `list`, with independent selection highlighting (#30).
+
 - Show complete help commands in argument errors, including the relevant
   subcommand, and consistently display the executable name as `verslot`.
 

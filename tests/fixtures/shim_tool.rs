@@ -27,6 +27,9 @@ fn main() {
         .unwrap_or("")
     {
         "--version" => println!("v{version}"),
+        "yarn-env" => println!("ignore_path={};corepack_check={}",
+            std::env::var("YARN_IGNORE_PATH").unwrap_or_else(|_| "<unset>".to_owned()),
+            std::env::var("SKIP_YARN_COREPACK_CHECK").unwrap()),
         "inspect" => {
             println!("version={version}");
             println!(

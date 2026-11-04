@@ -26,14 +26,14 @@ release or a major/minor release series whose supplied components must match.
 A tool and complete major, minor and patch version identifying one release.
 
 **Official release**:
-A Node.js version identified by major, minor, and patch numbers, without a
-prerelease suffix or build metadata. Official releases include LTS and non-LTS
-versions, regardless of whether they are still maintained.
+A managed tool's published version identified by major, minor, and patch numbers,
+without a prerelease suffix or build metadata. Official releases include versions
+that are no longer maintained.
 
 **Remotely available version**:
-An official release for which Node.js lists a distribution archive for the
-current platform. Remote availability is independent of whether the version is
-installed locally.
+An official release with a distribution available through the tool's supported
+official source for the current platform. Remote availability is independent of
+whether the version is installed locally.
 
 **Prefix filter**:
 A restriction on remote version discovery that keeps releases whose version
@@ -42,7 +42,7 @@ and `18.10.0`.
 _Avoid_: Major version filter
 
 **LTS release**:
-An official release marked as Long Term Support in Node.js's release catalog.
+A Node.js official release marked as Long Term Support in its release catalog.
 The marker applies to that particular release and does not imply that its release
 series is currently maintained.
 _Avoid_: Currently supported release

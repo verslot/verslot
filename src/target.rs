@@ -1,15 +1,21 @@
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Tool {
     Node,
+    Yarn,
+}
+
+impl Tool {
+    pub(crate) const ALL: [Self; 2] = [Self::Node, Self::Yarn];
 }
 
 impl fmt::Display for Tool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Node => f.write_str("node"),
+            Self::Yarn => f.write_str("yarn"),
         }
     }
 }
@@ -46,6 +52,10 @@ pub(crate) struct VersionRequest {
 }
 
 impl VersionRequest {
+    pub(crate) fn tool(&self) -> Tool {
+        self.target.tool
+    }
+
     pub(crate) fn exact(&self) -> Option<Target> {
         (self.components == 3).then_some(self.target)
     }
@@ -120,7 +130,7 @@ impl fmt::Display for ParseTargetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InvalidStructure => "invalid target: expected <tool>@<version> with exactly one @ and non-empty parts; example: node@22.0.0",
-            Self::UnsupportedTool => "unsupported tool: only node is supported",
+            Self::UnsupportedTool => "unsupported tool: only node and yarn are supported",
             Self::ComponentCount => "invalid version: expected major.minor.patch; example: node@22.0.0",
             Self::NonAsciiDigits => "invalid version: components must contain only ASCII digits; example: node@22.0.0",
             Self::LeadingZeros => "invalid version: leading zeros are not allowed; example: node@22.0.0",
@@ -141,9 +151,11 @@ impl FromStr for Target {
         if tool.is_empty() || version.is_empty() || version.contains('@') {
             return Err(ParseTargetError::InvalidStructure);
         }
-        if tool != "node" {
-            return Err(ParseTargetError::UnsupportedTool);
-        }
+        let tool = match tool {
+            "node" => Tool::Node,
+            "yarn" => Tool::Yarn,
+            _ => return Err(ParseTargetError::UnsupportedTool),
+        };
 
         let mut parts = version.split('.');
         let components = match (parts.next(), parts.next(), parts.next(), parts.next()) {
@@ -165,7 +177,7 @@ impl FromStr for Target {
 
         let [major, minor, patch] = components.map(str::parse::<u32>);
         Ok(Self {
-            tool: Tool::Node,
+            tool,
             version: Version {
                 major: major.map_err(|_| ParseTargetError::OutOfRange)?,
                 minor: minor.map_err(|_| ParseTargetError::OutOfRange)?,
@@ -178,6 +190,18 @@ impl FromStr for Target {
 #[cfg(test)]
 mod tests {
     use super::{ParseTargetError, Target, Tool, Version, VersionRequest};
+
+    #[test]
+    fn yarn_targets_and_partial_requests_keep_their_tool_identity() {
+        let target: Target = "yarn@4.9.2".parse().unwrap();
+        assert_eq!(target.tool, Tool::Yarn);
+        for input in ["yarn@4", "yarn@4.9", "yarn@4.9.2"] {
+            let request: VersionRequest = input.parse().unwrap();
+            assert_eq!(request.to_string(), input);
+            assert!(request.matches(&target));
+            assert!(!request.matches(&"node@4.9.2".parse().unwrap()));
+        }
+    }
 
     #[test]
     fn version_requests_accept_canonical_full_and_partial_versions() {
@@ -387,7 +411,10 @@ mod tests {
                 InvalidStructure,
                 "invalid target: expected <tool>@<version> with exactly one @ and non-empty parts; example: node@22.0.0",
             ),
-            (UnsupportedTool, "unsupported tool: only node is supported"),
+            (
+                UnsupportedTool,
+                "unsupported tool: only node and yarn are supported",
+            ),
             (
                 ComponentCount,
                 "invalid version: expected major.minor.patch; example: node@22.0.0",

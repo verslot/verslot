@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::{ROOT_DIRECTORY, ROOT_VARIABLE, Storage};
-use crate::target::Target;
+use crate::target::{Target, Tool};
 
 struct TestDirectory(PathBuf);
 
@@ -117,7 +117,7 @@ fn native_root_and_version_paths_are_constructed_without_writes() {
         storage.root().join("tmp")
     );
     assert_eq!(
-        storage.current_link_path().unwrap(),
+        storage.current_link_path(Tool::Node).unwrap(),
         storage.root().join("current/node")
     );
     assert_eq!(fs::read_dir(&temporary.0).unwrap().count(), 0);
@@ -171,7 +171,7 @@ fn linked_storage_root_is_the_boundary() {
     directory_link(&real_root, storage.root());
     assert!(storage.installation_path(&target()).is_ok());
     assert!(storage.temporary_path().is_ok());
-    assert!(storage.current_link_path().is_ok());
+    assert!(storage.current_link_path(Tool::Node).is_ok());
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn descendants_cannot_escape_through_directory_links() {
         directory_link(&outside, &link);
         let result = match relative {
             "tmp" => storage.temporary_path(),
-            "current" => storage.current_link_path(),
+            "current" => storage.current_link_path(Tool::Node),
             _ => storage.installation_path(&target()),
         };
         assert!(result.is_err(), "{relative}");
@@ -237,7 +237,7 @@ fn missing_roots_check_their_nearest_existing_ancestor() {
     let source = ancestor.join("missing");
     let storage = Storage::from_source(Some(source.as_os_str())).unwrap();
     assert!(storage.installation_path(&target()).is_err());
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
 }
 
 #[test]
@@ -257,13 +257,13 @@ fn existing_invalid_intermediate_directories_cannot_be_hidden_by_later_links() {
 fn absent_current_state_is_read_without_creating_directories() {
     let temporary = TestDirectory::new();
     let storage = temporary.storage();
-    assert_eq!(storage.read_current().unwrap(), None);
+    assert_eq!(storage.read_current(Tool::Node).unwrap(), None);
     assert_eq!(fs::read_dir(&temporary.0).unwrap().count(), 0);
     fs::create_dir(storage.root()).unwrap();
-    assert_eq!(storage.read_current().unwrap(), None);
+    assert_eq!(storage.read_current(Tool::Node).unwrap(), None);
     assert_eq!(fs::read_dir(storage.root()).unwrap().count(), 0);
     fs::create_dir(storage.root().join("current")).unwrap();
-    assert_eq!(storage.read_current().unwrap(), None);
+    assert_eq!(storage.read_current(Tool::Node).unwrap(), None);
     assert_eq!(
         fs::read_dir(storage.root().join("current"))
             .unwrap()
@@ -279,13 +279,16 @@ fn current_link_returns_the_resolved_version_without_checking_install_contents()
         let storage = temporary.storage();
         let target: Target = format!("node@{version}").parse().unwrap();
         let installation = storage.installation_path(&target).unwrap();
-        let link = storage.current_link_path().unwrap();
+        let link = storage.current_link_path(Tool::Node).unwrap();
         fs::create_dir_all(&installation).unwrap();
         let sentinel = installation.join("existing-content");
         fs::write(&sentinel, b"unchanged").unwrap();
         fs::create_dir_all(link.parent().unwrap()).unwrap();
         directory_link(&installation, &link);
-        assert_eq!(storage.read_current().unwrap(), Some(target.version));
+        assert_eq!(
+            storage.read_current(Tool::Node).unwrap(),
+            Some(target.version)
+        );
         assert_eq!(fs::read(sentinel).unwrap(), b"unchanged");
         assert_eq!(fs::read_dir(installation).unwrap().count(), 1);
     }
@@ -296,14 +299,14 @@ fn ordinary_current_entries_are_errors() {
     for directory in [false, true] {
         let temporary = TestDirectory::new();
         let storage = temporary.storage();
-        let link = storage.current_link_path().unwrap();
+        let link = storage.current_link_path(Tool::Node).unwrap();
         fs::create_dir_all(link.parent().unwrap()).unwrap();
         if directory {
             fs::create_dir(&link).unwrap();
         } else {
             fs::write(&link, b"22.0.0").unwrap();
         }
-        assert!(storage.read_current().is_err());
+        assert!(storage.read_current(Tool::Node).is_err());
     }
 }
 
@@ -312,12 +315,12 @@ fn dangling_current_link_is_an_error_not_no_selection() {
     let temporary = TestDirectory::new();
     let storage = temporary.storage();
     let installation = storage.installation_path(&target()).unwrap();
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(&installation).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(&installation, &link);
     fs::remove_dir(installation).unwrap();
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
     assert!(fs::symlink_metadata(link).is_ok());
 }
 
@@ -337,10 +340,10 @@ fn current_targets_must_be_direct_canonical_version_directories() {
         let destination = storage.root().join(relative);
         fs::create_dir_all(&destination).unwrap();
         fs::create_dir_all(storage.root().join("installs/node")).unwrap();
-        let link = storage.current_link_path().unwrap();
+        let link = storage.current_link_path(Tool::Node).unwrap();
         fs::create_dir_all(link.parent().unwrap()).unwrap();
         directory_link(&destination, &link);
-        assert!(storage.read_current().is_err(), "{relative}");
+        assert!(storage.read_current(Tool::Node).is_err(), "{relative}");
     }
 }
 
@@ -352,10 +355,13 @@ fn current_version_is_derived_from_the_resolved_name() {
     fs::create_dir_all(&installation).unwrap();
     let alias = storage.root().join("installs/node/not-a-version");
     directory_link(&installation, &alias);
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(&alias, &link);
-    assert_eq!(storage.read_current().unwrap(), Some(target().version));
+    assert_eq!(
+        storage.read_current(Tool::Node).unwrap(),
+        Some(target().version)
+    );
 }
 
 #[test]
@@ -378,7 +384,7 @@ fn invalid_current_ancestors_do_not_report_no_selection() {
             } else {
                 fs::write(ancestor, b"not a directory").unwrap();
             }
-            assert!(storage.read_current().is_err());
+            assert!(storage.read_current(Tool::Node).is_err());
         }
     }
 }
@@ -391,7 +397,7 @@ fn current_directory_cannot_escape_even_when_the_entry_is_missing() {
     fs::create_dir(&outside).unwrap();
     fs::create_dir(storage.root()).unwrap();
     directory_link(&outside, &storage.root().join("current"));
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
 }
 
 #[test]
@@ -401,10 +407,10 @@ fn current_links_to_external_installations_are_rejected() {
     let outside = temporary.0.join("outside/22.0.0");
     fs::create_dir_all(&outside).unwrap();
     fs::create_dir_all(storage.root().join("installs/node")).unwrap();
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(&outside, &link);
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
 }
 
 #[test]
@@ -416,10 +422,13 @@ fn current_reads_use_the_canonical_storage_root() {
     directory_link(&real_root, storage.root());
     let installation = storage.installation_path(&target()).unwrap();
     fs::create_dir_all(&installation).unwrap();
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(&installation, &link);
-    assert_eq!(storage.read_current().unwrap(), Some(target().version));
+    assert_eq!(
+        storage.read_current(Tool::Node).unwrap(),
+        Some(target().version)
+    );
 }
 
 #[test]
@@ -431,10 +440,10 @@ fn current_reads_reject_an_escaped_installation_ancestor() {
     fs::create_dir_all(&installation).unwrap();
     fs::create_dir(storage.root()).unwrap();
     directory_link(&outside, &storage.root().join("installs"));
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(&installation, &link);
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
 }
 
 #[cfg(unix)]
@@ -443,10 +452,13 @@ fn relative_current_links_are_resolved_against_the_link_parent() {
     let temporary = TestDirectory::new();
     let storage = temporary.storage();
     fs::create_dir_all(storage.installation_path(&target()).unwrap()).unwrap();
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(Path::new("../installs/node/22.0.0"), &link);
-    assert_eq!(storage.read_current().unwrap(), Some(target().version));
+    assert_eq!(
+        storage.read_current(Tool::Node).unwrap(),
+        Some(target().version)
+    );
 }
 
 #[test]
@@ -455,12 +467,12 @@ fn current_links_to_files_are_rejected() {
     let storage = temporary.storage();
     let installation = storage.installation_path(&target()).unwrap();
     fs::create_dir_all(&installation).unwrap();
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(&installation, &link);
     fs::remove_dir(&installation).unwrap();
     fs::write(&installation, b"not a directory").unwrap();
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
 }
 
 // macOS filesystems reject non-UTF-8 names before this fixture can be created.
@@ -476,10 +488,10 @@ fn non_utf8_current_version_names_are_rejected() {
         .join("installs/node")
         .join(OsStr::from_bytes(b"22.0.\xff"));
     fs::create_dir_all(&installation).unwrap();
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(&installation, &link);
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
 }
 
 #[test]
@@ -489,7 +501,7 @@ fn io_errors_are_not_treated_as_missing_state() {
         root: temporary.0.join("invalid\0name"),
     };
     assert!(storage.temporary_path().is_err());
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
 }
 
 #[cfg(unix)]
@@ -504,7 +516,7 @@ fn permission_failures_are_not_treated_as_missing_state() {
     let original = fs::metadata(&current).unwrap().permissions();
     fs::set_permissions(&current, fs::Permissions::from_mode(0o0)).unwrap();
     let access = fs::read_dir(&current);
-    let result = storage.read_current();
+    let result = storage.read_current(Tool::Node);
     fs::set_permissions(&current, original).unwrap();
     match access {
         Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
@@ -522,10 +534,10 @@ fn permission_failures_are_not_treated_as_missing_state() {
 fn link_loops_are_errors() {
     let temporary = TestDirectory::new();
     let storage = temporary.storage();
-    let link = storage.current_link_path().unwrap();
+    let link = storage.current_link_path(Tool::Node).unwrap();
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     directory_link(&link, &link);
-    assert!(storage.read_current().is_err());
+    assert!(storage.read_current(Tool::Node).is_err());
     directory_link(&storage.root().join("tmp"), &storage.root().join("tmp"));
     assert!(storage.temporary_path().is_err());
 }

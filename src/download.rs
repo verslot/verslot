@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha512};
 use ureq::unversioned::resolver::DefaultResolver;
 use ureq::unversioned::transport::{
     Buffers, ConnectionDetails, Connector, DefaultConnector, NextTimeout, Transport,
@@ -15,7 +15,7 @@ use crate::progress::Progress;
 use crate::target::Version;
 
 const CHECKSUM_LIMIT: u64 = 1024 * 1024;
-const ARCHIVE_LIMIT: u64 = 512 * 1024 * 1024;
+pub(crate) const ARCHIVE_LIMIT: u64 = 512 * 1024 * 1024;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
@@ -104,7 +104,7 @@ fn download_distribution_with_progress(
 }
 
 // Only display a length that describes the same untransformed archive bytes we copy.
-fn archive_display_total(headers: &ureq::http::HeaderMap) -> Option<u64> {
+pub(crate) fn archive_display_total(headers: &ureq::http::HeaderMap) -> Option<u64> {
     if headers.contains_key("transfer-encoding") || headers.contains_key("content-range") {
         return None;
     }
@@ -203,9 +203,29 @@ fn copy_bounded_with_progress(
     deadline: Instant,
     progress: &mut Progress<'_>,
 ) -> Result<String, String> {
+    copy_hashed_with_progress(reader, writer, limit, deadline, progress, Sha256::new())
+}
+
+pub(crate) fn copy_sha512_with_progress(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    limit: u64,
+    deadline: Instant,
+    progress: &mut Progress<'_>,
+) -> Result<String, String> {
+    copy_hashed_with_progress(reader, writer, limit, deadline, progress, Sha512::new())
+}
+
+fn copy_hashed_with_progress(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    limit: u64,
+    deadline: Instant,
+    progress: &mut Progress<'_>,
+    mut digest: impl Digest,
+) -> Result<String, String> {
     let mut buffer = [0; 64 * 1024];
     let mut total = 0_u64;
-    let mut digest = Sha256::new();
     progress.downloaded(0, true);
     loop {
         remaining_time(deadline)?;
@@ -233,8 +253,9 @@ fn copy_bounded_with_progress(
         .map_err(|error| format!("flush download: {error}"))?;
     remaining_time(deadline)?;
     let hex_digits = b"0123456789abcdef";
-    let mut hexadecimal = String::with_capacity(64);
-    for byte in digest.finalize() {
+    let bytes = digest.finalize();
+    let mut hexadecimal = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
         hexadecimal.push(char::from(hex_digits[(byte >> 4) as usize]));
         hexadecimal.push(char::from(hex_digits[(byte & 0x0f) as usize]));
     }

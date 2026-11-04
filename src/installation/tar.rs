@@ -1,10 +1,16 @@
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fs::{self, File};
+use std::collections::BTreeMap;
+#[cfg(unix)]
+use std::collections::{BTreeSet, VecDeque};
+#[cfg(unix)]
+use std::fs;
+use std::fs::File;
 use std::io::{self, Read};
 
 use flate2::read::MultiGzDecoder;
 
-use super::{EntryKind, Extraction, invalid, real_directory, validate_component};
+#[cfg(unix)]
+use super::{EntryKind, real_directory, validate_component};
+use super::{Extraction, invalid};
 
 const METADATA_LIMIT: u64 = 1024 * 1024;
 
@@ -97,6 +103,9 @@ pub(super) fn extract(archive: File, destination: &mut Extraction<'_>) -> io::Re
                 }
                 destination.add_directory_entry(&relative)?;
             } else if kind.is_symlink() {
+                if !destination.allow_links {
+                    return Err(invalid("package archives must not contain links"));
+                }
                 if size != 0 {
                     return Err(invalid("tar link contains payload data"));
                 }
@@ -109,7 +118,13 @@ pub(super) fn extract(archive: File, destination: &mut Extraction<'_>) -> io::Re
                     effective_name(long_link.take(), fields.remove("linkpath"), header_link)?;
                 let target = std::str::from_utf8(&target)
                     .map_err(|_| invalid("link target is not UTF-8"))?;
+                #[cfg(unix)]
                 destination.queue_link(&relative, target)?;
+                #[cfg(not(unix))]
+                {
+                    let _ = target;
+                    return Err(invalid("archive links are unsupported on this platform"));
+                }
             } else {
                 return Err(invalid(
                     "unsupported tar entry type (including hard links and sparse files)",
@@ -218,6 +233,7 @@ impl Read for TarReader {
     }
 }
 
+#[cfg(unix)]
 impl Extraction<'_> {
     fn queue_link(&mut self, relative: &str, target: &str) -> io::Result<()> {
         if self.entries.contains_key(relative) {
@@ -364,6 +380,7 @@ impl Extraction<'_> {
     }
 }
 
+#[cfg(unix)]
 fn normalize_link_target(relative: &str, target: &str) -> io::Result<String> {
     if target.is_empty() || target.starts_with('/') {
         return Err(invalid("absolute or empty archive link target"));

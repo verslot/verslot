@@ -10,6 +10,53 @@ struct Fixture {
     storage: Storage,
 }
 
+#[test]
+fn yarn_readback_failure_restores_only_yarn_selection() {
+    let fixture = Fixture::new();
+    fixture.install("22.0.0");
+    fixture.storage.select(&Fixture::target("22.0.0")).unwrap();
+    let root = fixture.storage.root();
+    let first: Target = "yarn@1.22.22".parse().unwrap();
+    let second: Target = "yarn@4.9.2".parse().unwrap();
+    fs::create_dir_all(root.join("installs/yarn")).unwrap();
+    for target in [first, second] {
+        let archive = root.join(format!("fixture-{}.tgz", target.version));
+        fs::write(
+            &archive,
+            crate::yarn::tests::archive_fixture(target.version),
+        )
+        .unwrap();
+        crate::yarn::extract_archive(
+            root,
+            &archive,
+            &root.join("installs/yarn").join(target.version.to_string()),
+            target.version,
+            &"a".repeat(128),
+        )
+        .unwrap();
+    }
+    fixture.storage.select(&first).unwrap();
+    let error = fixture
+        .storage
+        .select_unix(&second, |step| {
+            if step == SwitchStep::ReadBack {
+                Err(io::Error::other("injected Yarn read-back failure"))
+            } else {
+                Ok(())
+            }
+        })
+        .unwrap_err();
+    assert!(error.to_string().contains("previous selection restored"));
+    assert_eq!(
+        fixture.storage.read_selected(Tool::Yarn).unwrap(),
+        Some(first.version)
+    );
+    fixture.selected(Some("22.0.0"));
+    for name in [".yarn-next", ".yarn-previous"] {
+        assert!(fs::symlink_metadata(root.join("current").join(name)).is_err());
+    }
+}
+
 impl Fixture {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -61,7 +108,7 @@ impl Fixture {
 
     fn selected(&self, expected: Option<&str>) {
         assert_eq!(
-            self.storage.read_selected().unwrap(),
+            self.storage.read_selected(Tool::Node).unwrap(),
             expected.map(|version| Self::target(version).version)
         );
     }
@@ -252,7 +299,7 @@ fn native_exclusive_link_creation_preserves_conflicting_entries() {
         assert!(error.contains("create symbolic link"));
         assert_eq!(fs::read(fixture.sibling(name)).unwrap(), b"unexpected");
         assert_eq!(
-            fixture.storage.read_current().unwrap(),
+            fixture.storage.read_current(Tool::Node).unwrap(),
             Some(Fixture::target("22.0.0").version)
         );
         fixture.unchanged_installations();
@@ -336,7 +383,7 @@ fn rollback_failure_reports_observed_state_and_keeps_backup() {
             .file_type()
             .is_symlink()
     );
-    assert!(fixture.storage.read_selected().is_err());
+    assert!(fixture.storage.read_selected(Tool::Node).is_err());
     fixture.unchanged_installations();
 }
 
@@ -360,7 +407,7 @@ fn postcommit_cleanup_failure_keeps_new_selection_and_reports_residue() {
     assert!(error.starts_with("switch completed but cleanup failed"));
     assert!(error.contains(&fixture.sibling(".node-previous").display().to_string()));
     assert_eq!(
-        fixture.storage.read_current().unwrap(),
+        fixture.storage.read_current(Tool::Node).unwrap(),
         Some(Fixture::target("24.0.0").version)
     );
     assert!(fs::symlink_metadata(fixture.sibling(".node-previous")).is_ok());
@@ -410,7 +457,7 @@ fn preparation_cleanup_failure_reports_both_errors_and_retains_owned_candidate()
     assert!(error.contains("injected cleanup failure"));
     assert!(error.contains(&fixture.sibling(".node-next").display().to_string()));
     assert_eq!(
-        fixture.storage.read_current().unwrap(),
+        fixture.storage.read_current(Tool::Node).unwrap(),
         Some(Fixture::target("22.0.0").version)
     );
     assert!(fs::symlink_metadata(fixture.sibling(".node-next")).is_ok());
@@ -478,7 +525,7 @@ fn cleanup_rejects_replacement_even_when_it_has_the_same_destination() {
         first
     );
     assert_eq!(
-        fixture.storage.read_current().unwrap(),
+        fixture.storage.read_current(Tool::Node).unwrap(),
         Some(Fixture::target("24.0.0").version)
     );
     fixture.unchanged_installations();

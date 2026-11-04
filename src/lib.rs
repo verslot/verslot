@@ -16,8 +16,10 @@ mod shim;
 pub mod storage;
 pub mod target;
 mod uninstall;
+mod yarn;
 
 use cli::Command;
+use target::{Target, Tool};
 
 pub fn run() -> Result<(), String> {
     if let Some(command) = shim::invoked_command() {
@@ -63,25 +65,26 @@ pub fn run() -> Result<(), String> {
             let installations = inventory::list_installed()?;
             let terminal = io::stdout().is_terminal();
             // Listing remains available when selection state cannot be read.
-            let selected = if terminal {
-                storage::Storage::from_env()
-                    .ok()
-                    .and_then(|storage| storage.read_selected().ok().flatten())
-            } else {
-                None
-            };
-            output::print_list(&installations, selected, terminal);
+            let mut selected = Vec::new();
+            if terminal && let Ok(storage) = storage::Storage::from_env() {
+                for tool in Tool::ALL {
+                    if let Ok(Some(version)) = storage.read_selected(tool) {
+                        selected.push(Target { tool, version });
+                    }
+                }
+            }
+            output::print_list(&installations, &selected, terminal);
             Ok(())
         }
         Command::Current => {
             let storage =
                 storage::Storage::from_env().map_err(|error| format!("current: {error}"))?;
             let selected = storage
-                .read_selected()
+                .read_selections()
                 .map_err(|error| format!("current: {error}"))?;
             logger::print_stdout(
                 logger::Symbol::None,
-                &output::format_current(selected, io::stdout().is_terminal()),
+                &output::format_current(&selected, io::stdout().is_terminal()),
             );
             Ok(())
         }

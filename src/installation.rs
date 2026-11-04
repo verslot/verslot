@@ -6,7 +6,6 @@ use std::path::{Component, Path};
 use crate::distribution::{ArchiveFormat, NodeDistribution};
 use crate::target::{Target, Tool, Version};
 
-#[cfg(unix)]
 mod tar;
 #[cfg(windows)]
 mod zip;
@@ -55,12 +54,35 @@ pub fn extract_verified_archive(
 
 /// Checks the receipt and executable of a real, direct installation directory without executing it.
 pub fn validate_installation(canonical_root: &Path, target: &Target) -> io::Result<()> {
-    let distribution = NodeDistribution::for_current_build(target.version).map_err(invalid)?;
     let directory = canonical_root
         .join("installs")
         .join(target.tool.to_string())
         .join(target.version.to_string());
-    validate_directory(canonical_root, &directory, target, &distribution)
+    validate_staging(canonical_root, &directory, target)
+}
+
+pub(crate) fn validate_staging(root: &Path, directory: &Path, target: &Target) -> io::Result<()> {
+    match target.tool {
+        Tool::Node => validate_directory(
+            root,
+            directory,
+            target,
+            &NodeDistribution::for_current_build(target.version).map_err(invalid)?,
+        ),
+        Tool::Yarn => crate::yarn::validate_directory(root, directory, target),
+    }
+}
+
+pub(crate) fn extract_verified_package(
+    root: &Path,
+    archive: &Path,
+    staging: &Path,
+) -> io::Result<()> {
+    regular_file(root, archive)?;
+    let mut destination =
+        Extraction::with_root(root, staging, "package".to_owned(), BYTE_LIMIT, ENTRY_LIMIT)?;
+    destination.allow_links = false;
+    tar::extract(File::open(archive)?, &mut destination)
 }
 
 pub(crate) fn validate_directory(
@@ -261,6 +283,7 @@ struct Extraction<'a> {
     count: u64,
     byte_limit: u64,
     entry_limit: u64,
+    allow_links: bool,
 }
 
 impl<'a> Extraction<'a> {
@@ -280,6 +303,16 @@ impl<'a> Extraction<'a> {
             .strip_suffix(extension)
             .ok_or_else(|| invalid("unexpected archive filename"))?
             .to_owned();
+        Self::with_root(boundary, staging, archive_root, byte_limit, entry_limit)
+    }
+
+    fn with_root(
+        boundary: &'a Path,
+        staging: &'a Path,
+        archive_root: String,
+        byte_limit: u64,
+        entry_limit: u64,
+    ) -> io::Result<Self> {
         validate_component(&archive_root)?;
         real_directory(
             boundary,
@@ -305,6 +338,7 @@ impl<'a> Extraction<'a> {
             count: 0,
             byte_limit,
             entry_limit,
+            allow_links: true,
         })
     }
 

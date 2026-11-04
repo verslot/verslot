@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::installation::validate_installation;
 use crate::mutation::{acquire_read_lock, reject_switch_residue};
-use crate::target::{Target, Version, VersionRequest};
+use crate::target::{Target, Tool, Version, VersionRequest};
 
 mod links;
 
@@ -35,9 +35,11 @@ impl Storage {
         if let Some(target) = request.exact() {
             return Ok(target);
         }
-        crate::inventory::read_matching_installations(root, |target| request.matches(target))?
-            .pop()
-            .ok_or_else(|| selection_not_installed(request))
+        crate::inventory::read_matching_installations(root, &[request.tool()], |target| {
+            request.matches(target)
+        })?
+        .pop()
+        .ok_or_else(|| selection_not_installed(request))
     }
 
     pub fn from_env() -> io::Result<Self> {
@@ -79,47 +81,64 @@ impl Storage {
     }
 
     // Inspect the current entry separately: a dangling link is a state error.
-    pub fn current_link_path(&self) -> io::Result<PathBuf> {
-        Ok(self.checked_directory(&["current"])?.join("node"))
+    pub fn current_link_path(&self, tool: Tool) -> io::Result<PathBuf> {
+        Ok(self.checked_directory(&["current"])?.join(tool.to_string()))
     }
 
     /// Reads a complete selection under a shared lock without creating any files.
-    pub fn read_selected(&self) -> io::Result<Option<Version>> {
+    pub fn read_selected(&self, tool: Tool) -> io::Result<Option<Version>> {
+        Ok(self
+            .read_selected_tools(&[tool])?
+            .first()
+            .map(|target| target.version))
+    }
+
+    pub(crate) fn read_selections(&self) -> io::Result<Vec<Target>> {
+        self.read_selected_tools(&Tool::ALL)
+    }
+
+    fn read_selected_tools(&self, tools: &[Tool]) -> io::Result<Vec<Target>> {
         // Validate even missing ancestors using the existing read-only path rules.
-        self.current_link_path()?;
+        for tool in tools {
+            self.current_link_path(*tool)?;
+        }
         match fs::symlink_metadata(&self.root) {
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(error) => return Err(error),
             Ok(_) => {}
         }
         let root = fs::canonicalize(&self.root)?;
         let lock = acquire_read_lock(&root)?;
         reject_switch_residue(&root)?;
-        if lock.is_none() {
-            match fs::symlink_metadata(root.join("current/node")) {
-                Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-                Err(error) => return Err(error),
-                Ok(_) => {
-                    return Err(io::Error::other(
-                        "current selection exists without mutation lock",
-                    ));
+        let mut selected = Vec::new();
+        for &tool in tools {
+            if lock.is_none() {
+                match fs::symlink_metadata(root.join("current").join(tool.to_string())) {
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                    Err(error) => return Err(error),
+                    Ok(_) => {
+                        return Err(io::Error::other(
+                            "current selection exists without mutation lock",
+                        ));
+                    }
                 }
             }
+            if let Some(version) = self.read_complete_current(&root, tool)? {
+                selected.push(Target { tool, version });
+            }
         }
-        self.read_complete_current(&root)
+        Ok(selected)
     }
 
     // The caller holds the mutation lock; never reacquire it during a switch.
     pub(crate) fn read_complete_current(
         &self,
         canonical_root: &Path,
+        tool: Tool,
     ) -> io::Result<Option<Version>> {
-        let version = self.read_current()?;
+        let version = self.read_current(tool)?;
         if let Some(version) = version {
-            let target = Target {
-                tool: crate::target::Tool::Node,
-                version,
-            };
+            let target = Target { tool, version };
             validate_installation(canonical_root, &target).map_err(|error| {
                 io::Error::new(
                     error.kind(),
@@ -131,8 +150,8 @@ impl Storage {
     }
 
     // Internal state reads also protect the selected version during uninstall.
-    pub(crate) fn read_current(&self) -> io::Result<Option<Version>> {
-        let link = self.current_link_path()?;
+    pub(crate) fn read_current(&self, tool: Tool) -> io::Result<Option<Version>> {
+        let link = self.current_link_path(tool)?;
         match fs::symlink_metadata(&link) {
             Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
@@ -145,11 +164,11 @@ impl Storage {
             link.parent().unwrap().join(destination)
         };
         let resolved = fs::canonicalize(destination)?;
-        let installs = fs::canonicalize(self.checked_directory(&["installs", "node"])?)?;
+        let installs = fs::canonicalize(self.checked_directory(&["installs", &tool.to_string()])?)?;
         if !fs::metadata(&resolved)?.is_dir() || resolved.parent() != Some(installs.as_path()) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "current node must resolve to a direct installation directory",
+                format!("current {tool} must resolve to a direct installation directory"),
             ));
         }
         let name = resolved
@@ -161,7 +180,7 @@ impl Storage {
                     "invalid current version directory name",
                 )
             })?;
-        let target = format!("node@{name}")
+        let target = format!("{tool}@{name}")
             .parse::<Target>()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
         if fs::canonicalize(self.installation_path(&target)?)? != resolved {

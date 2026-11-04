@@ -45,7 +45,8 @@ impl Storage {
         request: &VersionRequest,
         mut checkpoint: impl FnMut(SwitchStep) -> io::Result<()>,
     ) -> io::Result<(Target, bool)> {
-        self.current_link_path()?;
+        let tool = request.tool();
+        self.current_link_path(tool)?;
         let not_installed = || selection_not_installed(request);
         match fs::symlink_metadata(self.root()) {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Err(not_installed()),
@@ -54,9 +55,12 @@ impl Storage {
         }
         let root = fs::canonicalize(self.root())?;
         let lock = acquire_lock(&root)?;
-        let previous = self.read_complete_current(&root)?;
+        let previous = self.read_complete_current(&root, tool)?;
         let target = &Self::resolve_selection(&root, request)?;
-        let destination = root.join("installs/node").join(target.version.to_string());
+        let destination = root
+            .join("installs")
+            .join(target.tool.to_string())
+            .join(target.version.to_string());
         real_directory(&root, destination.parent().unwrap()).map_err(|error| {
             if error.kind() == io::ErrorKind::NotFound {
                 not_installed()
@@ -77,9 +81,9 @@ impl Storage {
 
         let current_directory = root.join("current");
         create_directory(&root, &current_directory)?;
-        let current = current_directory.join("node");
-        let next = current_directory.join(".node-next");
-        let backup = current_directory.join(".node-previous");
+        let current = current_directory.join(tool.to_string());
+        let next = current_directory.join(format!(".{tool}-next"));
+        let backup = current_directory.join(format!(".{tool}-previous"));
         let old_link = previous.map(|_| UnixLink::inspect(&current)).transpose()?;
         let mut next_link = None;
         let mut backup_link = None;
@@ -90,11 +94,11 @@ impl Storage {
             verify_selection_link(&root, &next, next_link.as_ref().unwrap(), target)?;
             if let Some(version) = previous {
                 checkpoint(SwitchStep::Backup)?;
-                let old_target = Target {
-                    tool: Tool::Node,
-                    version,
-                };
-                let old_destination = root.join("installs/node").join(version.to_string());
+                let old_target = Target { tool, version };
+                let old_destination = root
+                    .join("installs")
+                    .join(target.tool.to_string())
+                    .join(version.to_string());
                 backup_link = Some(create_link(&root, &backup, &old_destination)?);
                 verify_selection_link(&root, &backup, backup_link.as_ref().unwrap(), &old_target)?;
             }
@@ -105,7 +109,7 @@ impl Storage {
                     &current,
                     old_link,
                     &Target {
-                        tool: Tool::Node,
+                        tool,
                         version: previous.unwrap(),
                     },
                 )?;
@@ -119,7 +123,7 @@ impl Storage {
                     &backup,
                     backup_link,
                     &Target {
-                        tool: Tool::Node,
+                        tool,
                         version: previous.unwrap(),
                     },
                 )?;
@@ -152,7 +156,7 @@ impl Storage {
         let read_back = (|| {
             checkpoint(SwitchStep::ReadBack)?;
             verify_selection_link(&root, &current, new_link, target)?;
-            verify_current(self, &root, Some(target.version))
+            verify_current(self, &root, tool, Some(target.version))
         })();
         if let Err(error) = read_back {
             let rollback = (|| {
@@ -160,7 +164,7 @@ impl Storage {
                 new_link.verify_identity(&root, &current)?;
                 if let Some(backup_link) = &backup_link {
                     let old_target = Target {
-                        tool: Tool::Node,
+                        tool,
                         version: previous.unwrap(),
                     };
                     verify_selection_link(&root, &backup, backup_link, &old_target)?;
@@ -171,15 +175,15 @@ impl Storage {
                     new_link.remove(&root, &current)?;
                     verify_absent(&root, &current)?;
                 }
-                verify_current(self, &root, previous)
+                verify_current(self, &root, tool, previous)
             })();
             return match rollback {
                 Ok(()) => Err(io::Error::other(format!(
                     "{error}; previous selection restored"
                 ))),
                 Err(rollback_error) => {
-                    let observed = match self.read_complete_current(&root) {
-                        Ok(Some(version)) => format!("node@{version}"),
+                    let observed = match self.read_complete_current(&root, tool) {
+                        Ok(Some(version)) => format!("{tool}@{version}"),
                         Ok(None) => "no selection".to_owned(),
                         Err(error) => format!("unavailable: {error}"),
                     };
@@ -254,7 +258,10 @@ fn verify_selection_link(
 ) -> io::Result<()> {
     link.verify_identity(root, path)?;
     validate_installation(root, target)?;
-    let destination = root.join("installs/node").join(target.version.to_string());
+    let destination = root
+        .join("installs")
+        .join(target.tool.to_string())
+        .join(target.version.to_string());
     if fs::canonicalize(path)? != destination {
         return Err(io::Error::other(format!(
             "unexpected link destination at {}",
@@ -276,8 +283,13 @@ fn verify_absent(root: &Path, path: &Path) -> io::Result<()> {
     }
 }
 
-fn verify_current(storage: &Storage, root: &Path, expected: Option<Version>) -> io::Result<()> {
-    if storage.read_complete_current(root)? != expected {
+fn verify_current(
+    storage: &Storage,
+    root: &Path,
+    tool: Tool,
+    expected: Option<Version>,
+) -> io::Result<()> {
+    if storage.read_complete_current(root, tool)? != expected {
         return Err(io::Error::other(
             "selection read-back does not match expected version",
         ));

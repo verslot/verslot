@@ -42,14 +42,14 @@ fn uninstall_at(
         fs::canonicalize(storage.root()).map_err(|error| format!("resolve storage: {error}"))?;
     let _lock = acquire_lock(&root).map_err(|error| error.to_string())?;
     let current = storage
-        .read_current()
+        .read_current(target.tool)
         .map_err(|error| format!("read current state: {error}"))?;
     if current == Some(target.version) {
         return Err(format!("cannot uninstall current version: {target}"));
     }
 
     let mut destination = root.clone();
-    for component in ["installs", "node"] {
+    for component in ["installs", &target.tool.to_string()] {
         destination.push(component);
         match fs::symlink_metadata(&destination) {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Err(not_installed()),

@@ -8,7 +8,7 @@ use crate::distribution::NodePlatform;
 use crate::download;
 use crate::logger;
 use crate::progress::Progress;
-use crate::target::{Target, Version};
+use crate::target::{Target, Tool, Version};
 
 const INDEX_URL: &str = "https://nodejs.org/dist/index.tab";
 const INDEX_LIMIT: u64 = 4 * 1024 * 1024;
@@ -16,8 +16,8 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone)]
 pub(crate) enum RemoteQuery {
-    All,
-    Prefix(String),
+    All(Tool),
+    Prefix(Tool, String),
     Lts,
 }
 
@@ -25,16 +25,23 @@ impl FromStr for RemoteQuery {
     type Err = String;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        if input == "node" {
-            return Ok(Self::All);
-        }
         if input == "node@lts" {
             return Ok(Self::Lts);
         }
         let invalid = || {
-            "invalid remote query: expected node, node@<numeric-prefix>, or node@lts; use one to three ASCII decimal components without leading zeros, each within 0..=4294967295".to_owned()
+            "invalid remote query: expected node, yarn, <tool>@<numeric-prefix>, or node@lts; use one to three ASCII decimal components without leading zeros, each within 0..=4294967295".to_owned()
         };
-        let prefix = input.strip_prefix("node@").ok_or_else(invalid)?;
+        let (tool, prefix) = input
+            .split_once('@')
+            .map_or((input, None), |(tool, prefix)| (tool, Some(prefix)));
+        let tool = match tool {
+            "node" => Tool::Node,
+            "yarn" => Tool::Yarn,
+            _ => return Err(invalid()),
+        };
+        let Some(prefix) = prefix else {
+            return Ok(Self::All(tool));
+        };
         let parts: Vec<_> = prefix.split('.').collect();
         if !(1..=3).contains(&parts.len())
             || parts.iter().any(|part| {
@@ -46,21 +53,41 @@ impl FromStr for RemoteQuery {
         {
             return Err(invalid());
         }
-        Ok(Self::Prefix(prefix.to_owned()))
+        Ok(Self::Prefix(tool, prefix.to_owned()))
     }
 }
 
 impl fmt::Display for RemoteQuery {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::All => formatter.write_str("node"),
-            Self::Prefix(prefix) => write!(formatter, "node@{prefix}"),
+            Self::All(tool) => write!(formatter, "{tool}"),
+            Self::Prefix(tool, prefix) => write!(formatter, "{tool}@{prefix}"),
             Self::Lts => formatter.write_str("node@lts"),
         }
     }
 }
 
 pub(crate) fn list(query: &RemoteQuery) -> Result<(), String> {
+    if matches!(
+        query,
+        RemoteQuery::All(Tool::Yarn) | RemoteQuery::Prefix(Tool::Yarn, _)
+    ) {
+        let mut progress = Progress::stderr();
+        progress.stage("Fetching versions");
+        let result = crate::yarn::available_versions();
+        progress.finish();
+        let mut output = std::io::stdout().lock();
+        for version in result? {
+            if let RemoteQuery::Prefix(_, prefix) = query
+                && !version.to_string().starts_with(prefix)
+            {
+                continue;
+            }
+            logger::write_plain_line(&mut output, &format!("v{version}"))
+                .map_err(|error| format!("write release list: {error}"))?;
+        }
+        return Ok(());
+    }
     let platform = NodePlatform::current()?;
     list_with_progress(
         query,
@@ -73,9 +100,12 @@ pub(crate) fn list(query: &RemoteQuery) -> Result<(), String> {
     )
 }
 
-pub(crate) fn available_versions() -> Result<Vec<Version>, String> {
+pub(crate) fn available_versions_for(tool: Tool) -> Result<Vec<Version>, String> {
+    if tool == Tool::Yarn {
+        return crate::yarn::available_versions();
+    }
     fetch_versions(
-        &RemoteQuery::All,
+        &RemoteQuery::All(Tool::Node),
         NodePlatform::current()?.index_file,
         &download::download_agent(),
         INDEX_URL,
@@ -193,8 +223,8 @@ pub(crate) fn fetch_versions(
             continue;
         }
         let matches = match query {
-            RemoteQuery::All => true,
-            RemoteQuery::Prefix(prefix) => version.starts_with(prefix),
+            RemoteQuery::All(_) => true,
+            RemoteQuery::Prefix(_, prefix) => version.starts_with(prefix),
             RemoteQuery::Lts => fields[lts_column] != "-",
         };
         if !matches {

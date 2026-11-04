@@ -24,6 +24,15 @@ fn executable_name(name: &str) -> String {
     }
 }
 
+fn write_node_fixture(executable: &Path) {
+    fs::write(executable, tool_bytes()).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(executable, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+}
+
 impl Fixture {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -79,12 +88,7 @@ impl Fixture {
             "bin/node"
         });
         fs::create_dir_all(executable.parent().unwrap()).unwrap();
-        fs::write(&executable, tool_bytes()).unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        write_node_fixture(&executable);
         fs::write(
             installation.join(".verslot-install"),
             format!(
@@ -104,13 +108,38 @@ impl Fixture {
             .success();
     }
 
+    fn seed_yarn(&self, version: &str) -> PathBuf {
+        let installation = self.root.join("installs/yarn").join(version);
+        fs::create_dir_all(installation.join("bin")).unwrap();
+        fs::write(installation.join("bin/yarn.js"), format!("yarn@{version}")).unwrap();
+        let classic = version.starts_with("1.");
+        let package = if classic { "yarn" } else { "@yarnpkg/cli-dist" };
+        let archive = if classic { "yarn" } else { "cli-dist" };
+        fs::write(
+            installation.join("package.json"),
+            format!(r#"{{"name":"{package}","version":"{version}"}}"#),
+        )
+        .unwrap();
+        fs::write(
+            installation.join(".verslot-install"),
+            format!(
+                "verslot-install-v2\nyarn@{version}\n{archive}-{version}.tgz\n{}\n",
+                "a".repeat(128)
+            ),
+        )
+        .unwrap();
+        installation
+    }
+
     fn finish(self) {
-        let current = self.root.join("current/node");
-        if fs::symlink_metadata(&current).is_ok() {
-            #[cfg(unix)]
-            fs::remove_file(current).unwrap();
-            #[cfg(windows)]
-            junction::delete(current).unwrap();
+        for tool in ["node", "yarn"] {
+            let current = self.root.join("current").join(tool);
+            if fs::symlink_metadata(&current).is_ok() {
+                #[cfg(unix)]
+                fs::remove_file(current).unwrap();
+                #[cfg(windows)]
+                junction::delete(current).unwrap();
+            }
         }
         assert_eq!(
             self.directory.parent(),
@@ -118,6 +147,190 @@ impl Fixture {
         );
         fs::remove_dir_all(self.directory).unwrap();
     }
+}
+
+#[test]
+fn yarn_and_yarnpkg_use_managed_node_on_path_and_inherit_yarn_settings() {
+    let fixture = Fixture::new();
+    fixture.setup();
+    fixture.seed("22.0.0");
+    fixture.seed("24.0.0");
+    fixture.select("22.0.0");
+    let path = fixture.root.join("shims");
+    for version in ["1.22.22", "4.9.2"] {
+        fixture.seed_yarn(version);
+        fixture
+            .manager()
+            .args(["use", &format!("yarn@{version}")])
+            .assert()
+            .success();
+        for name in ["yarn", "yarnpkg"] {
+            fixture
+                .shim(name)
+                .arg("yarn-env")
+                .env("PATH", &path)
+                .env("YARN_IGNORE_PATH", "0")
+                .env("SKIP_YARN_COREPACK_CHECK", "native-value")
+                .assert()
+                .success()
+                .stdout(format!(
+                    "bundled=yarn@{version};node=22.0.0\nignore_path=0;corepack_check=native-value\n"
+                ));
+        }
+        fixture
+            .manager()
+            .arg("current")
+            .assert()
+            .success()
+            .stdout(format!("   node@22.0.0\n   yarn@{version}\n"));
+    }
+    fixture.select("24.0.0");
+    fixture
+        .shim("yarn")
+        .args(["exit", "37"])
+        .env("PATH", &path)
+        .assert()
+        .code(37)
+        .stdout("bundled=yarn@4.9.2;node=24.0.0\n");
+    fixture
+        .shim("yarn")
+        .arg("--version")
+        .env("PATH", &fixture.directory)
+        .assert()
+        .code(1)
+        .stdout("");
+    fixture.finish();
+}
+
+#[test]
+fn yarn_uses_system_node_on_path_without_a_managed_node_selection() {
+    let fixture = Fixture::new();
+    fixture.setup();
+    fixture.seed_yarn("4.9.2");
+    fixture.manager().args(["use", "yarn@4"]).assert().success();
+    fixture
+        .manager()
+        .arg("current")
+        .assert()
+        .success()
+        .stdout("   yarn@4.9.2\n");
+    let system = fixture.directory.join("system");
+    fs::create_dir(&system).unwrap();
+    write_node_fixture(&system.join(executable_name("node")));
+    fixture
+        .shim("yarn")
+        .arg("yarn-env")
+        .env("PATH", system)
+        .env_remove("YARN_IGNORE_PATH")
+        .env("SKIP_YARN_COREPACK_CHECK", "native-value")
+        .assert()
+        .success()
+        .stdout(
+            "bundled=yarn@4.9.2;node=system\nignore_path=<unset>;corepack_check=native-value\n",
+        );
+    fixture.finish();
+}
+
+#[test]
+fn yarn_versions_list_select_and_uninstall_independently_of_same_numbered_node() {
+    let fixture = Fixture::new();
+    fixture.setup();
+    fixture.seed("4.9.2");
+    fixture.select("4.9.2");
+    fixture.seed_yarn("4.9.1");
+    fixture.seed_yarn("4.9.2");
+    fixture.seed_yarn("4.10.0");
+    fixture
+        .manager()
+        .args(["use", "yarn@4.9"])
+        .assert()
+        .success();
+    fixture
+        .manager()
+        .arg("list")
+        .assert()
+        .success()
+        .stdout("   node@4.9.2\n   yarn@4.9.1\n   yarn@4.9.2\n   yarn@4.10.0\n");
+    fixture
+        .manager()
+        .args(["uninstall", "yarn@4.9.2"])
+        .assert()
+        .code(1);
+    fixture.manager().args(["use", "yarn@4"]).assert().success();
+    fixture
+        .manager()
+        .args(["uninstall", "yarn@4.9.2"])
+        .assert()
+        .success();
+    fixture
+        .manager()
+        .arg("current")
+        .assert()
+        .success()
+        .stdout("   node@4.9.2\n   yarn@4.10.0\n");
+    assert!(fixture.root.join("installs/node/4.9.2").exists());
+    assert!(!fixture.root.join("installs/yarn/4.9.2").exists());
+    fixture.finish();
+}
+
+#[test]
+fn partial_selection_does_not_read_another_tools_damaged_inventory_directory() {
+    for (tool, version, other) in [("node", "22.0.0", "yarn"), ("yarn", "4.9.2", "node")] {
+        let fixture = Fixture::new();
+        if tool == "node" {
+            fixture.seed(version);
+        } else {
+            fixture.seed_yarn(version);
+        }
+        fs::write(
+            fixture.root.join("installs").join(other),
+            b"damaged unrelated inventory",
+        )
+        .unwrap();
+        fixture
+            .manager()
+            .args([
+                "use",
+                &format!("{tool}@{}", version.split('.').next().unwrap()),
+            ])
+            .assert()
+            .success();
+        fixture
+            .manager()
+            .arg("current")
+            .assert()
+            .success()
+            .stdout(format!("   {tool}@{version}\n"));
+        fixture.finish();
+    }
+}
+
+#[test]
+fn damaged_yarn_does_not_disable_node_or_fall_back_to_another_yarn() {
+    let fixture = Fixture::new();
+    fixture.setup();
+    fixture.seed("22.0.0");
+    fixture.select("22.0.0");
+    let yarn = fixture.seed_yarn("4.9.2");
+    fixture
+        .manager()
+        .args(["use", "yarn@4.9.2"])
+        .assert()
+        .success();
+    fs::remove_file(yarn.join("bin/yarn.js")).unwrap();
+    fixture
+        .shim("yarn")
+        .arg("--version")
+        .assert()
+        .code(1)
+        .stdout("");
+    fixture
+        .shim("node")
+        .arg("--version")
+        .assert()
+        .success()
+        .stdout("v22.0.0\n");
+    fixture.finish();
 }
 
 fn tool_bytes() -> &'static [u8] {
