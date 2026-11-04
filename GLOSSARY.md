@@ -18,6 +18,10 @@ A command supplied with a managed tool version, such as npm or npx in a Node.js
 distribution. It follows the supplying tool's selection rather than having an
 independent Verslot selection.
 
+**Command shim**:
+A Verslot-managed executable entry point in the shared PATH directory for the
+Verslot CLI or a supported tool command.
+
 **Version request**:
 A tool name with one to three numeric version components, identifying an exact
 release or a major/minor release series whose supplied components must match.
