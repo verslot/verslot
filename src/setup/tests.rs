@@ -22,7 +22,9 @@ impl Fixture {
     }
 
     fn setup(&self) -> io::Result<PathBuf> {
-        setup_at(&self.root, &self.source)
+        setup_at(&self.root, &self.source, |source, shim| {
+            fs::hard_link(source, shim)
+        })
     }
 
     fn finish(self) {
@@ -34,15 +36,34 @@ impl Fixture {
     }
 }
 
+#[cfg(unix)]
+fn file_identity(path: &Path) -> (u64, u64) {
+    use std::os::unix::fs::MetadataExt;
+
+    let metadata = fs::metadata(path).unwrap();
+    (metadata.dev(), metadata.ino())
+}
+
+#[cfg(windows)]
+fn file_identity(path: &Path) -> (u64, u64) {
+    let file = File::open(path).unwrap();
+    let information = winapi_util::file::information(&file).unwrap();
+    (information.volume_serial_number(), information.file_index())
+}
+
 #[test]
 fn setup_repeats_and_refreshes_the_complete_owned_generation() {
     let fixture = Fixture::new();
     let directory = fixture.setup().unwrap();
+    let executable = directory.join(executable_name("verslot"));
+    let identity = file_identity(&executable);
+    assert_ne!(identity, file_identity(&fixture.source));
     let modified = fs::metadata(directory.join(RECEIPT))
         .unwrap()
         .modified()
         .unwrap();
     fixture.setup().unwrap();
+    assert_eq!(file_identity(&executable), identity);
     assert_eq!(
         fs::metadata(directory.join(RECEIPT))
             .unwrap()
@@ -52,12 +73,83 @@ fn setup_repeats_and_refreshes_the_complete_owned_generation() {
     );
     fs::write(&fixture.source, b"new executable").unwrap();
     fixture.setup().unwrap();
+    let identity = file_identity(&executable);
     for name in COMMANDS {
-        assert_eq!(
-            fs::read(directory.join(executable_name(name))).unwrap(),
-            b"new executable"
-        );
+        let shim = directory.join(executable_name(name));
+        assert_eq!(fs::read(&shim).unwrap(), b"new executable");
+        assert_eq!(file_identity(&shim), identity);
     }
+    assert!(!fixture.root.join(".shims-previous").exists());
+    fixture.finish();
+}
+
+#[test]
+fn setup_migrates_legacy_copies_with_the_same_digest_and_commands() {
+    let fixture = Fixture::new();
+    let directory = fixture.root.join("shims");
+    fs::create_dir(&directory).unwrap();
+    for name in COMMANDS {
+        fs::copy(&fixture.source, directory.join(executable_name(name))).unwrap();
+    }
+    fs::write(
+        directory.join(RECEIPT),
+        format!(
+            "verslot-shims-v1\n{}\n{}\n",
+            file_digest(&fixture.source).unwrap(),
+            COMMANDS.map(executable_name).join("\n")
+        ),
+    )
+    .unwrap();
+
+    fixture.setup().unwrap();
+
+    let identity = file_identity(&directory.join(executable_name("verslot")));
+    for name in COMMANDS {
+        let shim = directory.join(executable_name(name));
+        assert_eq!(file_identity(&shim), identity);
+    }
+    fixture.finish();
+}
+
+#[test]
+fn setup_copies_entries_when_hard_links_are_unavailable() {
+    let fixture = Fixture::new();
+    let directory = setup_at(&fixture.root, &fixture.source, |_, _| {
+        #[cfg(windows)]
+        let error = io::Error::from_raw_os_error(50);
+        #[cfg(target_os = "linux")]
+        let error = io::Error::from_raw_os_error(1);
+        #[cfg(not(any(windows, target_os = "linux")))]
+        let error = io::Error::from(io::ErrorKind::Unsupported);
+        Err(error)
+    })
+    .unwrap();
+
+    let identity = file_identity(&directory.join(executable_name("verslot")));
+    for name in &COMMANDS[1..] {
+        let shim = directory.join(executable_name(name));
+        assert_ne!(file_identity(&shim), identity);
+        assert_eq!(fs::read(shim).unwrap(), b"old executable");
+    }
+    fixture.finish();
+}
+
+#[test]
+fn setup_preserves_the_previous_generation_after_an_unexpected_link_error() {
+    let fixture = Fixture::new();
+    let directory = fixture.setup().unwrap();
+    fs::write(&fixture.source, b"new executable").unwrap();
+
+    let error = setup_at(&fixture.root, &fixture.source, |_, _| {
+        Err(io::Error::from(io::ErrorKind::AlreadyExists))
+    })
+    .unwrap_err();
+
+    assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+    assert_eq!(
+        fs::read(directory.join(executable_name("verslot"))).unwrap(),
+        b"old executable"
+    );
     assert!(!fixture.root.join(".shims-previous").exists());
     fixture.finish();
 }

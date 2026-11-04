@@ -21,6 +21,10 @@
 - Display setup PATH instructions using standard Windows drive or UNC notation
   instead of the internal extended-length path prefix (#29).
 
+- Share one executable across command shims with hard links on Windows, Linux,
+  and macOS. Running `verslot setup` migrates verified shim directories and
+  uses copies when hard links are unavailable (#34).
+
 - Show `Resolving <request>` during partial installation and include the resolved
   complete target in subsequent installation progress. Delay the terminal
   resolution spinner by about 200 ms to avoid flicker, while logging redirected

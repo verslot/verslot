@@ -302,6 +302,9 @@ version does not protect processes still using its installation.
 After upgrading, invoke the **newly installed executable by its full path** with
 `setup` again to refresh every entry, including `verslot` itself. Updating Cargo's
 copy alone leaves the existing shims unchanged. No PATH adjustment is needed.
+On filesystems that support hard links, all entries share one executable in the
+shim directory. Running the new `setup` migrates verified directories made of
+separate copies. Setup uses separate copies where hard links are unavailable.
 `setup` verifies an ownership receipt and executable checksums before replacing
 an existing shim directory; unknown or modified entries are preserved and cause
 an error. Entries persist even after the last Node version is uninstalled.
