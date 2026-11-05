@@ -61,7 +61,9 @@ fn remote_list_rejects_invalid_queries_before_execution() {
                 .code(2)
                 .stdout("")
                 .stderr(predicate::str::contains("✘  error:"))
-                .stderr(predicate::str::contains("invalid remote query"));
+                .stderr(predicate::str::contains(
+                    "invalid remote query: expected <tool>, <tool>@<numeric-prefix>, or node@lts",
+                ));
         }
     }
 }
@@ -96,6 +98,7 @@ fn help_describes_the_cli() {
         .stdout(predicate::str::contains("install"))
         .stdout(predicate::str::contains("uninstall"))
         .stdout(predicate::str::contains("use"))
+        .stdout(predicate::str::contains("unuse"))
         .stdout(predicate::str::contains("list"))
         .stdout(predicate::str::contains("[alias: ls]"))
         .stdout(predicate::str::contains("not implemented yet").not())
@@ -178,6 +181,7 @@ fn subcommand_argument_errors_show_the_complete_help_command() {
         (vec!["uninstall"], "uninstall"),
         (vec!["use"], "use"),
         (vec!["use", "node@22."], "use"),
+        (vec!["unuse"], "unuse"),
         (vec!["list", "--invalid"], "list"),
         (vec!["ls", "--invalid"], "list"),
         (vec!["list-remote"], "list-remote"),
@@ -234,6 +238,82 @@ fn use_reports_storage_errors() {
         .stdout("")
         .stderr(predicate::str::contains("select node@22.0.0"))
         .stderr(predicate::str::contains("is missing"));
+}
+
+#[test]
+fn unuse_accepts_bare_tools_and_reports_storage_errors() {
+    for tool in ["node", "yarn"] {
+        verslot_command()
+            .args(["unuse", tool])
+            .env_remove("HOME")
+            .env_remove("LOCALAPPDATA")
+            .assert()
+            .code(1)
+            .stdout("")
+            .stderr(predicate::str::contains(format!("unuse {tool}")))
+            .stderr(predicate::str::contains("is missing"));
+    }
+}
+
+#[test]
+fn unuse_explains_that_version_suffixes_are_not_accepted() {
+    for input in ["node@16", "yarn@4.9.2", "future@1"] {
+        verslot_command()
+            .args(["unuse", input])
+            .env_remove("HOME")
+            .env_remove("LOCALAPPDATA")
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains(
+                "expected a tool name without a version",
+            ));
+    }
+}
+
+#[test]
+fn unsupported_tool_diagnostics_do_not_enumerate_supported_tools() {
+    for (command, input) in [
+        ("unuse", "python"),
+        ("use", "python@16"),
+        ("install", "python@16"),
+        ("uninstall", "python@16.0.0"),
+    ] {
+        verslot_command()
+            .args([command, input])
+            .env_remove("HOME")
+            .env_remove("LOCALAPPDATA")
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains(": unsupported tool\n"));
+    }
+}
+
+#[test]
+fn unuse_requires_exactly_one_bare_supported_tool_before_execution() {
+    for arguments in [
+        vec!["unuse"],
+        vec!["unuse", "node", "yarn"],
+        vec!["unuse", "--all"],
+        vec!["unuse", "node@22.0.0"],
+        vec!["unuse", "yarn@4"],
+        vec!["unuse", "python"],
+        vec!["unuse", "Node"],
+        vec!["unuse", " node"],
+        vec!["unuse", "../node"],
+    ] {
+        verslot_command()
+            .args(arguments)
+            .env_remove("HOME")
+            .env_remove("LOCALAPPDATA")
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains(
+                "For more information, try 'verslot unuse --help'.",
+            ));
+    }
 }
 
 #[test]
@@ -626,9 +706,11 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
 
 #[test]
 fn each_command_provides_help() {
-    for command in ["install", "uninstall", "use", "list", "current"] {
+    for command in ["install", "uninstall", "use", "unuse", "list", "current"] {
         let expected_usage = if matches!(command, "install" | "uninstall" | "use") {
             format!("Usage: verslot {command} <TOOL@VERSION>")
+        } else if command == "unuse" {
+            "Usage: verslot unuse <TOOL>".to_owned()
         } else {
             format!("Usage: verslot {command}")
         };

@@ -20,6 +20,21 @@ impl fmt::Display for Tool {
     }
 }
 
+impl FromStr for Tool {
+    type Err = &'static str;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        if input.contains('@') {
+            return Err("expected a tool name without a version");
+        }
+        match input {
+            "node" => Ok(Self::Node),
+            "yarn" => Ok(Self::Yarn),
+            _ => Err("unsupported tool"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Version {
     pub major: u32,
@@ -130,7 +145,7 @@ impl fmt::Display for ParseTargetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InvalidStructure => "invalid target: expected <tool>@<version> with exactly one @ and non-empty parts; example: node@22.0.0",
-            Self::UnsupportedTool => "unsupported tool: only node and yarn are supported",
+            Self::UnsupportedTool => "unsupported tool",
             Self::ComponentCount => "invalid version: expected major.minor.patch; example: node@22.0.0",
             Self::NonAsciiDigits => "invalid version: components must contain only ASCII digits; example: node@22.0.0",
             Self::LeadingZeros => "invalid version: leading zeros are not allowed; example: node@22.0.0",
@@ -411,10 +426,7 @@ mod tests {
                 InvalidStructure,
                 "invalid target: expected <tool>@<version> with exactly one @ and non-empty parts; example: node@22.0.0",
             ),
-            (
-                UnsupportedTool,
-                "unsupported tool: only node and yarn are supported",
-            ),
+            (UnsupportedTool, "unsupported tool"),
             (
                 ComponentCount,
                 "invalid version: expected major.minor.patch; example: node@22.0.0",

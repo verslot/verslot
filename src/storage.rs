@@ -4,7 +4,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::installation::validate_installation;
-use crate::mutation::{acquire_read_lock, reject_switch_residue};
+use crate::mutation::{acquire_lock, acquire_read_lock, reject_switch_residue};
 use crate::target::{Target, Tool, Version, VersionRequest};
 
 mod links;
@@ -80,9 +80,42 @@ impl Storage {
         self.checked_directory(&["tmp"])
     }
 
-    // Inspect the current entry separately: a dangling link is a state error.
+    // Inspect the current entry separately to distinguish dangling links from absence.
     pub fn current_link_path(&self, tool: Tool) -> io::Result<PathBuf> {
         Ok(self.checked_directory(&["current"])?.join(tool.to_string()))
+    }
+
+    /// Clears a selection under the mutation lock without inspecting its installation.
+    /// Returns false when the selection entry is already absent.
+    pub fn clear_selection(&self, tool: Tool) -> io::Result<bool> {
+        self.current_link_path(tool)?;
+        match fs::symlink_metadata(self.root()) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error),
+            Ok(_) => {}
+        }
+        let root = fs::canonicalize(self.root())?;
+        let _lock = acquire_lock(&root)?;
+        let current = root.join("current").join(tool.to_string());
+        match fs::symlink_metadata(&current) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error),
+            Ok(_) => {}
+        }
+
+        #[cfg(unix)]
+        links::UnixLink::inspect(&current)?.remove(&root, &current)?;
+        #[cfg(windows)]
+        links::WindowsJunction::inspect(&current)?.remove(&root, &current)?;
+
+        match fs::symlink_metadata(&current) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(true),
+            Err(error) => Err(error),
+            Ok(_) => Err(io::Error::other(format!(
+                "selection removal incomplete at {}; entry is still present",
+                current.display()
+            ))),
+        }
     }
 
     /// Reads a complete selection under a shared lock without creating any files.

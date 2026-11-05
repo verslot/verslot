@@ -133,8 +133,9 @@ fn format_error(error: &str) -> String {
     if let Some(target) = operation.strip_prefix("uninstall ")
         && reason == format!("cannot uninstall current version: {target}")
     {
+        let tool = target.split_once('@').map_or(target, |(tool, _)| tool);
         return format!(
-            "{target} is currently selected\n\nSelect another version before uninstalling."
+            "{target} is currently selected\n\nSelect another version or run `verslot unuse {tool}` before uninstalling."
         );
     }
     // Keep committed-operation and cleanup diagnostics intact: they describe actual state.
@@ -307,7 +308,7 @@ mod tests {
         );
         assert_eq!(
             format_error("uninstall node@22.0.0: cannot uninstall current version: node@22.0.0"),
-            "node@22.0.0 is currently selected\n\nSelect another version before uninstalling."
+            "node@22.0.0 is currently selected\n\nSelect another version or run `verslot unuse node` before uninstalling."
         );
         assert_eq!(
             format_error("install node@22.0.0: open C:\\data: permission denied"),

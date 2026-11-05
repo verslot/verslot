@@ -35,6 +35,7 @@ fn mutations_during_switch_child() {
     for error in [
         storage.select(&second).unwrap_err().to_string(),
         storage.read_selected(Tool::Node).unwrap_err().to_string(),
+        storage.clear_selection(Tool::Node).unwrap_err().to_string(),
         crate::install::install(&first.into()).unwrap_err(),
         crate::uninstall::uninstall(&first).unwrap_err(),
     ] {
@@ -306,6 +307,14 @@ fn readers_share_locks_and_exclude_writers_without_truncation() {
     let second = acquire_read_lock(fixture.storage.root()).unwrap().unwrap();
     assert!(fixture.storage.read_selected(Tool::Node).unwrap().is_some());
     assert!(
+        fixture
+            .storage
+            .clear_selection(Tool::Node)
+            .unwrap_err()
+            .to_string()
+            .contains("storage is busy")
+    );
+    assert!(
         acquire_lock(fixture.storage.root())
             .unwrap_err()
             .to_string()
@@ -433,6 +442,10 @@ fn invalid_lock_files_and_current_ancestors_are_preserved() {
             "{state}"
         );
         assert!(acquire_lock(fixture.storage.root()).is_err(), "{state}");
+        assert!(
+            fixture.storage.clear_selection(Tool::Node).is_err(),
+            "{state}"
+        );
         assert_eq!(fs::read(outside.join("sentinel")).unwrap(), b"preserved");
     }
 }
@@ -445,4 +458,63 @@ fn complete_query_accepts_existing_relative_links() {
     drop(acquire_lock(fixture.storage.root()).unwrap());
     fixture.select(Path::new("../installs/node/22.0.0"));
     assert!(fixture.storage.read_selected(Tool::Node).unwrap().is_some());
+    assert!(fixture.storage.clear_selection(Tool::Node).unwrap());
+    assert!(fixture.storage.read_selected(Tool::Node).unwrap().is_none());
+    assert!(fixture.storage.root().join("installs/node/22.0.0").exists());
+}
+
+#[test]
+fn clearing_selection_preserves_unexpected_files_and_directories() {
+    for directory in [false, true] {
+        let fixture = Fixture::new();
+        let current = fixture.storage.root().join("current/node");
+        fs::create_dir_all(current.parent().unwrap()).unwrap();
+        let sentinel = if directory {
+            fs::create_dir(&current).unwrap();
+            current.join("sentinel")
+        } else {
+            current.clone()
+        };
+        fs::write(&sentinel, b"preserved").unwrap();
+
+        assert!(fixture.storage.clear_selection(Tool::Node).is_err());
+        assert_eq!(fs::read(sentinel).unwrap(), b"preserved");
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn clearing_a_locked_junction_fails_then_succeeds_after_release() {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let fixture = Fixture::new();
+    let installation = fixture.installation();
+    fixture.select(&installation);
+    let current = fixture.storage.root().join("current/node");
+    let locked = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .custom_flags(0x0020_0000 | 0x0200_0000)
+        .open(&current)
+        .unwrap();
+
+    assert!(fixture.storage.clear_selection(Tool::Node).is_err());
+    drop(locked);
+    assert_eq!(fs::canonicalize(&current).unwrap(), installation);
+    assert!(fixture.storage.clear_selection(Tool::Node).unwrap());
+    assert!(fixture.storage.read_selected(Tool::Node).unwrap().is_none());
+    assert!(installation.join("node.exe").exists());
+}
+
+#[test]
+fn clearing_selection_preserves_contents_of_an_external_link_target() {
+    let fixture = Fixture::new();
+    let outside = fixture.base.join("outside");
+    fs::create_dir(&outside).unwrap();
+    fs::write(outside.join("sentinel"), b"preserved").unwrap();
+    fixture.select(&outside);
+
+    assert!(fixture.storage.clear_selection(Tool::Node).unwrap());
+    assert!(fixture.storage.read_selected(Tool::Node).unwrap().is_none());
+    assert_eq!(fs::read(outside.join("sentinel")).unwrap(), b"preserved");
 }

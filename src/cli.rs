@@ -4,7 +4,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 
 use crate::logger::{self, Symbol};
 use crate::remote::RemoteQuery;
-use crate::target::{Target, VersionRequest};
+use crate::target::{Target, Tool, VersionRequest};
 
 pub(crate) fn parse() -> Cli {
     match Cli::try_parse() {
@@ -86,6 +86,12 @@ pub(crate) enum Command {
         /// Exact version, major, or major.minor; partial versions select the newest installed match.
         #[arg(value_name = "TOOL@VERSION")]
         target: VersionRequest,
+    },
+    /// Clear a tool's global version selection, keeping its installed versions.
+    Unuse {
+        /// Tool name without a version.
+        #[arg(value_name = "TOOL")]
+        tool: Tool,
     },
     /// List installed tool versions.
     #[command(visible_alias = "ls")]
