@@ -24,6 +24,10 @@ Rust, and prefer the standard library. Preserve unrelated working-tree changes.
 Bug fixes require regression tests; behavior changes require corresponding tests.
 Explain any dependency addition and why smaller alternatives are insufficient.
 
+Development pull requests target `dev`; release pull requests target `main`.
+CI runs for pull requests targeting either branch and for pushes to both branches.
+Wait for the CI checks to pass before merging a pull request.
+
 Link the Issue in the PR (for example, `Closes #123`), describe resulting behavior,
 and record actual validation and any limitations. Update README when usage changes;
 put user-visible changes under CHANGELOG's `Unreleased`. Use Conventional Commits:
