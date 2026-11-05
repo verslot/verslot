@@ -111,6 +111,32 @@ impl Fixture {
 }
 
 #[test]
+fn unuse_succeeds_without_creating_missing_storage_or_current_directories() {
+    let fixture = Fixture::new();
+    for tool in ["node", "yarn"] {
+        fixture
+            .command()
+            .args(["unuse", tool])
+            .assert()
+            .success()
+            .stdout(format!("   Already unselected {tool}\n"))
+            .stderr("");
+        assert!(!fixture.root.exists());
+    }
+    fixture.seed("22.0.0");
+    fixture
+        .command()
+        .args(["unuse", "node"])
+        .assert()
+        .success()
+        .stdout("   Already unselected node\n")
+        .stderr("");
+    assert!(!fixture.root.join("current").exists());
+    fixture.assert_current("");
+    fixture.finish();
+}
+
+#[test]
 fn missing_selection_is_read_only_and_use_does_not_install() {
     let fixture = Fixture::new();
     fixture.assert_current("");
@@ -461,7 +487,7 @@ fn missing_or_incomplete_target_preserves_selection_and_invalid_current_takes_pr
 }
 
 #[test]
-fn current_and_use_fail_while_writer_holds_lock_then_succeed_after_release() {
+fn selection_commands_respect_the_writer_lock() {
     let fixture = Fixture::new();
     fixture.seed("22.0.0");
     fixture.seed("24.0.0");
@@ -480,6 +506,8 @@ fn current_and_use_fail_while_writer_holds_lock_then_succeed_after_release() {
         vec!["use", "node@24"],
         vec!["use", "node@24.0"],
         vec!["use", "node@18"],
+        vec!["unuse", "node"],
+        vec!["unuse", "yarn"],
     ] {
         fixture
             .command()
@@ -505,7 +533,12 @@ fn unfinished_switch_blocks_queries_and_writers_but_keeps_list_available() {
     let fixture = Fixture::new();
     fixture.seed("22.0.0");
     fixture.select("22.0.0");
-    for name in [".node-next", ".node-previous"] {
+    for name in [
+        ".node-next",
+        ".node-previous",
+        ".yarn-next",
+        ".yarn-previous",
+    ] {
         let residue = fixture.root.join("current").join(name);
         fs::write(&residue, b"preserved residue").unwrap();
         let diagnostic_path = fs::canonicalize(&residue).unwrap();
@@ -516,6 +549,8 @@ fn unfinished_switch_blocks_queries_and_writers_but_keeps_list_available() {
             vec!["use", "node@22.0"],
             vec!["install", "node@22.0.0"],
             vec!["uninstall", "node@22.0.0"],
+            vec!["unuse", "node"],
+            vec!["unuse", "yarn"],
         ] {
             fixture
                 .command()

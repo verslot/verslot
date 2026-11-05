@@ -10,8 +10,9 @@ Named software whose installed versions and global selection Verslot manages
 independently of other tools.
 
 **Global selection**:
-The installed version selected for a managed tool across directories until the
-user changes it. Each tool has its own selection.
+The version selected for a managed tool across directories until the user
+changes or clears the selection. Each tool's selection is independent and may be
+absent even when versions are installed.
 
 **Bundled command**:
 A command supplied with a managed tool version, such as npm or npx in a Node.js

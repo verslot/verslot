@@ -29,7 +29,7 @@ impl FromStr for RemoteQuery {
             return Ok(Self::Lts);
         }
         let invalid = || {
-            "invalid remote query: expected node, yarn, <tool>@<numeric-prefix>, or node@lts; use one to three ASCII decimal components without leading zeros, each within 0..=4294967295".to_owned()
+            "invalid remote query: expected <tool>, <tool>@<numeric-prefix>, or node@lts; use one to three ASCII decimal components without leading zeros, each within 0..=4294967295".to_owned()
         };
         let (tool, prefix) = input
             .split_once('@')

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Add `verslot unuse node` and `verslot unuse yarn` to clear a global selection
+  while keeping installations and shared shims. Allow damaged or dangling
+  selections to be cleared, and point selected-version uninstall errors to
+  `unuse` (#37).
+
+- Avoid hard-coded tool lists in argument diagnostics and explain that `unuse`
+  accepts a tool name without a version.
+
 - Add independent Yarn version discovery, installation, global selection and
   removal for official Classic `yarn` 1.x and modern `@yarnpkg/cli-dist` stable
   packages. Verify registry SHA-512 before safe tar extraction on every platform.

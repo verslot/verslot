@@ -61,6 +61,19 @@ pub fn run() -> Result<(), String> {
             }
             Ok(())
         }
+        Command::Unuse { tool } => {
+            let storage =
+                storage::Storage::from_env().map_err(|error| format!("unuse {tool}: {error}"))?;
+            let changed = storage
+                .clear_selection(tool)
+                .map_err(|error| format!("unuse {tool}: {error}"))?;
+            if changed {
+                output::print_result(&format!("unselected {tool}"));
+            } else {
+                output::print_result(&format!("already unselected {tool}"));
+            }
+            Ok(())
+        }
         Command::List => {
             let installations = inventory::list_installed()?;
             let terminal = io::stdout().is_terminal();

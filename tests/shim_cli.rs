@@ -618,23 +618,180 @@ fn a_running_tool_does_not_block_switching_or_change_its_own_version() {
 }
 
 #[test]
-fn uninstalling_the_last_version_keeps_the_stable_entry_points() {
+fn unuse_allows_uninstalling_the_only_selected_version_and_keeps_shims() {
+    for (tool, version, commands, error) in [
+        (
+            "node",
+            "22.0.0",
+            &["node", "npm", "npx"][..],
+            "no Node.js version selected",
+        ),
+        (
+            "yarn",
+            "4.9.2",
+            &["yarn", "yarnpkg"][..],
+            "no Yarn version selected",
+        ),
+    ] {
+        let fixture = Fixture::new();
+        fixture.setup();
+        if tool == "node" {
+            fixture.seed(version);
+        } else {
+            fixture.seed_yarn(version);
+        }
+        let target = format!("{tool}@{version}");
+        fixture.manager().args(["use", &target]).assert().success();
+        fixture
+            .manager()
+            .args(["uninstall", &target])
+            .assert()
+            .code(1)
+            .stdout("")
+            .stderr(predicates::str::contains(format!("verslot unuse {tool}")));
+        fixture
+            .manager()
+            .args(["unuse", tool])
+            .assert()
+            .success()
+            .stdout(format!("✔  Unselected {tool}\n"))
+            .stderr("");
+        fixture
+            .manager()
+            .arg("current")
+            .assert()
+            .success()
+            .stdout("");
+        fixture
+            .manager()
+            .arg("list")
+            .assert()
+            .success()
+            .stdout(format!("   {target}\n"));
+        fixture
+            .manager()
+            .args(["unuse", tool])
+            .assert()
+            .success()
+            .stdout(format!("   Already unselected {tool}\n"))
+            .stderr("");
+
+        let system = fixture.directory.join("system");
+        fs::create_dir(&system).unwrap();
+        for name in commands {
+            write_node_fixture(&system.join(executable_name(name)));
+            fixture
+                .shim(name)
+                .arg("--version")
+                .env("PATH", &system)
+                .assert()
+                .code(1)
+                .stdout("")
+                .stderr(predicates::str::contains(error));
+        }
+        fixture
+            .manager()
+            .args(["uninstall", &target])
+            .assert()
+            .success()
+            .stdout(format!("✔  Uninstalled {target}\n"));
+        fixture.manager().arg("list").assert().success().stdout("");
+        for name in ["verslot", "node", "npm", "npx", "yarn", "yarnpkg"] {
+            assert!(fixture.shim_path(name).is_file());
+        }
+        fixture.shim("verslot").arg("--help").assert().success();
+        fixture.finish();
+    }
+}
+
+#[test]
+fn unuse_keeps_tool_selections_independent_and_allows_reselection() {
     let fixture = Fixture::new();
-    fixture.setup();
-    fixture.seed("22.0.0");
-    fixture
-        .manager()
-        .args(["uninstall", "node@22.0.0"])
-        .assert()
-        .success();
-    fixture
-        .shim("node")
-        .assert()
-        .code(1)
-        .stdout("")
-        .stderr(predicates::str::contains("no Node.js version selected"));
-    fixture.shim("verslot").arg("--help").assert().success();
+    let node = fixture.seed("22.0.0");
+    let yarn = fixture.seed_yarn("4.9.2");
+    fixture.select("22.0.0");
+    fixture.manager().args(["use", "yarn@4"]).assert().success();
+    for (tool, remaining, target) in [
+        ("node", "yarn@4.9.2", "node@22.0.0"),
+        ("yarn", "node@22.0.0", "yarn@4.9.2"),
+    ] {
+        fixture.manager().args(["unuse", tool]).assert().success();
+        fixture
+            .manager()
+            .arg("current")
+            .assert()
+            .success()
+            .stdout(format!("   {remaining}\n"));
+        assert!(node.join(".verslot-install").is_file());
+        assert!(yarn.join(".verslot-install").is_file());
+        fixture.manager().args(["use", target]).assert().success();
+        fixture
+            .manager()
+            .arg("current")
+            .assert()
+            .success()
+            .stdout("   node@22.0.0\n   yarn@4.9.2\n");
+    }
     fixture.finish();
+}
+
+#[test]
+fn unuse_clears_damaged_and_dangling_selections_without_touching_installations() {
+    for (tool, version) in [("node", "22.0.0"), ("yarn", "4.9.2")] {
+        for damage in ["receipt", "executable", "missing"] {
+            let fixture = Fixture::new();
+            let installation = if tool == "node" {
+                fixture.seed(version)
+            } else {
+                fixture.seed_yarn(version)
+            };
+            fs::write(installation.join("sentinel"), b"preserved").unwrap();
+            fixture
+                .manager()
+                .args(["use", &format!("{tool}@{version}")])
+                .assert()
+                .success();
+            let retained = if damage == "missing" {
+                let detached = fixture.directory.join("detached-installation");
+                fs::rename(&installation, &detached).unwrap();
+                detached
+            } else {
+                let damaged = if damage == "receipt" {
+                    installation.join(".verslot-install")
+                } else if tool == "yarn" {
+                    installation.join("bin/yarn.js")
+                } else {
+                    installation.join(if cfg!(windows) {
+                        "node.exe"
+                    } else {
+                        "bin/node"
+                    })
+                };
+                fs::remove_file(damaged).unwrap();
+                installation
+            };
+
+            fixture
+                .manager()
+                .args(["unuse", tool])
+                .assert()
+                .success()
+                .stdout(format!("✔  Unselected {tool}\n"))
+                .stderr("");
+            assert!(matches!(
+                fs::symlink_metadata(fixture.root.join("current").join(tool)),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound
+            ));
+            assert_eq!(fs::read(retained.join("sentinel")).unwrap(), b"preserved");
+            fixture
+                .manager()
+                .arg("current")
+                .assert()
+                .success()
+                .stdout("");
+            fixture.finish();
+        }
+    }
 }
 
 #[cfg(windows)]

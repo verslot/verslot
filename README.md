@@ -88,12 +88,19 @@ or a `major.minor` series such as `24.1`. `uninstall` requires a full version.
 | `verslot ls-remote <tool>`            | List available releases for a tool    |
 | `verslot install <tool>@<version>`   | Install a tool version                |
 | `verslot use <tool>@<version>`       | Select an installed version           |
+| `verslot unuse <tool>`              | Clear a tool's global selection       |
 | `verslot ls`                         | List installed versions for all tools |
 | `verslot current`                    | Show selected versions                |
 | `verslot uninstall <tool>@<version>` | Remove an inactive version            |
 
 Run `verslot --help` for the full command list or `verslot <command> --help` for
 command-specific options.
+
+Run `verslot unuse node` or `verslot unuse yarn` before uninstalling a selected
+version, including the only installed version. This removes the tool's selection
+link, keeping its installed versions, the other tool's selection and shared shims.
+Repeating it succeeds, and damaged or missing installations do not prevent it.
+Commands for an unselected tool report the existing no-selection error.
 
 ## Documentation
 
