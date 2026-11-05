@@ -9,13 +9,13 @@ A minimal tool version manager written in Rust. Version management. Nothing else
 
 ## Installation
 
-Verslot is distributed as source. Install Git, stable Rust with Cargo, and the
-native build tools for your platform.
+Verslot is under active development. To build from source, install Git, stable
+Rust with Cargo, and the native build tools for your platform.
 
 ### Platforms and known limitations
 
 The Node.js installation and switching workflow was validated on these platforms
-for v0.5.0.
+during M5.
 
 | Platform              | Build tools                          |
 | --------------------- | ------------------------------------ |
@@ -23,8 +23,8 @@ for v0.5.0.
 | macOS arm64           | Xcode Command Line Tools             |
 | Linux x86-64 (GNU)    | C compiler and linker                |
 
-For other architectures and limitations, see the
-[v0.6.0 platform notes](https://github.com/verslot/verslot/blob/v0.6.0/README.md#platforms-and-known-limitations).
+See the [M5 validation record](docs/archive/milestones/m5/m5-validation.md#final-acceptance-on-2026-10-04)
+for platform coverage and limitations.
 
 ### Install from source
 
@@ -39,6 +39,9 @@ cargo install --path verslot --locked
 
 Run `setup` with the executable Cargo just installed, then prepend the shared
 `shims` directory to `PATH`. The examples use Cargo's default install location.
+
+The shims share one Verslot executable through hard links where supported.
+`setup` uses copies when hard links are unavailable.
 
 **Windows (PowerShell)**
 
@@ -58,8 +61,7 @@ verslot --version
 ```
 
 Add the same shim directory to your shell or user environment for future
-sessions. After upgrading, run `setup` again from the newly installed executable
-to refresh the shims.
+sessions. Run `setup` from a new build to refresh the shims.
 
 ## Quick start
 
@@ -95,13 +97,10 @@ command-specific options.
 
 ## Documentation
 
-- [Changelog and upgrade notes](CHANGELOG.md)
+- [Changelog](CHANGELOG.md)
 - [Design decisions and historical records](docs/README.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Bug reports and feature requests](https://github.com/verslot/verslot/issues)
-
-For the tagged source release, see the
-[v0.6.0 installation guide](https://github.com/verslot/verslot/blob/v0.6.0/README.md).
 
 ## License
 
