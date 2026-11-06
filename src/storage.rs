@@ -1,10 +1,12 @@
 use std::ffi::OsStr;
-use std::fs::{self, File};
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::installation::validate_installation;
-use crate::mutation::{acquire_lock, acquire_read_lock, is_link, reject_switch_residue};
+use crate::mutation::{
+    StorageLock, acquire_lock, acquire_read_lock, is_link, reject_switch_residue,
+};
 use crate::target::{Target, Tool, Version, VersionRequest};
 
 mod links;
@@ -151,7 +153,7 @@ impl Storage {
         Ok(selected)
     }
 
-    fn open_selection_read(&self) -> io::Result<Option<(PathBuf, Option<File>)>> {
+    fn open_selection_read(&self) -> io::Result<Option<(PathBuf, Option<StorageLock>)>> {
         // Validate even missing ancestors using the existing read-only path rules.
         self.checked_directory(&["current"])?;
         match fs::symlink_metadata(&self.root) {
@@ -168,7 +170,7 @@ impl Storage {
     fn read_locked_selection(
         &self,
         root: &Path,
-        lock: Option<&File>,
+        lock: Option<&StorageLock>,
         tool: Tool,
     ) -> io::Result<Option<Version>> {
         if lock.is_none() {
