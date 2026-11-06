@@ -5,9 +5,11 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 use crate::installation::{real_directory, regular_file};
+use crate::inventory::read_installations;
 use crate::mutation::{
     acquire_exclusive_lock, allocate_operation, create_directory, remove_operation,
 };
+use crate::output::format_path_for_display as display_path;
 use crate::shim::{COMMANDS, executable_name, is_command_file};
 use crate::storage::Storage;
 
@@ -15,14 +17,20 @@ const RECEIPT: &str = ".verslot-shims";
 const LEGACY_RECEIPT_VERSION: &str = "verslot-shims-v1";
 const RECEIPT_VERSION: &str = "verslot-shims-v2";
 
-pub(crate) fn setup() -> io::Result<PathBuf> {
+#[derive(Debug)]
+pub(crate) struct SetupOutcome {
+    pub(crate) directory: PathBuf,
+    pub(crate) cleanup_warning: Option<String>,
+}
+
+pub(crate) fn setup() -> io::Result<SetupOutcome> {
     let storage = Storage::from_env()?;
     let source = fs::canonicalize(std::env::current_exe()?)?;
     setup_at(storage.root(), &source, |source, shim| {
         fs::hard_link(source, shim)
     })
     .map_err(|error| {
-        if cfg!(windows) && matches!(error.raw_os_error(), Some(5 | 32 | 33)) {
+        if windows_file_access_blocked(&error) {
             io::Error::new(
                 error.kind(),
                 format!("{error}; check permissions, close related processes and retry"),
@@ -37,48 +45,77 @@ fn setup_at(
     root: &Path,
     source: &Path,
     create_hard_link: impl Fn(&Path, &Path) -> io::Result<()>,
-) -> io::Result<PathBuf> {
+) -> io::Result<SetupOutcome> {
     fs::create_dir_all(root)?;
     let root = fs::canonicalize(root)?;
     let _lock = acquire_exclusive_lock(&root)?;
+    let installed = read_installations(&root).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "read installations at {}: {error}",
+                root.join("installs").display()
+            ),
+        )
+    })?;
+    let names: Vec<_> = COMMANDS
+        .into_iter()
+        .filter(|&(_, tool)| {
+            tool.is_none_or(|tool| installed.iter().any(|target| target.tool == tool))
+        })
+        .map(|(name, _)| executable_name(name))
+        .collect();
     let directory = root.join("shims");
     let backup = root.join(".shims-previous");
-    // A committed update may retain a Windows executable until its process exits.
-    if fs::symlink_metadata(&backup).is_ok() {
-        validate_owned_directory(&root, &directory, false).map_err(|error| {
-            io::Error::other(format!(
-                "unfinished setup; previous shims preserved at {}: {error}",
-                backup.display()
-            ))
-        })?;
-        remove_owned_directory(&root, &backup).map_err(|error| {
-            io::Error::other(format!(
-                "cannot clean previous shims at {}; close related processes and retry: {error}",
-                backup.display()
-            ))
-        })?;
-    }
-    let digest = file_digest(source)?;
-    let previous = match fs::symlink_metadata(&directory) {
-        Ok(_) => Some(validate_owned_directory(&root, &directory, false)?),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+    let backup_exists = match fs::symlink_metadata(&backup) {
+        Ok(_) => true,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => false,
         Err(error) => return Err(error),
     };
-    let receipt = format!(
-        "{RECEIPT_VERSION}\n{digest}\n{}\n",
-        COMMANDS.map(executable_name).join("\n")
-    );
+    let previous = match fs::symlink_metadata(&directory) {
+        Ok(_) => validate_owned_directory(&root, &directory, false).map(Some),
+        Err(error) if error.kind() == io::ErrorKind::NotFound && !backup_exists => Ok(None),
+        Err(error) => Err(error),
+    }
+    .map_err(|error| {
+        if backup_exists {
+            io::Error::other(format!(
+                "unfinished setup. Previous shims preserved at {} ({error})",
+                display_path(&backup)
+            ))
+        } else {
+            error
+        }
+    })?;
+    let digest = file_digest(source)?;
+    let receipt = format!("{RECEIPT_VERSION}\n{digest}\n{}\n", names.join("\n"));
+    // A committed update may retain a Windows executable until its process exits.
+    let cleanup_warning = if backup_exists {
+        cleanup_previous_shims(&root, &backup)
+            .map_err(|error| setup_path_error("cannot clean previous shims", &backup, error))?
+    } else {
+        None
+    };
     if previous.as_deref() == Some(receipt.as_str()) {
-        return Ok(directory);
+        return Ok(SetupOutcome {
+            directory,
+            cleanup_warning,
+        });
+    }
+    if let Some(warning) = cleanup_warning {
+        return Err(io::Error::other(format!(
+            "refresh blocked by pending cleanup. Current shims remain at {}.\n{warning}",
+            display_path(&directory)
+        )));
     }
     let operation = allocate_operation(&root)?;
     let candidate = operation.join("shims");
     let result = (|| {
         create_directory(&root, &candidate)?;
-        let executable = candidate.join(executable_name("verslot"));
+        let executable = candidate.join(&names[0]);
         copy_shim(source, &executable)?;
-        for name in &COMMANDS[1..] {
-            let shim = candidate.join(executable_name(name));
+        for name in &names[1..] {
+            let shim = candidate.join(name);
             match create_hard_link(&executable, &shim) {
                 Ok(()) => {}
                 Err(error) if hard_link_unavailable(&error) => copy_shim(&executable, &shim)?,
@@ -90,12 +127,16 @@ fn setup_at(
         marker.sync_all()?;
         drop(marker);
         validate_owned_directory(&root, &candidate, false)?;
-        publish_shims(&root, &candidate, &directory, &backup, previous.is_some())?;
-        Ok(directory)
+        let cleanup_warning =
+            publish_shims(&root, &candidate, &directory, &backup, previous.is_some())?;
+        Ok(SetupOutcome {
+            directory,
+            cleanup_warning,
+        })
     })();
     let cleanup = remove_operation(&root, &operation);
     match (result, cleanup) {
-        (Ok(directory), Ok(())) => Ok(directory),
+        (Ok(outcome), Ok(())) => Ok(outcome),
         (Err(error), Ok(())) => Err(error),
         (result, Err(error)) => Err(io::Error::other(format!(
             "{}; setup cleanup failed at {}: {error}",
@@ -123,23 +164,35 @@ fn hard_link_unavailable(error: &io::Error) -> bool {
         || (cfg!(target_os = "linux") && error.raw_os_error() == Some(1))
 }
 
+fn windows_file_access_blocked(error: &io::Error) -> bool {
+    cfg!(windows) && matches!(error.raw_os_error(), Some(5 | 32 | 33))
+}
+
+fn setup_path_error(operation: &str, path: &Path, error: io::Error) -> io::Error {
+    let retry = if windows_file_access_blocked(&error) {
+        ". Check permissions, close related processes and retry."
+    } else {
+        ""
+    };
+    io::Error::new(
+        error.kind(),
+        format!("{operation} at {} ({error}){retry}", display_path(path)),
+    )
+}
+
 fn publish_shims(
     root: &Path,
     candidate: &Path,
     directory: &Path,
     backup: &Path,
     previous: bool,
-) -> io::Result<()> {
+) -> io::Result<Option<String>> {
     real_directory(root, root)?;
     if previous {
         validate_owned_directory(root, directory, false)?;
         require_missing(backup)?;
-        fs::rename(directory, backup).map_err(|error| {
-            io::Error::other(format!(
-                "cannot replace {}; close related processes and retry: {error}",
-                directory.display()
-            ))
-        })?;
+        fs::rename(directory, backup)
+            .map_err(|error| setup_path_error("cannot replace shims", directory, error))?;
     }
     let publication = require_missing(directory).and_then(|()| fs::rename(candidate, directory));
     if let Err(error) = publication {
@@ -152,16 +205,13 @@ fn publish_shims(
                 backup.display()
             )));
         }
-        return Err(error);
+        return Err(setup_path_error("cannot publish shims", directory, error));
     }
     if previous {
-        remove_owned_directory(root, backup).map_err(|error| {
-            io::Error::other(format!(
-                "shims updated but cleanup failed at {}; close related processes and retry: {error}", backup.display()
-            ))
-        })?;
+        return cleanup_previous_shims(root, backup)
+            .map_err(|error| setup_path_error("shims updated but cleanup failed", backup, error));
     }
-    Ok(())
+    Ok(None)
 }
 
 fn require_missing(path: &Path) -> io::Result<()> {
@@ -230,18 +280,25 @@ fn validate_owned_directory(
     Ok(receipt)
 }
 
-fn remove_owned_directory(root: &Path, directory: &Path) -> io::Result<()> {
+fn cleanup_previous_shims(root: &Path, directory: &Path) -> io::Result<Option<String>> {
     let receipt = validate_owned_directory(root, directory, true)?;
-    for name in receipt.lines().skip(2) {
+    // Keep the receipt until every shim is removed so a later setup can retry.
+    for name in receipt.lines().skip(2).chain([RECEIPT]) {
         let path = directory.join(name);
-        match fs::remove_file(path) {
+        match fs::remove_file(&path) {
             Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound && name != RECEIPT => {}
+            Err(error) if windows_file_access_blocked(&error) => {
+                return Ok(Some(format!(
+                    "previous shim cleanup is pending at {} ({error}).\nCheck permissions, close related processes and rerun `verslot setup` from the installed executable.",
+                    display_path(&path)
+                )));
+            }
             Err(error) => return Err(error),
         }
     }
-    fs::remove_file(directory.join(RECEIPT))?;
-    fs::remove_dir(directory)
+    fs::remove_dir(directory)?;
+    Ok(None)
 }
 
 fn file_digest(path: &Path) -> io::Result<String> {

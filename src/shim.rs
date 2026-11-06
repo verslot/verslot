@@ -8,7 +8,14 @@ use crate::installation::{real_directory, regular_file};
 use crate::storage::Storage;
 use crate::target::{Target, Tool};
 
-pub(crate) const COMMANDS: [&str; 6] = ["verslot", "node", "npm", "npx", "yarn", "yarnpkg"];
+pub(crate) const COMMANDS: [(&str, Option<Tool>); 6] = [
+    ("verslot", None),
+    ("node", Some(Tool::Node)),
+    ("npm", Some(Tool::Node)),
+    ("npx", Some(Tool::Node)),
+    ("yarn", Some(Tool::Yarn)),
+    ("yarnpkg", Some(Tool::Yarn)),
+];
 
 pub(crate) fn executable_name(command: &str) -> String {
     if cfg!(windows) {
@@ -25,14 +32,17 @@ pub(crate) fn invoked_command() -> Option<&'static str> {
     #[cfg(not(windows))]
     let argument = std::env::args_os().next()?;
     let name = Path::new(&argument).file_name()?.to_str()?;
-    COMMANDS[1..].iter().copied().find(|command| {
-        let expected = executable_name(command);
-        if cfg!(windows) {
-            name.eq_ignore_ascii_case(&expected)
-        } else {
-            name == expected
-        }
-    })
+    COMMANDS[1..]
+        .iter()
+        .map(|&(command, _)| command)
+        .find(|command| {
+            let expected = executable_name(command);
+            if cfg!(windows) {
+                name.eq_ignore_ascii_case(&expected)
+            } else {
+                name == expected
+            }
+        })
 }
 
 pub(crate) fn execute(name: &str) -> io::Result<()> {
@@ -147,5 +157,5 @@ fn execute_process(command: &mut Command) -> io::Result<()> {
 pub(crate) fn is_command_file(name: &OsStr) -> bool {
     COMMANDS
         .iter()
-        .any(|command| name == OsStr::new(&executable_name(command)))
+        .any(|(command, _)| name == OsStr::new(&executable_name(command)))
 }

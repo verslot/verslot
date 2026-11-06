@@ -18,6 +18,7 @@ impl Fixture {
         let root = fs::canonicalize(root).unwrap();
         let source = root.join("source");
         fs::write(&source, b"old executable").unwrap();
+        seed_installed_tools(&root);
         Self { root, source }
     }
 
@@ -25,6 +26,7 @@ impl Fixture {
         setup_at(&self.root, &self.source, |source, shim| {
             fs::hard_link(source, shim)
         })
+        .map(|outcome| outcome.directory)
     }
 
     fn finish(self) {
@@ -34,6 +36,51 @@ impl Fixture {
         );
         fs::remove_dir_all(self.root).unwrap();
     }
+}
+
+fn seed_installed_tools(root: &Path) {
+    let target: crate::target::Target = "node@22.0.0".parse().unwrap();
+    let distribution =
+        crate::distribution::NodeDistribution::for_current_build(target.version).unwrap();
+    let node = root.join("installs/node/22.0.0");
+    let executable = node.join(if cfg!(windows) {
+        "node.exe"
+    } else {
+        "bin/node"
+    });
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(&executable, b"offline node fixture").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    fs::write(
+        node.join(".verslot-install"),
+        format!(
+            "verslot-install-v1\n{target}\n{}\n{}\n",
+            distribution.archive_filename,
+            "a".repeat(64)
+        ),
+    )
+    .unwrap();
+
+    let yarn = root.join("installs/yarn/4.9.2");
+    fs::create_dir_all(yarn.join("bin")).unwrap();
+    fs::write(yarn.join("bin/yarn.js"), b"offline yarn fixture").unwrap();
+    fs::write(
+        yarn.join("package.json"),
+        r#"{"name":"@yarnpkg/cli-dist","version":"4.9.2"}"#,
+    )
+    .unwrap();
+    fs::write(
+        yarn.join(".verslot-install"),
+        format!(
+            "verslot-install-v2\nyarn@4.9.2\ncli-dist-4.9.2.tgz\n{}\n",
+            "a".repeat(128)
+        ),
+    )
+    .unwrap();
 }
 
 #[cfg(unix)]
@@ -74,7 +121,7 @@ fn setup_repeats_and_refreshes_the_complete_owned_generation() {
     fs::write(&fixture.source, b"new executable").unwrap();
     fixture.setup().unwrap();
     let identity = file_identity(&executable);
-    for name in COMMANDS {
+    for (name, _) in COMMANDS {
         let shim = directory.join(executable_name(name));
         assert_eq!(fs::read(&shim).unwrap(), b"new executable");
         assert_eq!(file_identity(&shim), identity);
@@ -88,7 +135,7 @@ fn setup_migrates_legacy_copies_with_the_same_digest_and_commands() {
     let fixture = Fixture::new();
     let directory = fixture.root.join("shims");
     fs::create_dir(&directory).unwrap();
-    for name in COMMANDS {
+    for (name, _) in COMMANDS {
         fs::copy(&fixture.source, directory.join(executable_name(name))).unwrap();
     }
     fs::write(
@@ -96,7 +143,7 @@ fn setup_migrates_legacy_copies_with_the_same_digest_and_commands() {
         format!(
             "verslot-shims-v1\n{}\n{}\n",
             file_digest(&fixture.source).unwrap(),
-            COMMANDS.map(executable_name).join("\n")
+            COMMANDS.map(|(name, _)| executable_name(name)).join("\n")
         ),
     )
     .unwrap();
@@ -104,7 +151,7 @@ fn setup_migrates_legacy_copies_with_the_same_digest_and_commands() {
     fixture.setup().unwrap();
 
     let identity = file_identity(&directory.join(executable_name("verslot")));
-    for name in COMMANDS {
+    for (name, _) in COMMANDS {
         let shim = directory.join(executable_name(name));
         assert_eq!(file_identity(&shim), identity);
     }
@@ -123,10 +170,11 @@ fn setup_copies_entries_when_hard_links_are_unavailable() {
         let error = io::Error::from(io::ErrorKind::Unsupported);
         Err(error)
     })
-    .unwrap();
+    .unwrap()
+    .directory;
 
     let identity = file_identity(&directory.join(executable_name("verslot")));
-    for name in &COMMANDS[1..] {
+    for (name, _) in &COMMANDS[1..] {
         let shim = directory.join(executable_name(name));
         assert_ne!(file_identity(&shim), identity);
         assert_eq!(fs::read(shim).unwrap(), b"old executable");
@@ -173,7 +221,7 @@ fn setup_upgrades_the_previous_four_command_receipt_with_yarn_entries() {
     )
     .unwrap();
     fixture.setup().unwrap();
-    for name in COMMANDS {
+    for (name, _) in COMMANDS {
         assert_eq!(
             fs::read(directory.join(executable_name(name))).unwrap(),
             b"old executable"
@@ -240,7 +288,7 @@ fn setup_retries_cleanup_but_preserves_the_only_previous_generation() {
             .setup()
             .unwrap_err()
             .to_string()
-            .contains("previous shims preserved")
+            .contains("Previous shims preserved")
     );
     assert!(backup.join(executable_name("verslot")).exists());
     fs::rename(&backup, &directory).unwrap();
@@ -250,6 +298,17 @@ fn setup_retries_cleanup_but_preserves_the_only_previous_generation() {
         fs::copy(entry.path(), backup.join(entry.file_name())).unwrap();
     }
     fs::remove_file(backup.join(executable_name("node"))).unwrap();
+    let unknown = backup.join("notes");
+    fs::write(&unknown, b"user notes").unwrap();
+    assert!(
+        fixture
+            .setup()
+            .unwrap_err()
+            .to_string()
+            .contains("unknown entry")
+    );
+    assert_eq!(fs::read(&unknown).unwrap(), b"user notes");
+    fs::remove_file(unknown).unwrap();
     fixture.setup().unwrap();
     assert!(!backup.exists());
     fixture.finish();
@@ -272,7 +331,9 @@ fn failed_publication_restores_the_previous_generation() {
     let directory = fixture.setup().unwrap();
     let backup = fixture.root.join(".shims-previous");
     let missing_candidate = fixture.root.join("missing-candidate");
-    assert!(publish_shims(&fixture.root, &missing_candidate, &directory, &backup, true).is_err());
+    let error =
+        publish_shims(&fixture.root, &missing_candidate, &directory, &backup, true).unwrap_err();
+    assert!(error.to_string().contains(&display_path(&directory)));
     assert_eq!(
         fs::read(directory.join(executable_name("node"))).unwrap(),
         b"old executable"

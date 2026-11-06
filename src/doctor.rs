@@ -85,7 +85,7 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
     let mut missing_shims = Vec::new();
     let mut off_path_shims = Vec::new();
     let mut shadowed = false;
-    for name in shim::COMMANDS {
+    for (name, tool) in shim::COMMANDS {
         let found = paths::first_match(path.as_deref(), name);
         match &found {
             Ok(Some(found)) => report.detail(format_args!("{name}: {}", display_path(found)))?,
@@ -94,10 +94,10 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
                 "{name}: cannot check PATH ({error}). Check access to the reported directory."
             ))?,
         }
-        let required = match name {
-            "node" | "npm" | "npx" => node_selected,
-            "yarn" | "yarnpkg" => yarn_selected,
-            _ => false,
+        let required = match tool {
+            Some(Tool::Node) => node_selected,
+            Some(Tool::Yarn) => yarn_selected,
+            None => false,
         };
         if required && let Some(shims) = &shims {
             match report_required_shim(&mut report, shims, name, &found)? {
