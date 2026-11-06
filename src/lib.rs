@@ -30,13 +30,14 @@ pub fn run() -> Result<(), String> {
 
     match cli.command {
         Command::Setup => {
-            let directory = setup::setup().map_err(|error| format!("setup: {error}"))?;
-            let directory = output::format_path_for_display(&directory);
-            output::print_result(&format!("configured shims at {directory}"));
-            logger::print_stdout(
-                logger::Symbol::None,
-                &format!("Prepend this directory to PATH: {directory}\n"),
-            );
+            let outcome = setup::setup().map_err(|error| format!("setup: {error}"))?;
+            let directory = output::format_path_for_display(&outcome.directory);
+            output::print_result(&format!(
+                "configured shims at {directory} (put it first on PATH)"
+            ));
+            if let Some(warning) = outcome.cleanup_warning {
+                logger::print_stderr(logger::Symbol::None, &format!("warning: {warning}\n"));
+            }
             Ok(())
         }
         Command::Doctor { verbose } => {

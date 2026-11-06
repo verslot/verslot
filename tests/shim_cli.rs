@@ -80,6 +80,21 @@ impl Fixture {
         self.manager().arg("setup").assert().success().stderr("");
     }
 
+    fn assert_shim_commands(&self, commands: &[&str]) {
+        let mut actual: Vec<_> = fs::read_dir(self.root.join("shims"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        let mut expected: Vec<_> = commands
+            .iter()
+            .map(|name| OsString::from(executable_name(name)))
+            .collect();
+        expected.push(".verslot-shims".into());
+        actual.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(actual, expected);
+    }
+
     fn seed(&self, version: &str) -> PathBuf {
         let target: verslot::target::Target = format!("node@{version}").parse().unwrap();
         let distribution =
@@ -153,15 +168,73 @@ impl Fixture {
 }
 
 #[test]
-fn yarn_and_yarnpkg_use_managed_node_on_path_and_inherit_yarn_settings() {
+fn setup_synchronizes_shims_with_installed_tools() {
     let fixture = Fixture::new();
     fixture.setup();
+    fixture.assert_shim_commands(&["verslot"]);
+
+    fixture.seed("22.0.0");
+    fixture.setup();
+    fixture.assert_shim_commands(&["verslot", "node", "npm", "npx"]);
+
+    fixture.seed_yarn("4.9.2");
+    fixture.setup();
+    let all_commands = ["verslot", "node", "npm", "npx", "yarn", "yarnpkg"];
+    fixture.assert_shim_commands(&all_commands);
+
+    fixture
+        .manager()
+        .args(["uninstall", "node@22.0.0"])
+        .assert()
+        .success();
+    fixture.assert_shim_commands(&all_commands);
+    fixture.setup();
+    fixture.assert_shim_commands(&["verslot", "yarn", "yarnpkg"]);
+
+    fixture
+        .manager()
+        .args(["uninstall", "yarn@4.9.2"])
+        .assert()
+        .success();
+    fixture.setup();
+    fixture.assert_shim_commands(&["verslot"]);
+    fixture.finish();
+}
+
+#[test]
+fn setup_preserves_published_shims_when_an_installed_version_is_corrupt() {
+    let fixture = Fixture::new();
+    fixture.seed("22.0.0");
+    fixture.setup();
+    let receipt = fixture.root.join("shims/.verslot-shims");
+    let published = fs::read(&receipt).unwrap();
+
+    fixture.seed_yarn("4.9.2");
+    fs::create_dir(fixture.root.join("installs/node/24.0.0")).unwrap();
+    fixture
+        .manager()
+        .arg("setup")
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicates::str::contains("inspect node@24.0.0"));
+
+    fixture.assert_shim_commands(&["verslot", "node", "npm", "npx"]);
+    assert_eq!(fs::read(receipt).unwrap(), published);
+    fixture.finish();
+}
+
+#[test]
+fn yarn_and_yarnpkg_use_managed_node_on_path_and_inherit_yarn_settings() {
+    let fixture = Fixture::new();
     fixture.seed("22.0.0");
     fixture.seed("24.0.0");
+    fixture.seed_yarn("1.22.22");
+    fixture.seed_yarn("4.9.2");
+    fixture.setup();
     fixture.select("22.0.0");
     let path = fixture.root.join("shims");
     for version in ["1.22.22", "4.9.2"] {
-        fixture.seed_yarn(version);
         fixture
             .manager()
             .args(["use", &format!("yarn@{version}")])
@@ -208,8 +281,8 @@ fn yarn_and_yarnpkg_use_managed_node_on_path_and_inherit_yarn_settings() {
 #[test]
 fn yarn_uses_system_node_on_path_without_a_managed_node_selection() {
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed_yarn("4.9.2");
+    fixture.setup();
     fixture.manager().args(["use", "yarn@4"]).assert().success();
     fixture
         .manager()
@@ -311,10 +384,10 @@ fn partial_selection_does_not_read_another_tools_damaged_inventory_directory() {
 #[test]
 fn damaged_yarn_does_not_disable_node_or_fall_back_to_another_yarn() {
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed("22.0.0");
     fixture.select("22.0.0");
     let yarn = fixture.seed_yarn("4.9.2");
+    fixture.setup();
     fixture
         .manager()
         .args(["use", "yarn@4.9.2"])
@@ -402,8 +475,8 @@ fn wait_for_controller(path: &Path, controller: &mut std::process::Child) {
 #[test]
 fn one_path_exposes_manager_and_selected_node_without_cargo_path() {
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed("22.0.0");
+    fixture.setup();
     fixture.select("22.0.0");
     // Invoke a system shell by absolute path with only our shim directory on PATH.
     #[cfg(windows)]
@@ -430,7 +503,7 @@ fn one_path_exposes_manager_and_selected_node_without_cargo_path() {
 
 #[cfg(windows)]
 #[test]
-fn windows_setup_prints_a_normal_path_in_both_output_lines() {
+fn windows_setup_prints_one_line_with_a_normal_path() {
     let fixture = Fixture::new();
     let directory = fixture.root.join("shims");
     let extended = directory.to_str().unwrap();
@@ -441,7 +514,7 @@ fn windows_setup_prints_a_normal_path_in_both_output_lines() {
         .assert()
         .success()
         .stdout(format!(
-            "✔  Configured shims at {expected}\n   Prepend this directory to PATH: {expected}\n"
+            "✔  Configured shims at {expected} (put it first on PATH)\n"
         ))
         .stderr("");
     fixture.finish();
@@ -450,6 +523,7 @@ fn windows_setup_prints_a_normal_path_in_both_output_lines() {
 #[test]
 fn shim_never_falls_back_when_selection_or_bundled_command_is_missing() {
     let fixture = Fixture::new();
+    let installation = fixture.seed("22.0.0");
     fixture.setup();
     let outside = fixture.directory.join("system");
     fs::create_dir(&outside).unwrap();
@@ -471,7 +545,6 @@ fn shim_never_falls_back_when_selection_or_bundled_command_is_missing() {
         .code(1)
         .stdout("")
         .stderr(predicates::str::contains("no Node.js version selected"));
-    let installation = fixture.seed("22.0.0");
     fixture.select("22.0.0");
     fixture
         .shim("npx")
@@ -514,9 +587,9 @@ fn shim_never_falls_back_when_selection_or_bundled_command_is_missing() {
 #[test]
 fn bundled_npm_and_npx_use_the_selected_node_and_explicit_script() {
     let fixture = Fixture::new();
-    fixture.setup();
     for version in ["22.0.0", "24.0.0"] {
         let installation = fixture.seed(version);
+        fixture.setup();
         let npm = installation.join(if cfg!(windows) {
             "node_modules/npm/bin"
         } else {
@@ -543,8 +616,8 @@ fn bundled_npm_and_npx_use_the_selected_node_and_explicit_script() {
 #[test]
 fn shim_preserves_arguments_environment_directory_streams_and_nonzero_exit() {
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed("22.0.0");
+    fixture.setup();
     fixture.select("22.0.0");
     let arguments: Vec<OsString> = [
         "",
@@ -592,9 +665,9 @@ fn shim_preserves_arguments_environment_directory_streams_and_nonzero_exit() {
 #[test]
 fn a_running_tool_does_not_block_switching_or_change_its_own_version() {
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed("22.0.0");
     fixture.seed("24.0.0");
+    fixture.setup();
     fixture.select("22.0.0");
     let ready = fixture.directory.join("ready");
     let mut child = fixture
@@ -637,12 +710,12 @@ fn unuse_allows_uninstalling_the_only_selected_version_and_keeps_shims() {
         ),
     ] {
         let fixture = Fixture::new();
-        fixture.setup();
         if tool == "node" {
             fixture.seed(version);
         } else {
             fixture.seed_yarn(version);
         }
+        fixture.setup();
         let target = format!("{tool}@{version}");
         fixture.manager().args(["use", &target]).assert().success();
         fixture
@@ -699,7 +772,7 @@ fn unuse_allows_uninstalling_the_only_selected_version_and_keeps_shims() {
             .success()
             .stdout(format!("✔  Uninstalled {target}\n"));
         fixture.manager().arg("list").assert().success().stdout("");
-        for name in ["verslot", "node", "npm", "npx", "yarn", "yarnpkg"] {
+        for name in commands {
             assert!(fixture.shim_path(name).is_file());
         }
         fixture.shim("verslot").arg("--help").assert().success();
@@ -801,6 +874,7 @@ fn unuse_clears_damaged_and_dangling_selections_without_touching_installations()
 #[test]
 fn windows_new_executable_refreshes_the_manager_and_every_tool_entry() {
     let fixture = Fixture::new();
+    fixture.seed("22.0.0");
     fixture.setup();
     let mut upgraded = fs::read(assert_cmd::cargo::cargo_bin!("verslot")).unwrap();
     // PE overlays change the generation digest without another executable build.
@@ -817,9 +891,70 @@ fn windows_new_executable_refreshes_the_manager_and_every_tool_entry() {
 
 #[cfg(windows)]
 #[test]
+fn windows_setup_warns_when_only_previous_shim_cleanup_is_blocked() {
+    let fixture = Fixture::new();
+    fixture.seed("22.0.0");
+    fixture.select("22.0.0");
+    fixture.setup();
+    let ready = fixture.directory.join("ready");
+    let mut running = fixture
+        .shim("node")
+        .arg("block")
+        .arg(&ready)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .spawn()
+        .unwrap();
+    wait_for_file(&ready);
+
+    fixture.seed_yarn("4.9.2");
+    let backup = fixture.root.join(".shims-previous");
+    for _ in 0..2 {
+        fixture
+            .manager()
+            .arg("setup")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("Configured shims at"))
+            .stderr(predicates::str::contains(
+                "warning: previous shim cleanup is pending",
+            ))
+            .stderr(predicates::str::contains(".shims-previous"));
+        assert!(backup.join(".verslot-shims").is_file());
+        fixture.assert_shim_commands(&["verslot", "node", "npm", "npx", "yarn", "yarnpkg"]);
+    }
+
+    fixture
+        .manager()
+        .args(["uninstall", "yarn@4.9.2"])
+        .assert()
+        .success();
+    fixture
+        .manager()
+        .arg("setup")
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(predicates::str::contains(
+            "refresh blocked by pending cleanup",
+        ))
+        .stderr(predicates::str::contains("Current shims remain at"));
+    fixture.assert_shim_commands(&["verslot", "node", "npm", "npx", "yarn", "yarnpkg"]);
+
+    drop(running.stdin.take());
+    assert!(running.wait().unwrap().success());
+    fixture.setup();
+    fixture.assert_shim_commands(&["verslot", "node", "npm", "npx"]);
+    assert!(!backup.exists());
+    fixture.finish();
+}
+
+#[cfg(windows)]
+#[test]
 fn windows_setup_preserves_a_locked_entry_then_succeeds_after_release() {
     use std::os::windows::fs::OpenOptionsExt;
     let fixture = Fixture::new();
+    fixture.seed("22.0.0");
     fixture.setup();
     let path = fixture.shim_path("node");
     let original = fs::read(&path).unwrap();
@@ -847,8 +982,8 @@ fn windows_setup_preserves_a_locked_entry_then_succeeds_after_release() {
 #[test]
 fn windows_shim_preserves_full_width_exit_codes() {
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed("22.0.0");
+    fixture.setup();
     fixture.select("22.0.0");
     fixture
         .shim("node")
@@ -865,8 +1000,8 @@ fn windows_shim_preserves_full_width_exit_codes() {
 fn unix_exec_preserves_non_utf8_arguments() {
     use std::os::unix::ffi::OsStringExt;
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed("22.0.0");
+    fixture.setup();
     fixture.select("22.0.0");
     let argument = OsString::from_vec(vec![0xff, b'a']);
     let output = fixture
@@ -889,8 +1024,8 @@ fn unix_exec_preserves_non_utf8_arguments() {
 #[test]
 fn unix_ctrl_c_reaches_the_tool_and_waits_for_its_cleanup() {
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed("22.0.0");
+    fixture.setup();
     fixture.select("22.0.0");
     let ready = fixture.directory.join("ready");
     let interrupted = fixture.directory.join("interrupted");
@@ -917,8 +1052,8 @@ fn unix_ctrl_c_reaches_the_tool_and_waits_for_its_cleanup() {
 #[test]
 fn windows_ctrl_c_keeps_the_wrapper_waiting_for_tool_cleanup() {
     let fixture = Fixture::new();
-    fixture.setup();
     let installation = fixture.seed("22.0.0");
+    fixture.setup();
     fixture.select("22.0.0");
     let node = installation.join("node.exe");
     fs::remove_file(&node).unwrap();

@@ -99,9 +99,9 @@ fn setup_without_a_selection_suggests_use_and_install() {
 #[test]
 fn healthy_shims_accept_a_cargo_cli_and_are_inspected_without_launching_tools() {
     let fixture = Fixture::new();
-    fixture.setup();
     select_node_with_bundles(&fixture);
     select_yarn(&fixture);
+    fixture.setup();
     let shims = fixture.root.join("shims");
     let receipt = shims.join(".verslot-shims");
     fs::remove_file(&receipt).unwrap();
@@ -167,8 +167,8 @@ fn healthy_shims_accept_a_cargo_cli_and_are_inspected_without_launching_tools() 
 #[test]
 fn missing_required_shims_and_off_path_shims_report_recovery_on_stdout() {
     let fixture = Fixture::new();
-    fixture.setup();
     select_node_with_bundles(&fixture);
+    fixture.setup();
     doctor(&fixture, &[&fixture.directory])
         .assert()
         .code(1)
@@ -199,9 +199,9 @@ fn missing_required_shims_and_off_path_shims_report_recovery_on_stdout() {
 #[test]
 fn missing_bundled_scripts_are_informational() {
     let fixture = Fixture::new();
-    fixture.setup();
     fixture.seed("22.0.0");
     fixture.select("22.0.0");
+    fixture.setup();
 
     doctor(&fixture, &[&fixture.root.join("shims")])
         .assert()
@@ -217,11 +217,8 @@ fn missing_bundled_scripts_are_informational() {
 #[test]
 fn selected_yarn_can_use_external_node_with_unselected_shims_missing() {
     let fixture = Fixture::new();
-    fixture.setup();
     select_yarn(&fixture);
-    for name in ["node", "npm", "npx"] {
-        fs::remove_file(fixture.shim_path(name)).unwrap();
-    }
+    fixture.setup();
     let shims = fixture.root.join("shims");
     let external = external_node(&fixture);
 
@@ -257,9 +254,9 @@ fn selected_yarn_can_use_external_node_with_unselected_shims_missing() {
 #[test]
 fn node_shadowing_does_not_hide_a_usable_yarn_dependency() {
     let fixture = Fixture::new();
-    fixture.setup();
     select_node_with_bundles(&fixture);
     select_yarn(&fixture);
+    fixture.setup();
     let external = external_node(&fixture);
 
     doctor(&fixture, &[&external, &fixture.root.join("shims")])
@@ -278,8 +275,9 @@ fn node_shadowing_does_not_hide_a_usable_yarn_dependency() {
 #[test]
 fn yarn_does_not_skip_a_node_shim_with_no_valid_selection() {
     let fixture = Fixture::new();
-    fixture.setup();
+    let installation = fixture.seed("22.0.0");
     select_yarn(&fixture);
+    fixture.setup();
     let external = external_node(&fixture);
     let shims = fixture.root.join("shims");
     doctor(&fixture, &[&shims, &external])
@@ -291,7 +289,6 @@ fn yarn_does_not_skip_a_node_shim_with_no_valid_selection() {
             "   Run `verslot use node@<version>` or put a system Node.js directory first on PATH.\n"
         ));
 
-    let installation = fixture.seed("22.0.0");
     fixture.select("22.0.0");
     let receipt = installation.join(".verslot-install");
     fs::write(&receipt, b"broken receipt").unwrap();
@@ -315,8 +312,8 @@ fn yarn_does_not_skip_a_node_shim_with_no_valid_selection() {
 #[test]
 fn invalid_selection_entry_leaves_other_findings_available() {
     let fixture = Fixture::new();
-    fixture.setup();
     select_yarn(&fixture);
+    fixture.setup();
     let current = fixture.root.join("current/node");
     fs::write(&current, b"invalid selection entry").unwrap();
     let external = external_node(&fixture);
@@ -338,6 +335,7 @@ fn invalid_selection_entry_leaves_other_findings_available() {
 #[test]
 fn a_busy_storage_still_reports_path_matches() {
     let fixture = Fixture::new();
+    fixture.seed_yarn("4.9.2");
     fixture.setup();
     let lock = fs::OpenOptions::new()
         .read(true)
@@ -366,9 +364,9 @@ fn a_busy_storage_still_reports_path_matches() {
 #[test]
 fn pathext_applies_in_each_directory_but_yarn_searches_for_node_exe() {
     let fixture = Fixture::new();
-    fixture.setup();
     select_node_with_bundles(&fixture);
     select_yarn(&fixture);
+    fixture.setup();
     let earlier = fixture.directory.join("earlier");
     fs::create_dir(&earlier).unwrap();
     for name in ["node.cmd", "npm.cmd", "npm.exe", "npx.ps1"] {
@@ -448,8 +446,9 @@ fn unix_path_resolves_empty_and_relative_entries_and_checks_execute_bits() {
 #[test]
 fn a_path_symlink_to_the_node_shim_still_requires_a_selection() {
     let fixture = Fixture::new();
-    fixture.setup();
+    fixture.seed("22.0.0");
     select_yarn(&fixture);
+    fixture.setup();
     let linked = fixture.directory.join("linked bin");
     fs::create_dir(&linked).unwrap();
     std::os::unix::fs::symlink(fixture.shim_path("node"), linked.join("node")).unwrap();

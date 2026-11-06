@@ -40,6 +40,10 @@ cargo install --path verslot --locked
 Run `setup` with the executable Cargo just installed, then prepend the shared
 `shims` directory to `PATH`. The examples use Cargo's default install location.
 
+`setup` always provides the `verslot` entry point. It also creates shims for each
+tool with at least one complete local installation, even before a version is
+selected.
+
 The shims share one Verslot executable through hard links where supported.
 `setup` uses copies when hard links are unavailable.
 
@@ -63,6 +67,11 @@ verslot --version
 Add the same shim directory to your shell or user environment for future
 sessions. Run `setup` from a new build to refresh the shims.
 
+On Windows, a cleanup warning means the requested shims are active and a file
+in the previous shim directory is still pending removal. Close the related
+processes and rerun `setup` to finish cleanup. A refresh that needs to replace
+the active shims can proceed once cleanup succeeds.
+
 ## Quick start
 
 Install and select a version for each tool using `tool@version`. Yarn uses Node.js
@@ -74,9 +83,33 @@ verslot install node@24
 verslot use node@24
 verslot install yarn@4.9.2
 verslot use yarn@4.9.2
+```
+
+After installing the first version of a tool, rerun `setup` with the
+Cargo-installed executable to add that tool's shims.
+
+**Windows (PowerShell)**
+
+```powershell
+& "$env:USERPROFILE\.cargo\bin\verslot.exe" setup
+```
+
+**macOS or Linux (Bash)**
+
+```bash
+"$HOME/.cargo/bin/verslot" setup
+hash -r
+```
+
+Check the selected versions through the shared PATH.
+
+```text
 node --version
 yarn --version
 ```
+
+After uninstalling a tool's last version, run the same `setup` command to remove
+its shims. The shell then uses ordinary PATH lookup for those commands.
 
 Both `install` and `use` accept a full version, a major version such as `24`,
 or a `major.minor` series such as `24.1`. `uninstall` requires a full version.
@@ -101,7 +134,7 @@ Run `verslot unuse node` or `verslot unuse yarn` before uninstalling a selected
 version, including the only installed version. This removes the tool's selection
 link, keeping its installed versions, the other tool's selection and shared shims.
 Repeating it succeeds, and damaged or missing installations do not prevent it.
-Commands for an unselected tool report the existing no-selection error.
+A tool shim reports an error when its global selection is missing.
 
 ## Diagnose selections and PATH
 

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Generate tool shims only for tools with complete local installations. Rerun
+  `verslot setup` after installing the first version of a tool or uninstalling
+  its last version to synchronize the shared PATH entries (#42).
+
+- Report pending cleanup of previous Windows shims as a warning when the
+  requested shim set is already active.
+
 - Add `verslot doctor` for read-only checks of selections, shim paths, PATH
   shadowing, and the Node.js dependency of selected Yarn. Show a short status
   or actionable findings by default and include path details with `--verbose`

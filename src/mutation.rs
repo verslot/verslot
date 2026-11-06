@@ -74,7 +74,7 @@ pub(crate) fn acquire_lock(root: &Path) -> io::Result<StorageLock> {
     Ok(file)
 }
 
-// Setup shares serialization with tool mutations but does not read Node state.
+// Setup shares this lock with tool mutations to read the inventory independently of selections.
 pub(crate) fn acquire_exclusive_lock(root: &Path) -> io::Result<StorageLock> {
     real_directory(root, root)?;
     let path = root.join(".mutation.lock");

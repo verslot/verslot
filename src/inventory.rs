@@ -11,7 +11,7 @@ pub(crate) fn list_installed() -> Result<Vec<Target>, String> {
     read_installations(storage.root()).map_err(|error| format!("list: {error}"))
 }
 
-fn read_installations(root: &Path) -> io::Result<Vec<Target>> {
+pub(crate) fn read_installations(root: &Path) -> io::Result<Vec<Target>> {
     read_matching_installations(root, &Tool::ALL, |_| true)
 }
 
