@@ -49,6 +49,13 @@ enum ShimFinding {
     Shadowed,
 }
 
+#[derive(PartialEq, Eq)]
+enum ShimDirectory {
+    Missing,
+    OnPath,
+    Unavailable,
+}
+
 /// Writes the report and returns whether any check failed.
 pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result<bool> {
     let mut report = Report {
@@ -57,16 +64,18 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
         has_findings: false,
         failed: false,
     };
-    let (shims, node_selected, yarn_selected) = match Storage::from_env() {
+    let path = std::env::var_os("PATH");
+    let path = path.as_deref();
+    let storage = Storage::from_env();
+    let (shims, shim_directory, [node, yarn]) = match &storage {
         Ok(storage) => {
             let shims = storage.root().join("shims");
             report.detail(format_args!("Storage: {}", display_path(storage.root())))?;
             report.detail(format_args!("Shims: {}", display_path(&shims)))?;
-            let [node, yarn] = report_selections(&mut report, &storage, &shims)?;
-            if let Some(version) = node {
-                report_bundled_scripts(&mut report, &storage, version)?;
-            }
-            (Some(shims), node.is_some(), yarn.is_some())
+            let directory = report_shim_directory(&mut report, &shims, path)?;
+            let selections =
+                report_selections(&mut report, storage, directory == ShimDirectory::OnPath)?;
+            (Some(shims), directory, selections)
         }
         Err(error) => {
             report.detail(format_args!("Storage: unavailable\nShims: unavailable"))?;
@@ -74,11 +83,10 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
                 "Cannot locate storage ({error}). Set the storage environment variable to an absolute directory."
             ))?;
             report_unavailable_selections(&mut report)?;
-            (None, false, false)
+            (None, ShimDirectory::Unavailable, [None, None])
         }
     };
 
-    let path = std::env::var_os("PATH");
     report.detail(format_args!(
         "\nPATH matches (static lookup, excluding shell aliases, functions and caches):"
     ))?;
@@ -86,7 +94,7 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
     let mut off_path_shims = Vec::new();
     let mut shadowed = false;
     for (name, tool) in shim::COMMANDS {
-        let found = paths::first_match(path.as_deref(), name);
+        let found = paths::first_match(path, name);
         match &found {
             Ok(Some(found)) => report.detail(format_args!("{name}: {}", display_path(found)))?,
             Ok(None) => report.detail(format_args!("{name}: not found"))?,
@@ -95,12 +103,18 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
             ))?,
         }
         let required = match tool {
-            Some(Tool::Node) => node_selected,
-            Some(Tool::Yarn) => yarn_selected,
+            Some(Tool::Node) => node.is_some(),
+            Some(Tool::Yarn) => yarn.is_some(),
             None => false,
         };
         if required && let Some(shims) = &shims {
-            match report_required_shim(&mut report, shims, name, &found)? {
+            match report_required_shim(
+                &mut report,
+                shims,
+                name,
+                &found,
+                shim_directory == ShimDirectory::OnPath,
+            )? {
                 Some(ShimFinding::Missing) => missing_shims.push(name),
                 Some(ShimFinding::NotOnPath) => off_path_shims.push(name),
                 Some(ShimFinding::Shadowed) => shadowed = true,
@@ -110,9 +124,14 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
     }
     if !missing_shims.is_empty() {
         report.error(format_args!(
-            "Missing or unusable shims: {}.\nRun `verslot setup` from the installed Verslot executable.\nIf setup rejects the existing shim directory, move it aside and retry.",
+            "Missing or unusable shims: {}.",
             missing_shims.join(", ")
         ))?;
+        if shim_directory != ShimDirectory::Missing {
+            report.line(format_args!(
+                "Run `verslot setup` from the installed Verslot executable.\nIf setup rejects the existing shim directory, move it aside and retry."
+            ))?;
+        }
     }
     if !off_path_shims.is_empty() {
         report.error(format_args!(
@@ -133,8 +152,13 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
             }
         ))?;
     }
-    if yarn_selected && let Some(shims) = &shims {
-        report_yarn_node(&mut report, path.as_deref(), shims, node_selected)?;
+    if let (Ok(storage), Some(version)) = (&storage, node) {
+        report_bundled_scripts(&mut report, storage, version)?;
+    }
+    if yarn.is_some()
+        && let Some(shims) = &shims
+    {
+        report_yarn_node(&mut report, path, shims, node.is_some())?;
     }
     if !verbose && !report.has_findings {
         report.line(format_args!("No issues found."))?;
@@ -143,10 +167,62 @@ pub(crate) fn write_report(output: &mut impl Write, verbose: bool) -> io::Result
     Ok(report.failed)
 }
 
+fn report_shim_directory(
+    report: &mut Report<'_>,
+    shims: &Path,
+    path: Option<&OsStr>,
+) -> io::Result<ShimDirectory> {
+    match fs::metadata(shims) {
+        Ok(metadata) if metadata.is_dir() => {}
+        Ok(_) => {
+            report.error(format_args!(
+                "Expected a shim directory at {}. Inspect the existing entry before running `verslot setup`.",
+                display_path(shims)
+            ))?;
+            return Ok(ShimDirectory::Unavailable);
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            report.finding(format_args!(
+                "Verslot is not configured yet.\nRun `verslot setup` and follow its PATH instructions."
+            ))?;
+            return Ok(ShimDirectory::Missing);
+        }
+        Err(error) => {
+            report.error(format_args!(
+                "Cannot check the shim directory ({error}). Check access to {}.",
+                display_path(shims)
+            ))?;
+            return Ok(ShimDirectory::Unavailable);
+        }
+    }
+    match paths::contains_directory(path, shims) {
+        Ok(true) => {
+            report.detail(format_args!("Shim directory is on PATH."))?;
+            return Ok(ShimDirectory::OnPath);
+        }
+        Ok(false) => {
+            let instructions = if cfg!(windows) {
+                "Add the folder below to your user Path, then open a new terminal."
+            } else {
+                "Add the folder below to PATH in your shell's startup file, then open a new terminal."
+            };
+            report.error(format_args!(
+                "Verslot's shims are missing from this terminal's PATH.\n{instructions}\n{}",
+                display_path(shims)
+            ))?;
+        }
+        Err(error) => report.error(format_args!(
+            "Cannot check the shim directory on PATH ({error}). Check access to {} and the directories on PATH.",
+            display_path(shims)
+        ))?,
+    }
+    Ok(ShimDirectory::Unavailable)
+}
+
 fn report_selections(
     report: &mut Report<'_>,
     storage: &Storage,
-    shims: &Path,
+    shims_on_path: bool,
 ) -> io::Result<[Option<Version>; 2]> {
     let selections = match storage.inspect_selections() {
         Ok(selections) => selections,
@@ -158,21 +234,12 @@ fn report_selections(
             return Ok([None, None]);
         }
     };
-    if selections.iter().all(|state| matches!(state, Ok(None))) {
-        match shims.try_exists() {
-            Ok(false) => report.finding(format_args!(
-                "Verslot is not configured yet.\nRun `verslot setup` and follow its PATH instructions."
-            ))?,
-            Ok(true) => report.finding(format_args!(concat!(
-                "No tools selected.\n",
-                "Run `verslot use <tool>@<version>` to select an installed version.\n",
-                "Run `verslot install <tool>@<version>` first if needed."
-            )))?,
-            Err(error) => report.error(format_args!(
-                "Cannot check the shim directory ({error}). Check access to {}.",
-                display_path(shims)
-            ))?,
-        }
+    if shims_on_path && selections.iter().all(|state| matches!(state, Ok(None))) {
+        report.finding(format_args!(concat!(
+            "No tools selected.\n",
+            "Run `verslot use <tool>@<version>` to select an installed version.\n",
+            "Run `verslot install <tool>@<version>` first if needed."
+        )))?;
     }
     report.detail(format_args!("Selections:"))?;
     let mut versions = [None; 2];
@@ -264,6 +331,7 @@ fn report_required_shim(
     shims: &Path,
     name: &str,
     found: &io::Result<Option<PathBuf>>,
+    shims_on_path: bool,
 ) -> io::Result<Option<ShimFinding>> {
     let expected = shims.join(shim::executable_name(name));
     let location = display_path(&expected);
@@ -281,6 +349,9 @@ fn report_required_shim(
             ))?;
             return Ok(None);
         }
+    }
+    if !shims_on_path {
+        return Ok(None);
     }
     let found = match found {
         Ok(Some(found)) => found,

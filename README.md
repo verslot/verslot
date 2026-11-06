@@ -146,9 +146,13 @@ Use `verslot doctor --verbose` to include the storage and shim directories, each
 tool's selection, the first PATH match for `verslot`, `node`, `npm`, `npx`,
 `yarn`, and `yarnpkg`, and the Node.js path used by Yarn.
 
-When a required shim is missing, run `verslot setup` from your installed Verslot
-executable. If setup refuses an existing shim directory, inspect it and move it
-aside before retrying.
+Doctor checks the shim directory and its presence on the current process's PATH
+before inspecting selections. If the directory exists but is missing from PATH,
+add the reported directory to PATH and open a new terminal.
+
+When the shim directory or a required shim is missing, run `verslot setup` from
+your installed Verslot executable. If setup refuses an existing shim directory,
+inspect it and move it aside before retrying.
 
 PATH results are static. On Windows the search uses PATH directory order and
 `PATHEXT` extension order, with `.exe` as the fallback when no extensions are

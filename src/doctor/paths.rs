@@ -6,6 +6,40 @@ use std::path::{Path, PathBuf};
 use crate::output::format_path_for_display as display_path;
 use crate::shim;
 
+pub(super) fn contains_directory(path: Option<&OsStr>, expected: &Path) -> io::Result<bool> {
+    let Some(path) = path else {
+        return Ok(false);
+    };
+    let expected = expected.canonicalize()?;
+    let mut first_error = None;
+    for directory in path_directories(path) {
+        let directory = if directory.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            &directory
+        };
+        match directory.canonicalize() {
+            Ok(resolved) if resolved == expected => return Ok(true),
+            Ok(_) => {}
+            Err(error) if is_missing(&error) => {}
+            Err(error) => {
+                first_error.get_or_insert_with(|| {
+                    io::Error::new(
+                        error.kind(),
+                        format!("{}: {error}", display_path(directory)),
+                    )
+                });
+            }
+        }
+    }
+    first_error.map_or(Ok(false), Err)
+}
+
+fn path_directories(path: &OsStr) -> impl Iterator<Item = PathBuf> {
+    std::env::split_paths(path)
+        .filter(|directory| !cfg!(windows) || !directory.as_os_str().is_empty())
+}
+
 pub(super) fn first_match(path: Option<&OsStr>, command: &str) -> io::Result<Option<PathBuf>> {
     let Some(path) = path else {
         return Ok(None);
@@ -14,11 +48,7 @@ pub(super) fn first_match(path: Option<&OsStr>, command: &str) -> io::Result<Opt
     let names = windows_candidate_names(command);
     #[cfg(unix)]
     let names = [command];
-    for directory in std::env::split_paths(path) {
-        #[cfg(windows)]
-        if directory.as_os_str().is_empty() {
-            continue;
-        }
+    for directory in path_directories(path) {
         for name in &names {
             let candidate = directory.join(name);
             if is_executable_file(&candidate)? {
