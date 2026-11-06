@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.7.1 — 2026-11-07
+
 - Report a missing shim directory on PATH in `verslot doctor` before checking
   version selections, including when no tools are selected.
 
