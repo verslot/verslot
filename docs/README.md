@@ -11,6 +11,10 @@
   one PATH entry for Verslot and managed commands.
 - [Yarn global selection](adr/0003-yarn-global-selection.md):
   official package sources, Node lookup on PATH and Yarn's project delegation.
+- [Doctor diagnostic report](adr/0004-doctor-diagnostic-report.md):
+  stdout reports, exit status and the boundary of PATH observations.
+- [Doctor specification](https://github.com/verslot/verslot/issues/38):
+  read-only diagnostics, selected-tool PATH checks and acceptance criteria.
 - [Yarn specification](https://github.com/verslot/verslot/issues/30):
   scope and acceptance criteria for the second managed tool.
 - [Unified shim specification](https://github.com/verslot/verslot/issues/29):

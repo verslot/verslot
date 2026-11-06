@@ -2,6 +2,7 @@ use std::io::{self, IsTerminal};
 
 mod cli;
 pub mod distribution;
+mod doctor;
 pub mod download;
 mod install;
 pub mod installation;
@@ -36,6 +37,14 @@ pub fn run() -> Result<(), String> {
                 logger::Symbol::None,
                 &format!("Prepend this directory to PATH: {directory}\n"),
             );
+            Ok(())
+        }
+        Command::Doctor { verbose } => {
+            let failed = doctor::write_report(&mut io::stdout().lock(), verbose)
+                .map_err(|error| format!("doctor: cannot write report: {error}"))?;
+            if failed {
+                std::process::exit(1);
+            }
             Ok(())
         }
         Command::Install { target } => {

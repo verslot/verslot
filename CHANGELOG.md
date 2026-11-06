@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add `verslot doctor` for read-only checks of selections, shim paths, PATH
+  shadowing, and the Node.js dependency of selected Yarn. Show a short status
+  or actionable findings by default and include path details with `--verbose`
+  (#38).
+
 - Add `verslot unuse node` and `verslot unuse yarn` to clear a global selection
   while keeping installations and shared shims. Allow damaged or dangling
   selections to be cleared, and point selected-version uninstall errors to

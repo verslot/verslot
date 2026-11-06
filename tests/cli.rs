@@ -551,7 +551,7 @@ fn failed_commands_preserve_existing_contents_and_list_does_not_create_storage()
 
 #[test]
 fn query_commands_reject_targets() {
-    for command in ["list", "ls", "current"] {
+    for command in ["list", "ls", "current", "doctor"] {
         verslot_command()
             .args([command, "node@22.0.0"])
             .assert()
@@ -706,7 +706,15 @@ fn uninstall_cli_protects_current_state_and_removes_only_complete_inactive_versi
 
 #[test]
 fn each_command_provides_help() {
-    for command in ["install", "uninstall", "use", "unuse", "list", "current"] {
+    for command in [
+        "install",
+        "uninstall",
+        "use",
+        "unuse",
+        "list",
+        "current",
+        "doctor",
+    ] {
         let expected_usage = if matches!(command, "install" | "uninstall" | "use") {
             format!("Usage: verslot {command} <TOOL@VERSION>")
         } else if command == "unuse" {

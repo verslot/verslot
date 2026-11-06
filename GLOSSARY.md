@@ -9,6 +9,10 @@ release and version-request terms used in discovery, installation and selection.
 Named software whose installed versions and global selection Verslot manages
 independently of other tools.
 
+**Installed tool**:
+A managed tool with at least one locally installed version, independently of
+whether it has a global selection.
+
 **Global selection**:
 The version selected for a managed tool across directories until the user
 changes or clears the selection. Each tool's selection is independent and may be
