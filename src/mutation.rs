@@ -32,14 +32,50 @@ pub(crate) fn create_directory(root: &Path, path: &Path) -> io::Result<()> {
     real_directory(root, path)
 }
 
-pub(crate) fn acquire_lock(root: &Path) -> io::Result<File> {
+#[derive(Debug)]
+pub(crate) struct StorageLock {
+    file: File,
+    released: bool,
+}
+
+impl StorageLock {
+    fn from_locked_file(file: File) -> Self {
+        Self {
+            file,
+            released: false,
+        }
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn file(&self) -> &File {
+        &self.file
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn unlock(mut self) -> io::Result<()> {
+        self.file.unlock()?;
+        self.released = true;
+        Ok(())
+    }
+}
+
+impl Drop for StorageLock {
+    fn drop(&mut self) {
+        // A child may still hold a duplicate descriptor between fork and exec.
+        if cfg!(unix) && !self.released {
+            let _ = self.file.unlock();
+        }
+    }
+}
+
+pub(crate) fn acquire_lock(root: &Path) -> io::Result<StorageLock> {
     let file = acquire_exclusive_lock(root)?;
     reject_switch_residue(root)?;
     Ok(file)
 }
 
 // Setup shares serialization with tool mutations but does not read Node state.
-pub(crate) fn acquire_exclusive_lock(root: &Path) -> io::Result<File> {
+pub(crate) fn acquire_exclusive_lock(root: &Path) -> io::Result<StorageLock> {
     real_directory(root, root)?;
     let path = root.join(".mutation.lock");
     match fs::symlink_metadata(&path) {
@@ -61,7 +97,7 @@ pub(crate) fn acquire_exclusive_lock(root: &Path) -> io::Result<File> {
     }
     let file = OpenOptions::new().read(true).write(true).open(path)?;
     file.try_lock().map_err(lock_error)?;
-    Ok(file)
+    Ok(StorageLock::from_locked_file(file))
 }
 
 fn lock_error(error: std::fs::TryLockError) -> io::Error {
@@ -76,7 +112,7 @@ fn lock_error(error: std::fs::TryLockError) -> io::Error {
 }
 
 // Open an existing persistent lock read-only; queries never create it.
-pub(crate) fn acquire_read_lock(root: &Path) -> io::Result<Option<File>> {
+pub(crate) fn acquire_read_lock(root: &Path) -> io::Result<Option<StorageLock>> {
     real_directory(root, root)?;
     let path = root.join(".mutation.lock");
     match fs::symlink_metadata(&path) {
@@ -89,7 +125,7 @@ pub(crate) fn acquire_read_lock(root: &Path) -> io::Result<Option<File>> {
     }
     let file = File::open(&path)?;
     file.try_lock_shared().map_err(lock_error)?;
-    Ok(Some(file))
+    Ok(Some(StorageLock::from_locked_file(file)))
 }
 
 // Check ancestors before entries, and never follow or remove reserved links.

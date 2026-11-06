@@ -55,7 +55,7 @@ impl Storage {
         }
         let root = fs::canonicalize(self.root())?;
         let lock = acquire_lock(&root)?;
-        let mut checkpoint = |step| checkpoint(step, &lock);
+        let mut checkpoint = |step| checkpoint(step, lock.file());
         let previous = self.read_complete_current(&root, tool)?;
         let target = &Self::resolve_selection(&root, request)?;
         let destination = root
@@ -208,7 +208,6 @@ impl Storage {
                     ))
                 }
             };
-            // A child can briefly retain a duplicate of the lock descriptor across fork.
             return Err(match lock.unlock() {
                 Ok(()) => failure,
                 Err(error) => io::Error::other(format!(

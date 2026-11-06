@@ -726,6 +726,24 @@ fn lock_contents_are_preserved_and_contention_is_nonblocking() {
     fixture.install().unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn storage_locks_release_while_descriptor_copies_are_open() {
+    let fixture = Fixture::new();
+    let writer = acquire_lock(&fixture.0).unwrap();
+    let inherited_writer = writer.file().try_clone().unwrap();
+    drop(writer);
+
+    let reader = crate::mutation::acquire_read_lock(&fixture.0)
+        .unwrap()
+        .unwrap();
+    let inherited_reader = reader.file().try_clone().unwrap();
+    drop(reader);
+
+    assert_eq!(fixture.install().unwrap(), "installed node@22.0.0");
+    drop((inherited_writer, inherited_reader));
+}
+
 #[test]
 fn lock_directory_and_linked_mutation_paths_are_rejected() {
     let fixture = Fixture::new();
