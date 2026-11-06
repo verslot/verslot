@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Report a missing shim directory on PATH in `verslot doctor` before checking
+  version selections, including when no tools are selected.
+
 ## v0.7.0 — 2026-11-06
 
 Source release with unified command shims, Yarn version management, and PATH

@@ -80,11 +80,35 @@ fn unconfigured_and_installed_but_unselected_environments_are_read_only() {
 }
 
 #[test]
+fn setup_without_a_selection_reports_the_missing_path_entry() {
+    let fixture = Fixture::new();
+    fixture.setup();
+    let shims = fixture.root.join("shims");
+    let instructions = if cfg!(windows) {
+        "Add the folder below to your user Path, then open a new terminal."
+    } else {
+        "Add the folder below to PATH in your shell's startup file, then open a new terminal."
+    };
+
+    doctor(&fixture, &[&fixture.directory])
+        .assert()
+        .stderr("")
+        .stdout(format!(
+            "   Error: Verslot's shims are missing from this terminal's PATH.\n   {instructions}\n   {}\n",
+            display_path(&shims)
+        ))
+        .code(1);
+    fixture.finish();
+}
+
+#[test]
 fn setup_without_a_selection_suggests_use_and_install() {
     let fixture = Fixture::new();
     fixture.setup();
+    let shims = fixture.root.join("shims");
+    let relative_shims = shims.strip_prefix(&fixture.directory).unwrap();
 
-    doctor(&fixture, &[&fixture.root.join("shims")])
+    doctor(&fixture, &[relative_shims])
         .assert()
         .success()
         .stderr("")
@@ -169,20 +193,24 @@ fn missing_required_shims_and_off_path_shims_report_recovery_on_stdout() {
     let fixture = Fixture::new();
     select_node_with_bundles(&fixture);
     fixture.setup();
-    doctor(&fixture, &[&fixture.directory])
-        .assert()
-        .code(1)
-        .stderr("")
-        .stdout(predicate::str::contains(
-            "Shims not found on PATH: node, npm, npx.",
-        ))
-        .stdout(predicate::str::contains("first on PATH").count(1))
-        .stdout(predicate::str::contains("PATH matches").not());
 
     fs::remove_file(fixture.shim_path("npm")).unwrap();
     fs::remove_file(fixture.shim_path("npx")).unwrap();
     fs::create_dir(fixture.shim_path("npx")).unwrap();
     let shims = fixture.root.join("shims");
+
+    doctor(&fixture, &[&fixture.directory])
+        .assert()
+        .code(1)
+        .stderr("")
+        .stdout(predicate::str::starts_with(
+            "   Error: Verslot's shims are missing from this terminal's PATH.\n",
+        ))
+        .stdout(predicate::str::contains(
+            "Missing or unusable shims: npm, npx.",
+        ))
+        .stdout(predicate::str::contains("Add the folder below").count(1))
+        .stdout(predicate::str::contains("PATH matches").not());
 
     doctor(&fixture, &[&shims])
         .assert()
