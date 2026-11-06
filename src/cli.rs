@@ -69,6 +69,12 @@ pub(crate) struct Cli {
 pub(crate) enum Command {
     /// Create or refresh the unified command entry points.
     Setup,
+    /// Diagnose local version selections and PATH entries.
+    Doctor {
+        /// Include storage paths, selections and PATH matches.
+        #[arg(long)]
+        verbose: bool,
+    },
     /// Install a tool version.
     Install {
         /// Exact version, major, or major.minor; partial versions install the newest remote match.

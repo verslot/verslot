@@ -91,6 +91,7 @@ or a `major.minor` series such as `24.1`. `uninstall` requires a full version.
 | `verslot unuse <tool>`              | Clear a tool's global selection       |
 | `verslot ls`                         | List installed versions for all tools |
 | `verslot current`                    | Show selected versions                |
+| `verslot doctor`                     | Diagnose selections and command paths |
 | `verslot uninstall <tool>@<version>` | Remove an inactive version            |
 
 Run `verslot --help` for the full command list or `verslot <command> --help` for
@@ -101,6 +102,31 @@ version, including the only installed version. This removes the tool's selection
 link, keeping its installed versions, the other tool's selection and shared shims.
 Repeating it succeeds, and damaged or missing installations do not prevent it.
 Commands for an unselected tool report the existing no-selection error.
+
+## Diagnose selections and PATH
+
+Run `verslot doctor` for a short status or findings with recovery steps.
+Use `verslot doctor --verbose` to include the storage and shim directories, each
+tool's selection, the first PATH match for `verslot`, `node`, `npm`, `npx`,
+`yarn`, and `yarnpkg`, and the Node.js path used by Yarn.
+
+When a required shim is missing, run `verslot setup` from your installed Verslot
+executable. If setup refuses an existing shim directory, inspect it and move it
+aside before retrying.
+
+PATH results are static. On Windows the search uses PATH directory order and
+`PATHEXT` extension order, with `.exe` as the fallback when no extensions are
+configured. On Unix empty and relative PATH entries are relative to the current
+directory, and candidates must have an execute bit. Shell aliases, functions,
+command caches, and PowerShell-specific `.ps1` rules are outside this search.
+Yarn uses its own Node.js lookup (`node.exe` on Windows). A system Node.js can
+satisfy this check. A Verslot Node.js shim needs a valid Node.js selection.
+On Unix the Yarn dependency check is unavailable when PATH is unset.
+
+Both reports are read-only and go to stdout as plain text. Save the full report
+with `verslot doctor --verbose > doctor.txt`. An unconfigured or healthy
+environment exits `0`. Errors or checks that could not be completed exit `1`,
+and invalid usage exits `2`.
 
 ## Documentation
 

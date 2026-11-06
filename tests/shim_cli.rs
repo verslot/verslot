@@ -11,6 +11,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use assert_cmd::assert::OutputAssertExt;
 
+#[path = "shim_cli/doctor.rs"]
+mod doctor;
+
 struct Fixture {
     directory: PathBuf,
     root: PathBuf,

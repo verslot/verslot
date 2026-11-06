@@ -68,12 +68,7 @@ fn selected_command(name: &str) -> io::Result<Command> {
     regular_file(&root, &executable)?;
     let mut command = Command::new(executable);
     if name != "node" {
-        let npm = installation.join(if cfg!(windows) {
-            "node_modules/npm/bin"
-        } else {
-            "lib/node_modules/npm/bin"
-        });
-        let script = npm.join(format!("{name}-cli.js"));
+        let script = bundled_node_script(&installation, name);
         regular_file(&root, &script).map_err(|error| {
             io::Error::new(
                 error.kind(),
@@ -83,6 +78,16 @@ fn selected_command(name: &str) -> io::Result<Command> {
         command.arg(script);
     }
     Ok(command)
+}
+
+pub(crate) fn bundled_node_script(installation: &Path, name: &str) -> std::path::PathBuf {
+    installation
+        .join(if cfg!(windows) {
+            "node_modules/npm/bin"
+        } else {
+            "lib/node_modules/npm/bin"
+        })
+        .join(format!("{name}-cli.js"))
 }
 
 fn selected_yarn_command(storage: &Storage) -> io::Result<Command> {
@@ -102,7 +107,9 @@ fn selected_yarn_command(storage: &Storage) -> io::Result<Command> {
     regular_file(&root, &script)?;
 
     #[cfg(windows)]
-    let mut command = Command::new(windows_node_on_path()?);
+    let mut command = Command::new(windows_node_on_path(
+        std::env::var_os("PATH").as_deref().unwrap_or_default(),
+    )?);
     #[cfg(not(windows))]
     let mut command = Command::new("node");
     command.arg(script);
@@ -110,10 +117,9 @@ fn selected_yarn_command(storage: &Storage) -> io::Result<Command> {
 }
 
 #[cfg(windows)]
-fn windows_node_on_path() -> io::Result<std::path::PathBuf> {
+pub(crate) fn windows_node_on_path(path: &OsStr) -> io::Result<std::path::PathBuf> {
     // A bare program name would search the Yarn shim's own directory before PATH.
-    let path = std::env::var_os("PATH").unwrap_or_default();
-    let executable = std::env::split_paths(&path)
+    let executable = std::env::split_paths(path)
         .filter(|directory| !directory.as_os_str().is_empty())
         .map(|directory| directory.join("node.exe"))
         .find(|candidate| candidate.is_file())

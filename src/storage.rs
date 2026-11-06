@@ -1,10 +1,10 @@
 use std::ffi::OsStr;
-use std::fs;
+use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::installation::validate_installation;
-use crate::mutation::{acquire_lock, acquire_read_lock, reject_switch_residue};
+use crate::mutation::{acquire_lock, acquire_read_lock, is_link, reject_switch_residue};
 use crate::target::{Target, Tool, Version, VersionRequest};
 
 mod links;
@@ -130,37 +130,57 @@ impl Storage {
         self.read_selected_tools(&Tool::ALL)
     }
 
+    /// Retains each tool's result from the same read lock for diagnostics.
+    pub(crate) fn inspect_selections(&self) -> io::Result<[io::Result<Option<Version>>; 2]> {
+        let Some((root, lock)) = self.open_selection_read()? else {
+            return Ok([Ok(None), Ok(None)]);
+        };
+        Ok(Tool::ALL.map(|tool| self.read_locked_selection(&root, lock.as_ref(), tool)))
+    }
+
     fn read_selected_tools(&self, tools: &[Tool]) -> io::Result<Vec<Target>> {
-        // Validate even missing ancestors using the existing read-only path rules.
-        for tool in tools {
-            self.current_link_path(*tool)?;
+        let Some((root, lock)) = self.open_selection_read()? else {
+            return Ok(Vec::new());
+        };
+        let mut selected = Vec::new();
+        for &tool in tools {
+            if let Some(version) = self.read_locked_selection(&root, lock.as_ref(), tool)? {
+                selected.push(Target { tool, version });
+            }
         }
+        Ok(selected)
+    }
+
+    fn open_selection_read(&self) -> io::Result<Option<(PathBuf, Option<File>)>> {
+        // Validate even missing ancestors using the existing read-only path rules.
+        self.checked_directory(&["current"])?;
         match fs::symlink_metadata(&self.root) {
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
             Ok(_) => {}
         }
         let root = fs::canonicalize(&self.root)?;
         let lock = acquire_read_lock(&root)?;
         reject_switch_residue(&root)?;
-        let mut selected = Vec::new();
-        for &tool in tools {
-            if lock.is_none() {
-                match fs::symlink_metadata(root.join("current").join(tool.to_string())) {
-                    Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
-                    Err(error) => return Err(error),
-                    Ok(_) => {
-                        return Err(io::Error::other(
-                            "current selection exists without mutation lock",
-                        ));
-                    }
-                }
-            }
-            if let Some(version) = self.read_complete_current(&root, tool)? {
-                selected.push(Target { tool, version });
-            }
+        Ok(Some((root, lock)))
+    }
+
+    fn read_locked_selection(
+        &self,
+        root: &Path,
+        lock: Option<&File>,
+        tool: Tool,
+    ) -> io::Result<Option<Version>> {
+        if lock.is_none() {
+            return match fs::symlink_metadata(root.join("current").join(tool.to_string())) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+                Err(error) => Err(error),
+                Ok(_) => Err(io::Error::other(
+                    "current selection exists without mutation lock",
+                )),
+            };
         }
-        Ok(selected)
+        self.read_complete_current(root, tool)
     }
 
     // The caller holds the mutation lock; never reacquire it during a switch.
@@ -186,6 +206,12 @@ impl Storage {
     pub(crate) fn read_current(&self, tool: Tool) -> io::Result<Option<Version>> {
         let link = self.current_link_path(tool)?;
         match fs::symlink_metadata(&link) {
+            Ok(metadata) if !is_link(&metadata) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("expected a selection link at {}", link.display()),
+                ));
+            }
             Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),

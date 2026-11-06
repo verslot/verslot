@@ -3,6 +3,9 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 
 fn main() {
+    if let Some(marker) = std::env::var_os("VERSLOT_FIXTURE_LAUNCH_MARKER") {
+        fs::write(marker, b"launched").unwrap();
+    }
     let executable = std::env::current_exe().unwrap();
     let version = executable
         .ancestors()
