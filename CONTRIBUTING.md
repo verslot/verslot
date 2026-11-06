@@ -50,17 +50,18 @@ honestly; retained M5 acceptance is historical evidence, not new execution.
 
 ## Versions
 
-Compatible fixes use `0.5.x`. Features or incompatible changes use the next minor
-version; document migration for incompatible changes. Move released Unreleased
-entries into a dated version section. Update Cargo.toml and only Verslot's own
-Cargo.lock version; do not upgrade dependencies as part of a version bump.
+Compatible fixes increment the patch version of the current release series.
+Features or incompatible changes use the next minor version. Document migration
+for incompatible changes. Move released Unreleased entries into a dated version
+section. Update Cargo.toml and Verslot's package version in Cargo.lock while
+keeping dependency versions pinned.
 An Issue may close when its fix merges; CHANGELOG and Release separately identify
 the first version containing it. Publish when needed, without a fixed schedule.
 
 ## Release procedure
 
 1. Review the final diff for scope, required accepted fixes and preserved history.
-   Update the version, CHANGELOG and README's fixed tag installation command.
+   Update the version, CHANGELOG and any README usage affected by the release.
 2. Run all four checks, commit with Conventional Commits and open a PR to main.
    Merge through the PR, then confirm the final main commit's three-platform CI
    and formatting job all pass. Record its SHA and run URL; do not substitute
@@ -75,10 +76,11 @@ the first version containing it. Publish when needed, without a fixed schedule.
    fixed-tag installation, changes, supported targets, limitations, final SHA/CI
    and historical M5 evidence links. Do not attach precompiled binaries or publish
    to crates.io for v0.5.0.
-6. Verify remote tag SHA, Release URL and README installation tag agree. Failed
-   candidates must be repaired and revalidated before publication. If remote
-   permissions block delivery, retain the local commit and complete Release body,
-   and report the unfinished steps explicitly.
+6. Verify the remote tag SHA against the final commit and check that the Release
+   and its installation instructions use that tag. Failed candidates must be
+   repaired and revalidated before publication. If remote permissions block
+   delivery, retain the local commit and complete Release body, and report the
+   unfinished steps explicitly.
 
 M1–M5 roadmap, designs and acceptance records stay frozen; new work belongs in
 Issues. Do not rewrite historical versions or conclusions as release evidence.

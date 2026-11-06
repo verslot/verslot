@@ -2,9 +2,14 @@
 
 ## Unreleased
 
-- Generate tool shims only for tools with complete local installations. Rerun
-  `verslot setup` after installing the first version of a tool or uninstalling
-  its last version to synchronize the shared PATH entries (#42).
+## v0.7.0 — 2026-11-06
+
+Source release with unified command shims, Yarn version management, and PATH
+diagnostics through `verslot doctor`.
+
+### Changes since v0.6.0
+
+- Generate tool shims only for tools with complete local installations (#42).
 
 - Report pending cleanup of previous Windows shims as a warning when the
   requested shim set is already active.
@@ -55,6 +60,21 @@
   selection or the newest remotely available version for installation. Report
   complete resolved versions, show remote resolution progress for partial
   installation, and retain exact targets for uninstall (#27).
+
+- Release Unix storage locks when an operation ends, including after switch
+  rollback (#33, #44).
+
+### Migration from v0.6.0
+
+Run `setup` from the newly installed Verslot executable. Replace the old Node.js
+PATH entry with the shared shim directory. The old entry was
+`%LOCALAPPDATA%\verslot\current\node` on Windows and
+`$HOME/.verslot/current/node/bin` on macOS and Linux.
+See [platform-specific setup commands](README.md#configure-the-shared-path).
+
+Rerun `setup` after installing a tool's first version or uninstalling its last
+version to synchronize its shims. Scripts that consume redirected `list` or
+`current` output should filter by tool prefix, such as `node@`.
 
 ## v0.6.0 — 2026-11-02
 

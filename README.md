@@ -35,6 +35,9 @@ git clone --branch main --depth 1 https://github.com/verslot/verslot.git verslot
 cargo install --path verslot --locked
 ```
 
+For upgrades from v0.6.0, follow the
+[v0.7.0 migration steps](CHANGELOG.md#migration-from-v060).
+
 ### Configure the shared PATH
 
 Run `setup` with the executable Cargo just installed, then prepend the shared
