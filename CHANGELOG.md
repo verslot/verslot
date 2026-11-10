@@ -2,10 +2,12 @@
 
 ## Unreleased
 
+## v0.8.0 — 2026-11-10
+
 - Build verified precompiled archives for Windows x86-64, macOS Apple Silicon
   and Linux x86-64 GNU from version tags, and prepare a Release draft with
-  SHA-256 checksums and installation instructions (#12). The first binary
-  release has not yet been published.
+  SHA-256 checksums and installation instructions (#12). This is the first
+  release prepared with precompiled binary archives.
 
 ## v0.7.1 — 2026-11-07
 

@@ -28,7 +28,7 @@ for platform coverage and limitations.
 
 ### Install a precompiled binary
 
-The first precompiled binary release is pending. When available, choose the
+Starting with v0.8.0, releases can provide precompiled archives. Choose the
 archive and its matching `.sha256` file from the same
 [GitHub Release](https://github.com/verslot/verslot/releases). The supported
 targets are Windows x86-64 (`x86_64-pc-windows-msvc`), macOS Apple Silicon
