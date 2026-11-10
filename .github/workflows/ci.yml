@@ -7,6 +7,16 @@ on:
     branches: [main, dev]
 
 jobs:
+  release-draft:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test draft Release preparation
+        shell: pwsh
+        run: .github/scripts/test-release-draft.ps1
+
   fmt:
     runs-on: ubuntu-latest
 

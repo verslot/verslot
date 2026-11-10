@@ -1,0 +1,207 @@
+name: Release build
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUST_VERSION: 1.98.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+            executable: verslot.exe
+            extension: zip
+          - os: macos-15
+            target: aarch64-apple-darwin
+            executable: verslot
+            extension: tar.gz
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            executable: verslot
+            extension: tar.gz
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      TARGET: ${{ matrix.target }}
+      EXECUTABLE: ${{ matrix.executable }}
+      EXTENSION: ${{ matrix.extension }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install $env:RUST_VERSION --profile minimal --target $env:TARGET
+
+      - name: Read package version
+        id: package
+        run: |
+          $metadataJson = cargo "+$env:RUST_VERSION" metadata --locked --no-deps --format-version 1
+          if ($LASTEXITCODE -ne 0) { throw 'Cargo metadata failed' }
+          $metadata = $metadataJson | ConvertFrom-Json
+          $packages = @($metadata.packages | Where-Object { $_.name -eq 'verslot' })
+          if ($packages.Count -ne 1) { throw 'Expected one Verslot package' }
+          $version = $packages[0].version
+          if ($version -cnotmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' -or $env:GITHUB_REF_NAME -cne "v$version") {
+            throw 'Release tag must match the stable Cargo package version'
+          }
+          "version=$($packages[0].version)" >> $env:GITHUB_OUTPUT
+
+      - name: Build release executable
+        run: cargo "+$env:RUST_VERSION" build --release --locked --bin verslot --target $env:TARGET
+
+      - name: Record build environment and runtime dependencies
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          $commit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $commit -cne $env:GITHUB_SHA) { throw 'Checkout SHA does not match the workflow run' }
+          $rustc = rustc "+$env:RUST_VERSION" -Vv
+          if ($LASTEXITCODE -ne 0 -or $rustc -cnotcontains "host: $env:TARGET") { throw 'The build is not running on the target architecture' }
+          $binary = Join-Path $env:GITHUB_WORKSPACE "target/$env:TARGET/release/$env:EXECUTABLE"
+          $evidence = @(
+            "commit=$commit"
+            "version=$env:VERSION"
+            "target=$env:TARGET"
+            "runner_image=$env:ImageOS"
+            "runner_image_version=$env:ImageVersion"
+            "rust_toolchain=$env:RUST_VERSION"
+          ) + $rustc
+
+          if ($env:RUNNER_OS -eq 'Windows') {
+            $evidence += "os_version=$([Environment]::OSVersion.VersionString)"
+            $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+            $visualStudio = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($LASTEXITCODE -ne 0 -or -not $visualStudio) { throw 'Could not locate the MSVC tools' }
+            $dumpbin = Get-ChildItem (Join-Path $visualStudio 'VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe') | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+            if (-not $dumpbin) { throw 'Could not locate dumpbin' }
+            $dependencies = & $dumpbin /dependents $binary
+            if ($LASTEXITCODE -ne 0) { throw 'Could not inspect Windows runtime dependencies' }
+            $evidence += $dependencies
+          } elseif ($env:RUNNER_OS -eq 'macOS') {
+            $osVersion = & sw_vers
+            if ($LASTEXITCODE -ne 0) { throw 'Could not inspect the macOS version' }
+            $libraries = & otool -L $binary
+            if ($LASTEXITCODE -ne 0) { throw 'Could not inspect macOS runtime dependencies' }
+            $loadCommands = & otool -l $binary
+            if ($LASTEXITCODE -ne 0) { throw 'Could not inspect macOS load commands' }
+            $evidence += $osVersion + $libraries + $loadCommands
+          } else {
+            $osVersion = Get-Content /etc/os-release
+            $libc = & ldd --version
+            if ($LASTEXITCODE -ne 0) { throw 'Could not inspect the Linux runtime' }
+            $libraries = & ldd $binary
+            if ($LASTEXITCODE -ne 0) { throw 'Could not inspect Linux runtime dependencies' }
+            $symbols = & readelf --version-info $binary
+            if ($LASTEXITCODE -ne 0) { throw 'Could not inspect Linux symbol versions' }
+            $evidence += $osVersion + $libc + $libraries + $symbols
+          }
+          $artifactDirectory = Join-Path $env:RUNNER_TEMP 'verslot-release'
+          New-Item -ItemType Directory -Path $artifactDirectory | Out-Null
+          $evidence | Set-Content -Path (Join-Path $artifactDirectory 'build-info.txt') -Encoding utf8
+          $evidence
+
+      - name: Package executable and checksum
+        id: archive
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          $artifactDirectory = Join-Path $env:RUNNER_TEMP 'verslot-release'
+          $archiveName = "verslot-v$env:VERSION-$env:TARGET.$env:EXTENSION"
+          $archive = Join-Path $artifactDirectory $archiveName
+          $binary = Join-Path $env:GITHUB_WORKSPACE "target/$env:TARGET/release/$env:EXECUTABLE"
+          $license = Join-Path $env:GITHUB_WORKSPACE 'LICENSE'
+          if ($env:RUNNER_OS -eq 'Windows') {
+            Compress-Archive -LiteralPath @($binary, $license) -DestinationPath $archive
+          } else {
+            & tar -czf $archive -C (Split-Path $binary) $env:EXECUTABLE -C $env:GITHUB_WORKSPACE 'LICENSE'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create archive' }
+          }
+          $digest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("$archive.sha256", "$digest  $archiveName`n", [Text.UTF8Encoding]::new($false))
+          "name=$archiveName" >> $env:GITHUB_OUTPUT
+          "path=$archive" >> $env:GITHUB_OUTPUT
+
+      - name: Verify archive and isolated setup
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+          ARCHIVE: ${{ steps.archive.outputs.path }}
+          ARCHIVE_NAME: ${{ steps.archive.outputs.name }}
+        run: |
+          $digest = (Get-FileHash -LiteralPath $env:ARCHIVE -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksum = [IO.File]::ReadAllText("$env:ARCHIVE.sha256").TrimEnd("`r", "`n")
+          if ($checksum -cne "$digest  $env:ARCHIVE_NAME") { throw 'Archive checksum mismatch' }
+          $unpacked = Join-Path $env:RUNNER_TEMP 'verslot-unpacked'
+          New-Item -ItemType Directory -Path $unpacked | Out-Null
+          if ($env:RUNNER_OS -eq 'Windows') {
+            Expand-Archive -LiteralPath $env:ARCHIVE -DestinationPath $unpacked
+          } else {
+            & tar -xzf $env:ARCHIVE -C $unpacked
+            if ($LASTEXITCODE -ne 0) { throw 'Could not extract archive' }
+          }
+          $names = @(Get-ChildItem -LiteralPath $unpacked -Force | Select-Object -ExpandProperty Name | Sort-Object)
+          if (($names -join ',') -cne ((@('LICENSE', $env:EXECUTABLE) | Sort-Object) -join ',')) { throw 'Unexpected archive contents' }
+          $binary = Join-Path $unpacked $env:EXECUTABLE
+          $version = & $binary --version
+          if ($LASTEXITCODE -ne 0 -or "$version".Trim() -cne "verslot $env:VERSION") { throw 'Unpacked executable reports the wrong version' }
+          & $binary --help
+          if ($LASTEXITCODE -ne 0) { throw 'Unpacked executable help failed' }
+          $isolated = Join-Path $env:RUNNER_TEMP 'verslot-isolated'
+          New-Item -ItemType Directory -Path $isolated | Out-Null
+          if ($env:RUNNER_OS -eq 'Windows') {
+            $env:LOCALAPPDATA = $isolated
+            $shim = Join-Path $isolated 'verslot/shims/verslot.exe'
+          } else {
+            $env:HOME = $isolated
+            $shim = Join-Path $isolated '.verslot/shims/verslot'
+          }
+          & $binary setup
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated setup failed' }
+          $shimVersion = & $shim --version
+          if ($LASTEXITCODE -ne 0 -or "$shimVersion".Trim() -cne "verslot $env:VERSION") { throw 'Shim reports the wrong version' }
+
+      - name: Upload verified package and build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: verslot-${{ matrix.target }}
+          path: ${{ runner.temp }}/verslot-release/
+          if-no-files-found: error
+          overwrite: true
+
+  draft-release:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: verslot-*
+          path: ${{ runner.temp }}/verslot-artifacts
+
+      - name: Create or complete the draft Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/create-release-draft.ps1

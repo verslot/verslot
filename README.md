@@ -9,8 +9,8 @@ A minimal tool version manager written in Rust. Version management. Nothing else
 
 ## Installation
 
-Verslot is under active development. To build from source, install Git, stable
-Rust with Cargo, and the native build tools for your platform.
+Verslot is under active development. Install a precompiled binary when one is
+available for your platform, or build from source.
 
 ### Platforms and known limitations
 
@@ -26,8 +26,79 @@ during M5.
 See the [M5 validation record](docs/archive/milestones/m5/m5-validation.md#final-acceptance-on-2026-10-04)
 for platform coverage and limitations.
 
+### Install a precompiled binary
+
+Starting with v0.8.0, releases can provide precompiled archives. Choose the
+archive and its matching `.sha256` file from the same
+[GitHub Release](https://github.com/verslot/verslot/releases). The supported
+targets are Windows x86-64 (`x86_64-pc-windows-msvc`), macOS Apple Silicon
+(`aarch64-apple-darwin`), and Linux x86-64 GNU (`x86_64-unknown-linux-gnu`).
+Check the Release notes for tested OS versions and runtime requirements,
+including the required glibc versions on Linux. If a Release has no binary for
+your platform, use the source installation below.
+
+Run the following examples in an empty working directory and replace `X.Y.Z`
+with the published version. They download and check the archive before
+extracting it to a new directory and running `setup`. A checksum detects a
+mismatch with the published checksum; it does not independently authenticate
+files downloaded from the same source.
+
+**Windows x86-64 (PowerShell)**
+
+```powershell
+$version = 'X.Y.Z'
+$target = 'x86_64-pc-windows-msvc'
+$archive = "verslot-v$version-$target.zip"
+$directory = Join-Path (Get-Location) "verslot-v$version-$target"
+$base = "https://github.com/verslot/verslot/releases/download/v$version"
+& {
+    $ErrorActionPreference = 'Stop'
+    Invoke-WebRequest "$base/$archive" -OutFile $archive
+    Invoke-WebRequest "$base/$archive.sha256" -OutFile "$archive.sha256"
+    $digest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ((Get-Content -Raw -LiteralPath "$archive.sha256").Trim() -cne "$digest  $archive") {
+        throw 'Checksum verification failed'
+    }
+    New-Item -ItemType Directory -Path $directory | Out-Null
+    Expand-Archive -LiteralPath $archive -DestinationPath $directory
+    & (Join-Path $directory 'verslot.exe') setup
+    if ($LASTEXITCODE -ne 0) { throw 'Setup failed' }
+}
+```
+
+**macOS Apple Silicon or Linux x86-64 GNU (Bash)**
+
+```bash
+version=X.Y.Z
+target=aarch64-apple-darwin  # On Linux use x86_64-unknown-linux-gnu
+archive="verslot-v$version-$target.tar.gz"
+directory="$PWD/verslot-v$version-$target"
+base="https://github.com/verslot/verslot/releases/download/v$version"
+curl -fL "$base/$archive" -o "$archive" &&
+curl -fL "$base/$archive.sha256" -o "$archive.sha256" &&
+if [ "$target" = aarch64-apple-darwin ]; then
+  actual=$(shasum -a 256 "$archive")
+else
+  actual=$(sha256sum "$archive")
+fi &&
+expected=$(cat "$archive.sha256") &&
+if [ "$actual" != "$expected" ]; then
+  echo 'Checksum verification failed' >&2
+  false
+else
+  mkdir "$directory" &&
+  tar -xzf "$archive" -C "$directory" &&
+  "$directory/verslot" setup
+fi
+```
+
+Keep the extracted executable: use it when `setup` must refresh the shims. For
+an upgrade, download and verify the new release and run `setup` from its newly
+extracted executable. Then configure the shared PATH below.
+
 ### Install from source
 
+Install Git, stable Rust with Cargo, and the native build tools listed above.
 Build the current `main` branch in PowerShell or Bash.
 
 ```text
@@ -38,10 +109,19 @@ cargo install --path verslot --locked
 For upgrades from v0.6.0, follow the
 [v0.7.0 migration steps](CHANGELOG.md#migration-from-v060).
 
+Run `setup` with the executable Cargo just installed:
+
+```powershell
+& "$env:USERPROFILE\.cargo\bin\verslot.exe" setup
+```
+
+```bash
+"$HOME/.cargo/bin/verslot" setup
+```
+
 ### Configure the shared PATH
 
-Run `setup` with the executable Cargo just installed, then prepend the shared
-`shims` directory to `PATH`. The examples use Cargo's default install location.
+After running `setup`, prepend the shared `shims` directory to `PATH`.
 
 `setup` always provides the `verslot` entry point. It also creates shims for each
 tool with at least one complete local installation, even before a version is
@@ -53,7 +133,6 @@ The shims share one Verslot executable through hard links where supported.
 **Windows (PowerShell)**
 
 ```powershell
-& "$env:USERPROFILE\.cargo\bin\verslot.exe" setup
 $env:PATH = "$env:LOCALAPPDATA\verslot\shims;$env:PATH"
 verslot --version
 ```
@@ -61,7 +140,6 @@ verslot --version
 **macOS or Linux (Bash)**
 
 ```bash
-"$HOME/.cargo/bin/verslot" setup
 export PATH="$HOME/.verslot/shims:$PATH"
 hash -r
 verslot --version
@@ -88,21 +166,9 @@ verslot install yarn@4.9.2
 verslot use yarn@4.9.2
 ```
 
-After installing the first version of a tool, rerun `setup` with the
-Cargo-installed executable to add that tool's shims.
-
-**Windows (PowerShell)**
-
-```powershell
-& "$env:USERPROFILE\.cargo\bin\verslot.exe" setup
-```
-
-**macOS or Linux (Bash)**
-
-```bash
-"$HOME/.cargo/bin/verslot" setup
-hash -r
-```
+After installing the first version of a tool, rerun `setup` using the installed
+executable from the installation steps above to add that tool's shims. On macOS
+or Linux, run `hash -r` afterward if your shell caches command paths.
 
 Check the selected versions through the shared PATH.
 
