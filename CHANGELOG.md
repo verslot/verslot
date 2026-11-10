@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Build verified precompiled archives for Windows x86-64, macOS Apple Silicon
+  and Linux x86-64 GNU from version tags, and prepare a Release draft with
+  SHA-256 checksums and installation instructions (#12). The first binary
+  release has not yet been published.
+
 ## v0.7.1 — 2026-11-07
 
 - Report a missing shim directory on PATH in `verslot doctor` before checking
