@@ -103,7 +103,12 @@ $release = Get-ReleaseByTag $tag
 if ($null -eq $release) {
     & gh release create $tag --repo $env:GITHUB_REPOSITORY --draft --verify-tag --title "Verslot $tag" --notes-file $notesPath
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the Release draft' }
-    $release = Get-ReleaseByTag $tag
+    # A new draft may not appear in the releases list immediately.
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        $release = Get-ReleaseByTag $tag
+        if ($null -ne $release) { break }
+        if ($attempt -lt 9) { Start-Sleep -Seconds 1 }
+    }
 }
 if ($null -eq $release -or -not $release.draft -or $release.tag_name -cne $tag) {
     throw 'The Release is not a draft for this tag'
