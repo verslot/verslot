@@ -1,3 +1,5 @@
 [workspace]
 git_only = true
 features_always_increment_minor = true
+# Prepare a release for features, fixes, performance improvements, or breaking changes.
+release_commits = '^(feat|fix|perf)(\([^)\r\n]+\))?:|^[a-z]+(\([^)\r\n]+\))?!:|(?m:^BREAKING[ -]CHANGE:)'
