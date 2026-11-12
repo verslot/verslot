@@ -12,6 +12,7 @@ $global:releaseTest = @{
     assetBytes = @{}
     calls = [Collections.Generic.List[string]]::new()
     uploadsBeforeFailure = -1
+    delayedReleaseReads = 0
 }
 
 function global:Invoke-WebRequest {
@@ -31,7 +32,13 @@ function global:Invoke-WebRequest {
         }) }
     } elseif ($Uri -match '/releases\?per_page=100&page=1$') {
         $data = @()
-        if ($null -ne $global:releaseTest.release) { $data += $global:releaseTest.release }
+        if ($null -ne $global:releaseTest.release) {
+            if ($global:releaseTest.delayedReleaseReads -gt 0) {
+                $global:releaseTest.delayedReleaseReads--
+            } else {
+                $data += $global:releaseTest.release
+            }
+        }
     } else {
         throw "Unexpected API request: $Uri"
     }
@@ -130,6 +137,7 @@ try {
     $global:releaseTest.ciConclusion = 'success'
     if ($global:releaseTest.calls.Count -ne 0) { throw 'Failed CI reached the Release' }
 
+    $global:releaseTest.delayedReleaseReads = 2
     $global:releaseTest.uploadsBeforeFailure = 2
     Expect-DraftFailure 'Could not upload all Release assets'
     if ($global:releaseTest.release.assets.Count -ne 2) { throw 'Expected a partial draft' }

@@ -1,0 +1,25 @@
+name: Release preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install release-plz
+        run: cargo install --locked --version 0.4.3 release-plz
+
+      - name: Preview version and changelog changes
+        run: |
+          release-plz update
+          git diff -- Cargo.toml Cargo.lock CHANGELOG.md

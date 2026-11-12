@@ -7,6 +7,35 @@ on:
     branches: [main, dev]
 
 jobs:
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install commitlint
+        run: >-
+          npm install --no-save --no-package-lock --ignore-scripts
+          @commitlint/cli@21.2.4 @commitlint/config-conventional@21.2.4
+
+      - name: Lint pull request commits
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: >-
+          ./node_modules/.bin/commitlint --config .github/commitlint.config.json
+          --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --git-log-args=--no-merges
+
   release-draft:
     runs-on: ubuntu-latest
 
