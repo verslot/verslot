@@ -1,0 +1,55 @@
+name: Prepare release patch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install release-plz
+        run: cargo install --locked --version 0.4.3 release-plz
+
+      - name: Generate release patch and preview
+        id: prepare
+        shell: bash
+        run: |
+          release-plz update
+          patch="$RUNNER_TEMP/release.patch"
+          git diff --no-ext-diff --no-color --binary HEAD -- Cargo.toml Cargo.lock CHANGELOG.md > "$patch"
+
+          printf 'Source commit on `dev`: `%s`\n\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          if [[ ! -s "$patch" ]]; then
+            echo 'No release changes to apply.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          version=$(cargo metadata --locked --no-deps --format-version 1 |
+            jq -er '.packages[] | select(.name == "verslot") | .version')
+          {
+            printf '## Verslot %s\n\n' "$version"
+            echo 'Download `release-patch` from the Artifacts section of this run.'
+            printf '\n```diff\n'
+            git diff --no-ext-diff --no-color HEAD -- CHANGELOG.md
+            printf '```\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo 'has_patch=true' >> "$GITHUB_OUTPUT"
+
+      - name: Upload release patch
+        if: steps.prepare.outputs.has_patch == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-patch
+          path: ${{ runner.temp }}/release.patch
+          if-no-files-found: error
+          overwrite: true
