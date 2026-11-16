@@ -92,6 +92,7 @@ function Expect-DraftFailure([string] $message) {
 try {
     New-Item -ItemType Directory -Path $scratch | Out-Null
     $env:RUNNER_TEMP = $scratch
+    $env:GITHUB_WORKSPACE = $scratch
     $env:GITHUB_REF_TYPE = 'tag'
     $env:GITHUB_REF_NAME = 'v1.2.3'
     $env:GITHUB_SHA = $global:releaseTest.commit
@@ -100,6 +101,29 @@ try {
     $env:GITHUB_REPOSITORY = 'verslot/verslot'
     $env:GITHUB_RUN_ID = '12345'
     $env:GH_TOKEN = 'test-token'
+    $changelogPath = Join-Path $scratch 'CHANGELOG.md'
+    $changelog = @'
+# Changelog
+
+## Unreleased
+
+- Future change.
+
+## [1.2.30](https://github.test/compare/v1.2.3...v1.2.30) - 2026-11-13
+
+- Other release.
+
+## [1.2.3](https://github.test/compare/v1.2.2...v1.2.3) - 2026-11-12
+
+### Fixed
+
+- Preserve shim paths.
+
+## v1.2.2 — 2026-11-11
+
+- Previous release.
+'@
+    [IO.File]::WriteAllText($changelogPath, $changelog)
     $targets = [ordered]@{
         'x86_64-pc-windows-msvc' = 'zip'
         'aarch64-apple-darwin' = 'tar.gz'
@@ -137,10 +161,24 @@ try {
     $global:releaseTest.ciConclusion = 'success'
     if ($global:releaseTest.calls.Count -ne 0) { throw 'Failed CI reached the Release' }
 
+    [IO.File]::WriteAllText($changelogPath, $changelog.Replace('## [1.2.3]', '## [1.2.4]'))
+    Expect-DraftFailure 'Expected exactly one CHANGELOG.md section for v1.2.3'
+    [IO.File]::WriteAllText($changelogPath, "$changelog`n`n## v1.2.3 — 2026-11-12`n`n- Duplicate release.")
+    Expect-DraftFailure 'Expected exactly one CHANGELOG.md section for v1.2.3'
+    [IO.File]::WriteAllText($changelogPath, $changelog)
+    if ($global:releaseTest.calls.Count -ne 0) { throw 'Invalid changelog notes reached the Release' }
+
     $global:releaseTest.delayedReleaseReads = 2
     $global:releaseTest.uploadsBeforeFailure = 2
     Expect-DraftFailure 'Could not upload all Release assets'
     if ($global:releaseTest.release.assets.Count -ne 2) { throw 'Expected a partial draft' }
+    $notes = $global:releaseTest.release.body -replace '\r\n', "`n"
+    if (-not $notes.Contains("### Fixed`n`n- Preserve shim paths.")) {
+        throw 'Draft notes did not include the tagged changelog section'
+    }
+    if ($notes -match 'Future change|Other release|Previous release') {
+        throw 'Draft notes included changes from another changelog section'
+    }
     $global:releaseTest.uploadsBeforeFailure = -1
     [IO.File]::AppendAllText($evidencePath, 'changed runner')
     Expect-DraftFailure 'different artifacts or a different workflow run'

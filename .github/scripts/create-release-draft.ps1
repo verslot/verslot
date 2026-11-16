@@ -79,10 +79,22 @@ $ci = @($runs.workflow_runs | Where-Object {
 } | Select-Object -First 1)
 if ($ci.Count -ne 1) { throw 'No successful main CI run was found for the tagged commit' }
 
+$changelogPath = Join-Path $env:GITHUB_WORKSPACE 'CHANGELOG.md'
+$changelog = [IO.File]::ReadAllText($changelogPath)
+$escapedVersion = [regex]::Escape($version)
+# Match both the existing vX.Y.Z headings and release-plz's version links.
+$versionHeading = "(?:v$escapedVersion|\[$escapedVersion\](?:\([^\r\n)]+\))?)"
+$sections = [regex]::Matches($changelog, "(?ms)^##[ \t]+$versionHeading(?=\s|\z)[^\r\n]*(?<body>.*?)(?=^##[ \t]+|\z)")
+if ($sections.Count -ne 1) { throw "Expected exactly one CHANGELOG.md section for $tag" }
+$changes = $sections[0].Groups['body'].Value.Trim("`r", "`n")
+if ([string]::IsNullOrWhiteSpace($changes)) { throw "CHANGELOG.md section for $tag is empty" }
+
 $runMarker = "<!-- verslot-release-run:$env:GITHUB_RUN_ID $($artifactDigests -join ' ') -->"
 $fence = '```'
 $notes = @(
     "## Verslot $tag"
+    ''
+    $changes
     ''
     "Changes: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/blob/$commit/CHANGELOG.md"
     "Commit: $commit"
