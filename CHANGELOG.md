@@ -1,7 +1,5 @@
 # Changelog
 
-## Unreleased
-
 ## v0.8.0 — 2026-11-10
 
 - Build verified precompiled archives for Windows x86-64, macOS Apple Silicon
@@ -79,10 +77,10 @@ diagnostics through `verslot doctor`.
 ### Migration from v0.6.0
 
 Run `setup` from the newly installed Verslot executable. Replace the old Node.js
-PATH entry with the shared shim directory. The old entry was
+PATH entry with the shared shim directory (`%LOCALAPPDATA%\verslot\shims` on
+Windows or `$HOME/.verslot/shims` on macOS and Linux). The old entry was
 `%LOCALAPPDATA%\verslot\current\node` on Windows and
 `$HOME/.verslot/current/node/bin` on macOS and Linux.
-See [platform-specific setup commands](README.md#configure-the-shared-path).
 
 Rerun `setup` after installing a tool's first version or uninstalling its last
 version to synchronize its shims. Scripts that consume redirected `list` or
@@ -176,6 +174,7 @@ These capabilities were implemented before this release, not all added in 0.5.0.
 M5 accepted Windows x86_64 MSVC, macOS arm64 and Linux x86_64 GNU. Windows arm64,
 macOS x86_64 and Linux GNU arm64 remain mapped but unverified; musl, 32-bit and
 other targets are unsupported. Network, filesystem, Windows locking and manual
-recovery limitations remain as documented in [README](README.md#platforms-and-known-limitations).
+recovery limitations are documented in the
+[M5 validation record](docs/archive/milestones/m5/m5-validation.md#t5-installation-usage-and-limitations-documentation).
 M1 independent historical acceptance remains unrecorded and is not a release
 blocker. Historical design and acceptance conclusions are retained unchanged.

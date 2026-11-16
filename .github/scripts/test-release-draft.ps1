@@ -179,6 +179,9 @@ try {
     if ($notes -match 'Future change|Other release|Previous release') {
         throw 'Draft notes included changes from another changelog section'
     }
+    if (-not $notes.Contains('## Installation') -or -not $notes.Contains('`./verslot setup`')) {
+        throw 'Draft notes did not include installation instructions'
+    }
     $global:releaseTest.uploadsBeforeFailure = -1
     [IO.File]::AppendAllText($evidencePath, 'changed runner')
     Expect-DraftFailure 'different artifacts or a different workflow run'

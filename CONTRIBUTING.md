@@ -24,13 +24,16 @@ Rust, and prefer the standard library. Preserve unrelated working-tree changes.
 Bug fixes require regression tests; behavior changes require corresponding tests.
 Explain any dependency addition and why smaller alternatives are insufficient.
 
-Development pull requests target `dev`; release pull requests target `main`.
-CI runs for pull requests targeting either branch and for pushes to both branches.
-Wait for the CI checks to pass before merging a pull request.
+Development pull requests target `dev`, which also accepts direct pushes.
+`main` accepts changes only through pull requests. When ready to release, open
+a pull request from `dev` to `main`. CI runs on pull requests targeting either
+branch and on pushes to either branch, including merges. Wait for the CI checks
+to pass before merging a pull request.
 
 Link the Issue in the PR (for example, `Closes #123`), describe resulting behavior,
-and record actual validation and any limitations. Update README when usage changes;
-put user-visible changes under CHANGELOG's `Unreleased`. Use Conventional Commits:
+and record actual validation and any limitations. Update README when usage changes.
+Describe user-visible changes in Conventional Commits so release-plz can include
+them in the changelog. The commit format is
 `<type>(<scope>): <imperative description>`, with lowercase type/scope and a concise
 subject. Inspect the staged diff before committing.
 
@@ -50,24 +53,38 @@ honestly; retained M5 acceptance is historical evidence, not new execution.
 
 ## Versions
 
-Compatible fixes increment the patch version of the current release series.
-Features or incompatible changes use the next minor version. Document migration
-for incompatible changes. Move released Unreleased entries into a dated version
-section. Update Cargo.toml and Verslot's package version in Cargo.lock while
-keeping dependency versions pinned.
+Use release-plz to determine the next version from commits since the latest
+version tag. On the current 0.x series, `fix` and `perf` increment the patch
+version, and `feat` and breaking changes increment the minor version. Other
+changes are included when a release is prepared for an eligible commit.
 An Issue may close when its fix merges; CHANGELOG and Release separately identify
 the first version containing it. Publish when needed, without a fixed schedule.
 
 ## Release procedure
 
-1. Review the final diff for scope, required accepted fixes and preserved history.
-   Update the version, CHANGELOG and any README usage affected by the release.
+1. When ready to release, pause unrelated changes to `dev`, then open
+   **Actions → Prepare release patch → Run workflow** and select `dev`.
+   The workflow runs release-plz and shows the source SHA,
+   proposed version and changelog diff in the run summary. If there are no
+   release changes, stop. Otherwise, download `release-patch` from Artifacts
+   and extract `release.patch`. On a clean, up-to-date `dev` checkout, confirm
+   that `git rev-parse HEAD` matches the source SHA in the summary. If `dev`
+   has advanced, run the workflow again for its latest commit. Check the patch
+   with `git apply --check <path-to-release.patch>`, then apply it with
+   `git apply <path-to-release.patch>`. Review `Cargo.toml`, `Cargo.lock` and
+   the new version section in `CHANGELOG.md`. Check that locked dependency
+   versions are still pinned and add migration instructions for any incompatible
+   changes.
    Record the first binary release in CHANGELOG and update README's pending-release
    wording when publishing it.
-2. Run all four checks, commit with Conventional Commits and open a PR to main.
-   Merge through the PR, then confirm the final main commit's three-platform CI
-   and formatting job all pass. Record its SHA and run URL; do not substitute
-   earlier candidate runs for the final commit.
+2. Run all four checks, commit the three files as `chore(release): prepare vX.Y.Z`,
+   push to `dev`, and open a PR from `dev` to `main`. If new changes enter `dev`
+   while the PR is open, revert the release preparation commit and push the
+   revert to `dev`. Repeat step 1 and push the new preparation commit to update
+   the PR. Wait for CI on the latest PR head and use a merge commit to preserve
+   the `dev` history.
+   Confirm the final `main` commit's three-platform CI and formatting job pass.
+   Record its SHA and run URL.
 3. Install from a clean checkout of that exact commit using
    `cargo install --path <checkout> --locked --root <temporary-install-directory>`.
    Invoke its bin/verslot (bin/verslot.exe on Windows) by full path; verify the
@@ -76,18 +93,20 @@ the first version containing it. Publish when needed, without a fixed schedule.
    from the verified final commit and push it; never move or overwrite a tag.
    The push starts `Release build`, which checks the tag against Cargo's version
    and builds Windows x86-64 MSVC, macOS Apple Silicon and Linux x86-64 GNU.
+   Merge `main` back into `dev` to include the tagged commit in the development
+   history.
 5. Confirm all three jobs pass on the tagged SHA. Each verifies its archive,
    checksum, extracted executable and shim before uploading. After all pass, the
    workflow verifies the matching main CI run and creates a Release draft with
-   the three archives and three `.sha256` files. The draft notes include the SHA,
-   CI and build links, runner versions and runtime dependencies, including Linux
-   glibc symbol versions. The workflow does not publish the draft.
+   the three archives and three `.sha256` files. The draft notes include the
+   tagged version's `CHANGELOG.md` section, SHA, CI and build links, runner
+   versions and runtime dependencies, including Linux glibc symbol versions.
 6. Download the three artifacts from that run. On each target, use an environment
-   without Rust or native build tools and follow README's checksum, extraction
-   and `setup` instructions with the downloaded files; skip its Release download
-   commands until the assets are published. Confirm `--version` matches the Cargo
-   version, `--help` succeeds and the new shim runs. Record the tested OS versions
-   and runtime requirements in the draft; do not claim unverified minimum versions.
+   without Rust or native build tools. Use the draft's installation instructions
+   to verify, extract and set up the downloaded files. Confirm `--version`
+   matches the Cargo version, `--help` succeeds and the new shim runs. Record
+   the tested OS versions and runtime requirements in the draft; do not claim
+   unverified minimum versions.
 7. Review the six attachments, notes and historical M5 evidence links, then
    publish the draft. Download the public assets and verify their filenames and
    SHA-256 digests. Verify the remote tag SHA against the final commit. Link the

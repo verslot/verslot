@@ -32,6 +32,13 @@ Do not implement hypothetical future requirements.
 - Every behavior change requires tests.
 - Every bug fix requires a regression test.
 
+## README
+
+Keep the root `README.md` concise. Include only information users need to
+understand Verslot, install it, get started, and find essential help. Keep
+agent notes, implementation details, development or release procedures,
+validation records, and project history out of the README.
+
 ## Required validation
 
 Pure documentation changes require no Cargo checks. Code changes and version releases must run all four checks before completion. See [CONTRIBUTING.md](CONTRIBUTING.md) for the ongoing maintenance and release procedure.
@@ -118,6 +125,13 @@ Examples:
 - test(switching): add selection workflow coverage
 - docs: record M4 Windows acceptance
 - build(deps): add winapi-util dependency
+
+## Changelog
+
+Record user-visible changes in Conventional Commits. Leave `CHANGELOG.md` to
+versioned release entries and omit an `Unreleased` section. Generate each new
+version section with release-plz when preparing a release as described in
+[CONTRIBUTING.md](CONTRIBUTING.md#release-procedure).
 
 ## Agent skills
 

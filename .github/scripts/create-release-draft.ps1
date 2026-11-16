@@ -102,6 +102,13 @@ $notes = @(
     "Release build: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
     $runMarker
     ''
+    '## Installation'
+    ''
+    '1. Download the archive for your platform and its matching `.sha256` file from this release.'
+    '2. Compare the digest in the `.sha256` file with `Get-FileHash <archive> -Algorithm SHA256` on Windows, `shasum -a 256 <archive>` on macOS, or `sha256sum <archive>` on Linux.'
+    '3. Extract the archive into a directory you can keep. From that directory, run `.\verslot.exe setup` in PowerShell or `./verslot setup` on macOS or Linux.'
+    '4. Prepend the shim directory printed by `setup` to `PATH` and run `verslot --version`.'
+    ''
     '## Build environments and runtime dependencies'
 )
 foreach ($target in $targets.Keys) {
