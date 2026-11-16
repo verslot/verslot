@@ -1,0 +1,85 @@
+name: Prepare release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install release-plz
+        run: cargo install --locked --version 0.4.3 release-plz
+
+      - name: Prepare version and changelog
+        id: release
+        shell: bash
+        run: |
+          release-plz update
+
+          if git diff --quiet -- Cargo.toml; then
+            echo 'No release version was prepared.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          version=$(cargo metadata --locked --no-deps --format-version 1 |
+            jq -er '.packages[] | select(.name == "verslot") | .version')
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Expected a stable release version, got $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Open release pull request
+        if: steps.release.outputs.version != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          branch="release/v$VERSION"
+          title="chore(release): prepare v$VERSION"
+          existing_pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+            --state open --json isCrossRepository,url --jq '.[] | select(.isCrossRepository == false) | .url')
+          if [[ -n "$existing_pr" ]]; then
+            printf '[Existing release PR](%s)\n' "$existing_pr" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          remote_ref="refs/remotes/origin/$branch"
+          if git show-ref --verify --quiet "$remote_ref"; then
+            # Reuse a branch from an earlier attempt that stopped before opening the PR.
+            if [[ "$(git show -s --format=%P "$remote_ref")" != "$GITHUB_SHA" ]] ||
+                ! git diff --quiet "$remote_ref" -- . ':(exclude)CHANGELOG.md'; then
+              echo "::error::Branch $branch already contains a different release candidate."
+              exit 1
+            fi
+          else
+            git add -- Cargo.toml Cargo.lock CHANGELOG.md
+            git diff --cached -- Cargo.toml Cargo.lock CHANGELOG.md
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "$title"
+            gh auth setup-git --hostname github.com
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+
+          body="$RUNNER_TEMP/release-pr.md"
+          printf 'Prepare Verslot v%s from `dev` commit `%s`.\n\nReview the version and changelog changes before merging.\n' \
+            "$VERSION" "$GITHUB_SHA" > "$body"
+          pr_url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+            --title "$title" --body-file "$body")
+          printf '[Release PR](%s)\n' "$pr_url" >> "$GITHUB_STEP_SUMMARY"

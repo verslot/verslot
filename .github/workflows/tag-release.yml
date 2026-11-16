@@ -1,0 +1,107 @@
+name: Tag release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  tag:
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: tag-release-${{ github.event.workflow_run.head_sha }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - name: Find merged release pull request
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/pulls" |
+            jq -sr --arg sha "$RELEASE_SHA" --arg repo "$GITHUB_REPOSITORY" '
+              [.[][] | select(
+                .merged_at != null and .merge_commit_sha == $sha and
+                .base.ref == "main" and .head.repo.full_name == $repo
+              ) | .head.ref | select(test("^release/v[0-9]+\\.[0-9]+\\.[0-9]+$"))]
+              | .[0] // empty | ltrimstr("release/")')
+          if [[ -z "$tag" ]]; then
+            echo 'No merged release PR for this commit.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.release.outputs.tag != ''
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify version and source installation
+        id: verify
+        if: steps.release.outputs.tag != ''
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          version=$(cargo metadata --locked --no-deps --format-version 1 |
+            jq -er '.packages[] | select(.name == "verslot") | .version')
+          if [[ "$RELEASE_TAG" != "v$version" ]]; then
+            echo "::error::Release PR expects $RELEASE_TAG but Cargo reports $version"
+            exit 1
+          fi
+
+          tag_ref="refs/tags/$RELEASE_TAG"
+          if git show-ref --verify --quiet "$tag_ref"; then
+            if [[ "$(git rev-parse "$tag_ref^{commit}")" != "$RELEASE_SHA" ]]; then
+              echo "::error::Tag $RELEASE_TAG already points to a different commit."
+              exit 1
+            fi
+            printf 'Tag `%s` already points to `%s`.\n' "$RELEASE_TAG" "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          install_root="$RUNNER_TEMP/verslot-source-install"
+          cargo install --path . --locked --root "$install_root"
+          binary="$install_root/bin/verslot"
+          installed_version=$("$binary" --version)
+          if [[ "$installed_version" != "verslot $version" ]]; then
+            echo "::error::Source installation did not report verslot $version"
+            exit 1
+          fi
+          "$binary" --help
+          echo 'push_tag=true' >> "$GITHUB_OUTPUT"
+
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: release-token
+        if: steps.verify.outputs.push_tag == 'true'
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Push release tag
+        if: steps.verify.outputs.push_tag == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            tag -a "$RELEASE_TAG" "$RELEASE_SHA" -m "Verslot $RELEASE_TAG"
+          gh auth setup-git --hostname github.com
+          git push origin "refs/tags/$RELEASE_TAG"
+          printf 'Pushed `%s` at `%s`.\n' "$RELEASE_TAG" "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
