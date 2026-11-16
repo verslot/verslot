@@ -102,11 +102,11 @@ the first version containing it. Publish when needed, without a fixed schedule.
    tagged version's `CHANGELOG.md` section, SHA, CI and build links, runner
    versions and runtime dependencies, including Linux glibc symbol versions.
 6. Download the three artifacts from that run. On each target, use an environment
-   without Rust or native build tools and follow README's checksum, extraction
-   and `setup` instructions with the downloaded files; skip its Release download
-   commands until the assets are published. Confirm `--version` matches the Cargo
-   version, `--help` succeeds and the new shim runs. Record the tested OS versions
-   and runtime requirements in the draft; do not claim unverified minimum versions.
+   without Rust or native build tools. Use the draft's installation instructions
+   to verify, extract and set up the downloaded files. Confirm `--version`
+   matches the Cargo version, `--help` succeeds and the new shim runs. Record
+   the tested OS versions and runtime requirements in the draft; do not claim
+   unverified minimum versions.
 7. Review the six attachments, notes and historical M5 evidence links, then
    publish the draft. Download the public assets and verify their filenames and
    SHA-256 digests. Verify the remote tag SHA against the final commit. Link the
