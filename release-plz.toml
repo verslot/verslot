@@ -3,3 +3,30 @@ git_only = true
 features_always_increment_minor = true
 # Prepare a release for features, fixes, performance improvements, or breaking changes.
 release_commits = '^(feat|fix|perf)(\([^)\r\n]+\))?:|^[a-z]+(\([^)\r\n]+\))?!:|(?m:^BREAKING[ -]CHANGE:)'
+
+[changelog]
+header = "# Changelog\n\n"
+body = """
+## [{{ version }}]{% if release_link %}({{ release_link }}){% endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
+{% set groups = ["Features", "Bug Fixes", "Performance"] -%}
+{% for group in groups -%}
+{% set entries = commits | filter(attribute="group", value=group) -%}
+{% if entries | length > 0 %}
+### {{ group }}
+
+{% for commit in entries -%}
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+{% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message }}\
+{% if commit.links %} ({% for link in commit.links %}\
+[{{ link.text }}]({{ link.href }}){% if not loop.last %}, {% endif %}\
+{% endfor %}){% endif %}
+{% endfor %}
+{% endif -%}
+{% endfor -%}
+"""
+commit_parsers = [
+    { message = '^feat(\([^)]+\))?!?:', group = "Features" },
+    { message = '^fix(\([^)]+\))?!?:', group = "Bug Fixes" },
+    { message = '^perf(\([^)]+\))?!?:', group = "Performance" },
+    { message = ".*", skip = true },
+]
