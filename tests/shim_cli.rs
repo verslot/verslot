@@ -14,6 +14,9 @@ use assert_cmd::assert::OutputAssertExt;
 #[path = "shim_cli/doctor.rs"]
 mod doctor;
 
+#[path = "shim_cli/self_update.rs"]
+mod self_update;
+
 struct Fixture {
     directory: PathBuf,
     root: PathBuf,

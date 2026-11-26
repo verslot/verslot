@@ -69,6 +69,14 @@ pub(crate) struct Cli {
 pub(crate) enum Command {
     /// Create or refresh the unified command entry points.
     Setup,
+    /// Manage the Verslot installation.
+    #[command(name = "self")]
+    SelfManage {
+        #[command(subcommand)]
+        command: SelfCommand,
+    },
+    #[command(name = "__self-update", hide = true)]
+    SelfUpdateComplete { operation: std::path::PathBuf },
     /// Diagnose local version selections and PATH entries.
     Doctor {
         /// Include storage paths, selections and PATH matches.
@@ -110,6 +118,12 @@ pub(crate) enum Command {
     },
     /// Show the selected tool version.
     Current,
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum SelfCommand {
+    /// Update an owned installation to the latest official stable release.
+    Update,
 }
 
 #[cfg(test)]

@@ -85,6 +85,35 @@ pub(crate) fn extract_verified_package(
     tar::extract(File::open(archive)?, &mut destination)
 }
 
+// Official manager archives contain exactly two flat, regular files.
+pub(crate) fn extract_verified_self_update(
+    root: &Path,
+    archive: &Path,
+    staging: &Path,
+) -> io::Result<()> {
+    regular_file(root, archive)?;
+    let mut destination =
+        Extraction::with_root(root, staging, String::new(), 128 * 1024 * 1024, 2)?;
+    destination.allow_links = false;
+    #[cfg(windows)]
+    zip::extract(File::open(archive)?, &mut destination)?;
+    #[cfg(not(windows))]
+    tar::extract(File::open(archive)?, &mut destination)?;
+    regular_file(root, &staging.join("LICENSE"))?;
+    let metadata = regular_file(root, &staging.join(crate::shim::executable_name("verslot")))?;
+    if metadata.len() == 0 {
+        return Err(invalid("Verslot executable is empty"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o111 == 0 {
+            return Err(invalid("Verslot executable lacks executable permission"));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_directory(
     canonical_root: &Path,
     directory: &Path,
@@ -313,7 +342,10 @@ impl<'a> Extraction<'a> {
         byte_limit: u64,
         entry_limit: u64,
     ) -> io::Result<Self> {
-        validate_component(&archive_root)?;
+        // An empty archive root selects the strictly flat manager release layout.
+        if !archive_root.is_empty() {
+            validate_component(&archive_root)?;
+        }
         real_directory(
             boundary,
             staging
@@ -353,6 +385,14 @@ impl<'a> Extraction<'a> {
 
     fn validate_payload_path(&self, name: &[u8], directory: bool) -> io::Result<String> {
         let name = std::str::from_utf8(name).map_err(|_| invalid("archive path is not UTF-8"))?;
+        if self.archive_root.is_empty() {
+            if directory
+                || !["LICENSE", crate::shim::executable_name("verslot").as_str()].contains(&name)
+            {
+                return Err(invalid("unsafe or unexpected manager archive entry"));
+            }
+            return Ok(name.to_owned());
+        }
         let name = if directory {
             name.strip_suffix('/').unwrap_or(name)
         } else {

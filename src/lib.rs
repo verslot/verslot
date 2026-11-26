@@ -12,6 +12,7 @@ mod mutation;
 mod output;
 mod progress;
 mod remote;
+mod self_update;
 mod setup;
 mod shim;
 pub mod storage;
@@ -29,6 +30,10 @@ pub fn run() -> Result<(), String> {
     let cli = cli::parse();
 
     match cli.command {
+        Command::SelfManage {
+            command: cli::SelfCommand::Update,
+        } => self_update::update(),
+        Command::SelfUpdateComplete { operation } => self_update::complete(&operation),
         Command::Setup => {
             let outcome = setup::setup().map_err(|error| format!("setup: {error}"))?;
             let directory = output::format_path_for_display(&outcome.directory);

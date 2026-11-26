@@ -49,7 +49,21 @@ fn setup_at(
     fs::create_dir_all(root)?;
     let root = fs::canonicalize(root)?;
     let _lock = acquire_exclusive_lock(&root)?;
-    let installed = read_installations(&root).map_err(|error| {
+    refresh_shims(&root, source, create_hard_link)
+}
+
+// The self updater keeps the mutation lock across ownership validation and publication.
+pub(crate) fn setup_locked(root: &Path, source: &Path) -> io::Result<SetupOutcome> {
+    refresh_shims(root, source, |source, shim| fs::hard_link(source, shim))
+}
+
+fn refresh_shims(
+    root: &Path,
+    source: &Path,
+    create_hard_link: impl Fn(&Path, &Path) -> io::Result<()>,
+) -> io::Result<SetupOutcome> {
+    let update_cleanup = crate::self_update::cleanup_pending(root)?;
+    let installed = read_installations(root).map_err(|error| {
         io::Error::new(
             error.kind(),
             format!(
@@ -73,7 +87,7 @@ fn setup_at(
         Err(error) => return Err(error),
     };
     let previous = match fs::symlink_metadata(&directory) {
-        Ok(_) => validate_owned_directory(&root, &directory, false).map(Some),
+        Ok(_) => validate_owned_directory(root, &directory, false).map(Some),
         Err(error) if error.kind() == io::ErrorKind::NotFound && !backup_exists => Ok(None),
         Err(error) => Err(error),
     }
@@ -91,7 +105,7 @@ fn setup_at(
     let receipt = format!("{RECEIPT_VERSION}\n{digest}\n{}\n", names.join("\n"));
     // A committed update may retain a Windows executable until its process exits.
     let cleanup_warning = if backup_exists {
-        cleanup_previous_shims(&root, &backup)
+        cleanup_previous_shims(root, &backup)
             .map_err(|error| setup_path_error("cannot clean previous shims", &backup, error))?
     } else {
         None
@@ -99,7 +113,7 @@ fn setup_at(
     if previous.as_deref() == Some(receipt.as_str()) {
         return Ok(SetupOutcome {
             directory,
-            cleanup_warning,
+            cleanup_warning: combine_cleanup_warnings(cleanup_warning, update_cleanup),
         });
     }
     if let Some(warning) = cleanup_warning {
@@ -108,10 +122,10 @@ fn setup_at(
             display_path(&directory)
         )));
     }
-    let operation = allocate_operation(&root)?;
+    let operation = allocate_operation(root)?;
     let candidate = operation.join("shims");
     let result = (|| {
-        create_directory(&root, &candidate)?;
+        create_directory(root, &candidate)?;
         let executable = candidate.join(&names[0]);
         copy_shim(source, &executable)?;
         for name in &names[1..] {
@@ -126,15 +140,15 @@ fn setup_at(
         marker.write_all(receipt.as_bytes())?;
         marker.sync_all()?;
         drop(marker);
-        validate_owned_directory(&root, &candidate, false)?;
+        validate_owned_directory(root, &candidate, false)?;
         let cleanup_warning =
-            publish_shims(&root, &candidate, &directory, &backup, previous.is_some())?;
+            publish_shims(root, &candidate, &directory, &backup, previous.is_some())?;
         Ok(SetupOutcome {
             directory,
-            cleanup_warning,
+            cleanup_warning: combine_cleanup_warnings(cleanup_warning, update_cleanup),
         })
     })();
-    let cleanup = remove_operation(&root, &operation);
+    let cleanup = remove_operation(root, &operation);
     match (result, cleanup) {
         (Ok(outcome), Ok(())) => Ok(outcome),
         (Err(error), Ok(())) => Err(error),
@@ -145,6 +159,13 @@ fn setup_at(
                 .map_or_else(|| "shims updated".to_owned(), |error| error.to_string()),
             operation.display()
         ))),
+    }
+}
+
+fn combine_cleanup_warnings(first: Option<String>, second: Option<String>) -> Option<String> {
+    match (first, second) {
+        (Some(first), Some(second)) => Some(format!("{first}\n{second}")),
+        (first, second) => first.or(second),
     }
 }
 
@@ -227,7 +248,7 @@ fn require_missing(path: &Path) -> io::Result<()> {
 
 // Receipts prove which flat files setup may replace or remove. Unknown entries,
 // modified executables, symlinks and reparse points are preserved.
-fn validate_owned_directory(
+pub(crate) fn validate_owned_directory(
     root: &Path,
     directory: &Path,
     allow_missing: bool,
@@ -301,7 +322,7 @@ fn cleanup_previous_shims(root: &Path, directory: &Path) -> io::Result<Option<St
     Ok(None)
 }
 
-fn file_digest(path: &Path) -> io::Result<String> {
+pub(crate) fn file_digest(path: &Path) -> io::Result<String> {
     let mut input = File::open(path)?;
     let mut digest = Sha256::new();
     let mut buffer = [0; 64 * 1024];

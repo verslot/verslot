@@ -19,4 +19,10 @@ requires Node.js on `PATH`.
 Run `verslot --help` for commands or `verslot doctor` to diagnose selections and
 PATH.
 
+Run `verslot self update` from the installed Verslot executable to update to the
+latest official stable release. It preserves installed tools, selections,
+configuration and PATH, and never downgrades. External copies and unsupported
+installations require a manual or package-manager upgrade. If Windows reports
+pending cleanup, close related processes and rerun `verslot setup`.
+
 [Changelog](CHANGELOG.md) · [Report an issue](https://github.com/verslot/verslot/issues) · [MIT License](LICENSE)
