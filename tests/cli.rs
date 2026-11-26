@@ -6,6 +6,37 @@ fn verslot_command() -> Command {
 }
 
 #[test]
+fn self_update_help_exposes_only_the_public_update_command() {
+    verslot_command()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("self"))
+        .stdout(predicate::str::contains("__self-update").not());
+    verslot_command()
+        .args(["self", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("update"));
+    verslot_command()
+        .args(["self", "update", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("latest official stable release"));
+}
+
+#[test]
+fn self_update_rejects_version_arguments_and_missing_subcommands() {
+    for arguments in [
+        vec!["self"],
+        vec!["self", "update", "1.0.0"],
+        vec!["self", "update", "--version", "1.0.0"],
+    ] {
+        verslot_command().args(arguments).assert().code(2);
+    }
+}
+
+#[test]
 fn remote_list_help_exposes_required_query_and_alias() {
     verslot_command()
         .arg("--help")

@@ -154,7 +154,7 @@ pub(crate) fn fetch_response(
     }
 }
 
-fn parse_checksum(text: &str, archive_filename: &str) -> Result<String, String> {
+pub(crate) fn parse_checksum(text: &str, archive_filename: &str) -> Result<String, String> {
     let mut matched = None;
     for line in text.lines() {
         let fields: Vec<_> = line.split_ascii_whitespace().collect();
